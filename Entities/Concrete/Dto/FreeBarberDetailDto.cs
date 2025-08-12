@@ -1,0 +1,27 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Entities.Abstract;
+using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
+
+namespace Entities.Concrete.Dto
+{
+    public class FreeBarberDetailDto : IDto
+    {
+        public Guid Id { get; set; }
+        public string FreeBarberImageUrl { get; set; }
+        public string FullName { get; set; }
+        public BarberType Type { get; set; }
+        public double Rating { get; set; }
+        public int FavoriteCount { get; set; }
+        public bool IsAvailable { get; set; }
+        public AddressInfo Address { get; set; }
+
+
+        public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
+        public List<WorkingHourDto> WorkingHours { get; set; }
+    }
+}

@@ -1,0 +1,70 @@
+﻿using Business.Abstract;
+using Entities.Concrete.Dto;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Api.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class FreeBarberController : ControllerBase
+    {
+        private readonly IFreeBarberService _freeBarberService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public FreeBarberController(IFreeBarberService freeBarberService, IHttpContextAccessor httpContextAccessor)
+        {
+            _freeBarberService = freeBarberService;
+            _httpContextAccessor = httpContextAccessor;
+        }
+        private Guid CurrentUserId
+        {
+            get
+            {
+                var claim = _httpContextAccessor.HttpContext?.User.FindFirst("identifier");
+                if (claim == null || !Guid.TryParse(claim.Value, out var userId))
+                {
+                    throw new UnauthorizedAccessException("Kullanıcı kimliği alınamadı veya geçersiz.");
+                }
+                return userId;
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Add([FromBody] FreeBarberCreateDto dto)
+        {
+            var result = await _freeBarberService.Add(dto, CurrentUserId);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> Update([FromBody] FreeBarberUpdateDto dto)
+        {
+            var result = await _freeBarberService.Update(dto);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var result = await _freeBarberService.DeleteAsync(id);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+        [HttpGet("{id}")]
+        public async Task<IActionResult> Get(Guid id)
+        {
+            var result = await _freeBarberService.GetByIdAsync(id);
+            return result.Success ? Ok(result.Data) : NotFound(result);
+        }
+        [HttpGet("nearby")]
+        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng, [FromQuery] double distance = 1.0)
+        {
+            var result = await _freeBarberService.GetNearbyStoresAsync(lat, lng, distance);
+            return result.Success ? Ok(result.Data) : BadRequest(result);
+        }
+        [HttpGet("mypanel")]
+        public async Task<IActionResult> GetMine()
+        {
+            var result = await _freeBarberService.GetMyPanel(CurrentUserId);
+            return result.Success ? Ok(result.Data) : NotFound(result);
+        }
+    }
+}
