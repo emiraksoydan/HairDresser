@@ -22,7 +22,7 @@ namespace Api.Controllers
         [HttpPut]
         public async Task<IActionResult> Update([FromBody] ManuelBarberUpdateDto dto)
         {
-            var result = await manuelBarberService.UpdateAsync(dto, CurrentUserId);
+            var result = await manuelBarberService.UpdateAsync(dto);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 

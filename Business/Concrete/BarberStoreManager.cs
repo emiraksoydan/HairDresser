@@ -18,7 +18,7 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourDal workingHourDal, IManuelBarberDal _manuelBarberDal, ISlotService slotService, IBarberStoreChairDal _barberStoreChairDal, IServiceOfferingDal _serviceOfferingDal, IMapper _mapper) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourDal workingHourDal, IManuelBarberDal _manuelBarberDal, ISlotService slotService, IBarberStoreChairDal _barberStoreChairDal, IServiceOfferingDal _serviceOfferingDal,IAppointmentDal appointmentDal, IMapper _mapper) : IBarberStoreService
     {
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
         public async Task<IResult> Add(BarberStoreCreateDto dto, Guid currentUserId)
@@ -90,29 +90,16 @@ namespace Business.Concrete
             var store = await barberStoreDal.Get(x => x.Id == dto.Id);
             if (store == null)
                 return new ErrorResult("Güncellenecek dükkan bulunamadı.");
+            var dtoChairIds = dto.Chairs.Select(c => c.Id).ToList();
+            var conflict = await appointmentDal.AnyAsync(a =>
+                dtoChairIds.Contains(a.ChairId) && (a.Status == AppointmentStatus.Approved || a.Status == AppointmentStatus.Pending));
+            if (conflict)
+            {
+                return new ErrorResult("Bu dükkana ait randevu bulunmaktadır. Önce randevuların tamamlanması gerekir");
+            }
             dto.Adapt(store);
             await barberStoreDal.Update(store);
             var existingChairs = await _barberStoreChairDal.GetAll(x => x.StoreId == dto.Id);
-            //foreach (var dtoManuelBarber in dto.ManualBarbers)
-            //{
-            //    var match = _manuelBarberDal.Get(x => x.Id == dtoManuelBarber.Id).Result;
-            //    if (match != null)
-            //    {
-            //        if(match.FirstName.Trim().ToLowerInvariant() != dtoManuelBarber.FirstName.Trim().ToLowerInvariant() || match.ProfileImageUrl != dtoManuelBarber.ProfileImageUrl)
-            //        {
-            //            dtoManuelBarber.Adapt(match);
-            //            await _manuelBarberDal.Update(match);
-            //        }
-            //    }
-            //    else
-            //    {
-            //        var newManauelBarber = dtoManuelBarber.Adapt<ManuelBarber>();
-            //        newManauelBarber.StoreId = dto.Id;
-            //        await _manuelBarberDal.Add(newManauelBarber);
-            //    }
-            //}
-
-            // 1) .Result -> await
             foreach (var dtoManuelBarber in dto.ManualBarbers)
             {
                 var match = await _manuelBarberDal.Get(x => x.Id == dtoManuelBarber.Id); 

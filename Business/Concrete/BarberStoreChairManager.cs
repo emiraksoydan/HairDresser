@@ -29,18 +29,17 @@ namespace Business.Concrete
 
         public async Task<IResult> DeleteAsync(Guid chairId)
         {
-
             var storeChair = await barberStoreChairDal.Get(x => x.Id == chairId);
             if (storeChair == null)
                 return new ErrorResult("Koltuk bulunamadı");
 
             var hasActiveAppointment = await appointmentDal.AnyAsync(x =>
             x.ChairId == chairId &&
-            x.Status != AppointmentStatus.Completed &&
-            x.Status != AppointmentStatus.Cancelled);
+            x.Status == AppointmentStatus.Pending ||
+            x.Status == AppointmentStatus.Approved);
             if (hasActiveAppointment)
             {   
-                return new ErrorResult("Koltuğunuza ait aktif randevu bulunduğu için koltuk silinemez");
+                return new ErrorResult("Koltuğunuza ait randevu bulunduğu için koltuk silinemez");
             }
             await barberStoreChairDal.Remove(storeChair);
             return new SuccessResult("Koltuk silindi.");
@@ -51,6 +50,15 @@ namespace Business.Concrete
             var result = await barberStoreChairDal.GetAll(x=>x.StoreId == storeId);
             var dto = mapper.Map<List<BarberChairDto>>(result);
             return new SuccessDataResult<List<BarberChairDto>>(dto);
+        }
+
+        public async Task<IDataResult<BarberChairDto>> GetChairById(Guid chairId)
+        {
+            var result = await barberStoreChairDal.Get(x => x.Id == chairId);
+            var dto = mapper.Map<BarberChairDto>(result);
+            return new SuccessDataResult<BarberChairDto>(dto);
+
+
         }
 
         public async Task<IResult> UpdateAsync(BarberChairUpdateDto dto)

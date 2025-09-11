@@ -81,9 +81,6 @@ namespace DataAccess.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool>("IsAvailable")
-                        .HasColumnType("bit");
-
                     b.Property<double>("Rating")
                         .HasColumnType("float");
 
@@ -125,6 +122,9 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool?>("BarberApproval")
+                        .HasColumnType("bit");
+
                     b.Property<int>("BookedByType")
                         .HasColumnType("int");
 
@@ -134,7 +134,7 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("ChairId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedAtUtc")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("CustomerId")
@@ -143,7 +143,10 @@ namespace DataAccess.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("PerformerUserId")
+                    b.Property<bool>("IsLinkedAppointment")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("PerformerUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("StartUtc")
@@ -152,12 +155,41 @@ namespace DataAccess.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("StoreId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<bool?>("StoreApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
                     b.ToTable("Appointments");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.AppointmentServiceOffering", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ServiceOfferingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.ToTable("AppointmentServiceOfferings");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.BarberChair", b =>
@@ -304,6 +336,9 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
@@ -346,6 +381,40 @@ namespace DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ManuelBarbers");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.OperationClaim", b =>
@@ -550,6 +619,17 @@ namespace DataAccess.Migrations
                     b.ToTable("WorkingHours");
                 });
 
+            modelBuilder.Entity("Entities.Concrete.Entities.AppointmentServiceOffering", b =>
+                {
+                    b.HasOne("Entities.Concrete.Entities.Appointment", "Appointment")
+                        .WithMany("ServiceOfferings")
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Appointment");
+                });
+
             modelBuilder.Entity("Entities.Concrete.Entities.BarberChair", b =>
                 {
                     b.HasOne("Entities.Concrete.Entities.User", "AssignedBarberUser")
@@ -668,6 +748,11 @@ namespace DataAccess.Migrations
                     b.Navigation("OperationClaim");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.Appointment", b =>
+                {
+                    b.Navigation("ServiceOfferings");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.OperationClaim", b =>

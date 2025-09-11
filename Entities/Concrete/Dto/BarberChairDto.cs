@@ -13,6 +13,8 @@ namespace Entities.Concrete.Dto
         public string? Name { get; set; }
         public Guid? ManualBarberId { get; set; }
         public ManuelBarberOperation? ManuelBarber { get; set; }
+
+        public Guid? StoreId { get; set; }
     }
 
 }

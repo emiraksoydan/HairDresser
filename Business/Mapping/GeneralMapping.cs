@@ -21,6 +21,7 @@ namespace Business.Mapping
 
             config.NewConfig<FreeBarberCreateDto, FreeBarber>()
                 .Map(dest => dest.FullName, src => $"{src.Name} {src.Surname}")
+                .Map(dest => dest.IsAvailable, src => true)
                 .Ignore(dest => dest.FreeBarberUser);
             config.NewConfig<FreeBarberUpdateDto, FreeBarber>()
                 .Map(dest => dest.FullName, src => $"{src.Name} {src.Surname}")

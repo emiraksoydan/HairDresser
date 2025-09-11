@@ -1,5 +1,7 @@
+
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Business.Abstract;
 using Business.DependencyResolvers.Autofac;
 using Core.CrossCuttingConcerns.Validation;
 using Core.DependencyResolvers;
@@ -38,7 +40,6 @@ builder.Services.AddCors(options =>
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-
 builder.Services.AddControllers();
 var tokenOptions = builder.Configuration.GetSection("TokenOptions").Get<TokenOption>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -55,7 +56,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey)
         };
     });
-
 builder.Services.AddDependencyResolvers(new ICoreModule[]
 {
     new CoreModule(),
@@ -118,7 +118,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

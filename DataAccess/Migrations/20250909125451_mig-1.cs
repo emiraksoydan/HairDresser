@@ -30,16 +30,19 @@ namespace DataAccess.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    StoreId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     ChairId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CustomerId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PerformerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PerformerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     BookedByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     BookedByType = table.Column<int>(type: "int", nullable: false),
                     StartUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EndTime = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    BarberApproval = table.Column<bool>(type: "bit", nullable: true),
+                    StoreApproval = table.Column<bool>(type: "bit", nullable: true),
+                    IsLinkedAppointment = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -80,6 +83,24 @@ namespace DataAccess.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ManuelBarbers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Notifications",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CorrelationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    Topic = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Payload = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsRead = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Notifications", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -166,6 +187,27 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "AppointmentServiceOfferings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ServiceOfferingId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ServiceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AppointmentServiceOfferings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AppointmentServiceOfferings_Appointments_AppointmentId",
+                        column: x => x.AppointmentId,
+                        principalTable: "Appointments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "BarberStores",
                 columns: table => new
                 {
@@ -230,6 +272,7 @@ namespace DataAccess.Migrations
                     AddressId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     FreeBarberImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsAvailable = table.Column<bool>(type: "bit", nullable: false),
                     Type = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
@@ -333,6 +376,11 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AppointmentServiceOfferings_AppointmentId",
+                table: "AppointmentServiceOfferings",
+                column: "AppointmentId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_BarberChairs_AssignedBarberUserId",
                 table: "BarberChairs",
                 column: "AssignedBarberUserId");
@@ -402,7 +450,7 @@ namespace DataAccess.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Appointments");
+                name: "AppointmentServiceOfferings");
 
             migrationBuilder.DropTable(
                 name: "BarberChairs");
@@ -415,6 +463,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "FreeBarbers");
+
+            migrationBuilder.DropTable(
+                name: "Notifications");
 
             migrationBuilder.DropTable(
                 name: "Ratings");
@@ -430,6 +481,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "WorkingHours");
+
+            migrationBuilder.DropTable(
+                name: "Appointments");
 
             migrationBuilder.DropTable(
                 name: "BarberStores");

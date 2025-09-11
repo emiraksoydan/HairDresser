@@ -17,7 +17,6 @@ namespace Entities.Concrete.Dto
         public BarberType Type { get; set; }
         public AddressInfo Address { get; set; }
         public List<ServiceOfferingCreateDto> Offerings { get; set; }
-        public List<WorkingHourCreateDto> WorkingHours { get; set; }
 
     }
 }

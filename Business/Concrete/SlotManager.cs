@@ -32,7 +32,7 @@ namespace Business.Concrete
             var manualBarberInfos = await manuelBarberDal.GetManualBarberRatingsAsync(manualBarberIds);
             var workingHours = await workingHourDal.GetAll(x => x.OwnerId == storeId && !x.IsClosed);
             var appointments = await appointmentDal.GetAll(a =>
-           a.Status != AppointmentStatus.Cancelled &&
+           a.Status != AppointmentStatus.Cancelled && a.Status == AppointmentStatus.Approved &&
            a.ChairId.HasValue &&
            chairIds.Contains(a.ChairId.Value) &&
            a.StartUtc >= today && a.StartUtc < endDate.AddDays(1));
@@ -76,6 +76,7 @@ namespace Business.Concrete
                         {
                             ChairId = chair.Id,
                             ChairName = chair.Name,
+                            BarberId = mb?.BarberId,
                             BarberName = mb?.BarberName,
                             BarberRating = mb?.Rating ?? 0,
                             Slots = slots

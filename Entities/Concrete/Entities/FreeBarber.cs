@@ -17,7 +17,8 @@ namespace Entities.Concrete.Entities
         public string FreeBarberImageUrl { get; set; }
         public string FullName { get; set; }    
         public AddressInfo Address { get; set; }
-    
+        
+        public bool IsAvailable { get; set; }
         public BarberType Type { get; set; }
 
     }

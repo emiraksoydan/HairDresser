@@ -13,6 +13,9 @@ namespace DataAccess.Abstract
     {
         Task<List<ServiceOfferingListDto>> GetServiceOfferingsByIdAsync(Guid Id);
 
+        Task<List<ServiceOffering>> GetServiceOfferingsByIdsAsync(IEnumerable<Guid> ids);
+
+
 
     }
 }

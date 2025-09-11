@@ -8,9 +8,11 @@ namespace Entities.Concrete.Enums
 {
     public enum AppointmentStatus
     {
-        Pending,   // müşteri aldı, onay bekliyor
-        Approved,  // berber/store onayladı
+        Pending,   
+        Approved,  
         Completed,
-        Cancelled
+        Cancelled,
+        Rejected,
+  
     }
 }

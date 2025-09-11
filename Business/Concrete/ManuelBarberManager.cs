@@ -8,11 +8,12 @@ using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
 using Mapster;
 
 namespace Business.Concrete
 {
-    public class ManuelBarberManager(IManuelBarberDal manuelBarberDal, IBarberStoreChairDal barberStoreChairDal, IBarberStoreDal barberStoreDal) : IManuelBarberService
+    public class ManuelBarberManager(IManuelBarberDal manuelBarberDal, IBarberStoreChairDal barberStoreChairDal, IBarberStoreDal barberStoreDal,IAppointmentDal appointmentDal) : IManuelBarberService
     {
         public async Task<IResult> AddAsync(ManuelBarberCreateDto dto, Guid storeOwnerId)
         {
@@ -24,11 +25,14 @@ namespace Business.Concrete
             return new SuccessResult("Manuel berber eklendi.");
         }
 
-        public async Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto, Guid storeOwnerId)
+        public async Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto)
         {
             var entity = await manuelBarberDal.Get(x => x.Id == dto.Id);
             if (entity == null)
                 return new ErrorResult("Berber bulunamadı");
+            var appointmentManuelBarber = await appointmentDal.Get(x => x.PerformerUserId == entity.Id && (x.Status == AppointmentStatus.Approved || x.Status == AppointmentStatus.Pending));
+            if (appointmentManuelBarber != null)
+                return new ErrorResult("Berberin randevusu bulunuyor");
 
             dto.Adapt(entity);
             await manuelBarberDal.Update(entity);

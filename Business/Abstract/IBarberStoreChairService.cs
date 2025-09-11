@@ -14,5 +14,7 @@ namespace Business.Abstract
         Task<IResult> UpdateAsync(BarberChairUpdateDto dto);
         Task<IResult> DeleteAsync(Guid chairId);
         Task<IDataResult<List<BarberChairDto>>> GetAllByStoreAsync(Guid storeId);
+
+        Task<IDataResult<BarberChairDto>> GetChairById(Guid chairId);
     }
 }

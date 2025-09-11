@@ -32,6 +32,12 @@ namespace DataAccess.Concrete
 
             return offerings;
         }
+        public async Task<List<ServiceOffering>> GetServiceOfferingsByIdsAsync(IEnumerable<Guid> ids)
+        {
+            return await _context.ServiceOfferings
+                .Where(o => ids.Contains(o.Id))
+                .ToListAsync();
+        }
 
 
     }

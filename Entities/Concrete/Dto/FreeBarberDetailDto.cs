@@ -19,9 +19,6 @@ namespace Entities.Concrete.Dto
         public int FavoriteCount { get; set; }
         public bool IsAvailable { get; set; }
         public AddressInfo Address { get; set; }
-
-
         public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
-        public List<WorkingHourDto> WorkingHours { get; set; }
     }
 }

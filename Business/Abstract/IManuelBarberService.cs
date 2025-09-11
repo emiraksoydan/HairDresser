@@ -11,7 +11,7 @@ namespace Business.Abstract
     public interface IManuelBarberService
     {
         Task<IResult> AddAsync(ManuelBarberCreateDto dto, Guid storeOwnerId);
-        Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto, Guid storeOwnerId);
+        Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto);
         Task<IResult> DeleteAsync(Guid id);
         Task<IDataResult<List<ManuelBarberDto>>> GetAllByStoreAsync(Guid storeOwnerId);
     }

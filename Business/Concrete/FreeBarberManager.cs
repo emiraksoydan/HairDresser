@@ -18,7 +18,7 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class FreeBarberManager(IFreeBarberDal freeBarberDal, IWorkingHourDal workingHourDal, IServiceOfferingDal serviceOfferingDal, IMapper _mapper) : IFreeBarberService
+    public class FreeBarberManager(IFreeBarberDal freeBarberDal, IWorkingHourDal workingHourDal, IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IMapper _mapper) : IFreeBarberService
     {
         [ValidationAspect(typeof(FreeBarberCreateDtoValidator))]
         public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
@@ -27,15 +27,6 @@ namespace Business.Concrete
             var newFreeBaarber = _mapper.Map<FreeBarber>(freeBarberCreateDto);
             newFreeBaarber.FreeBarberUserId = currentUserId;
             await freeBarberDal.Add(newFreeBaarber);
-            var whList = freeBarberCreateDto.WorkingHours.Select(r => new WorkingHour
-            {
-                OwnerId = newFreeBaarber.Id,
-                DayOfWeek = r.DayOfWeek,
-                StartTime = r.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(r.StartTime),
-                EndTime = r.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(r.EndTime),
-                IsClosed = r.IsClosed
-            }).ToList();
-            await workingHourDal.AddRange(whList);
             var offerEntities = freeBarberCreateDto.Offerings?.Select(o =>
             {
                 var e = o.Adapt<ServiceOffering>();
@@ -53,38 +44,23 @@ namespace Business.Concrete
             using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
             var store = await freeBarberDal.Get(x => x.Id == freeBarberUpdateDto.Id);
             if (store == null)
-                return new ErrorResult("Güncellenecek serbest berber bulunamadı.");
+                return new ErrorResult(" serbest berber bulunamadı.");
+            var findAppointment = await appointmentDal.Get(x => x.PerformerUserId == freeBarberUpdateDto.Id && (x.Status == Entities.Concrete.Enums.AppointmentStatus.Approved || x.Status == Entities.Concrete.Enums.AppointmentStatus.Pending));
+            if(findAppointment == null)
+                return new ErrorResult("  Randevu hazılığı bulunmaktadır");
             freeBarberUpdateDto.Adapt(store);
             await freeBarberDal.Update(store);
-            var existingHours = await workingHourDal.GetAll(x => x.OwnerId == freeBarberUpdateDto.Id);
-            foreach (var dtoWh in freeBarberUpdateDto.WorkingHours)
-            {
-                var match = existingHours.FirstOrDefault(x => x.DayOfWeek == dtoWh.DayOfWeek);
-                if (match == null || WorkingHourChanged(match, dtoWh))
-                {
-                    match ??= new WorkingHour { OwnerId = freeBarberUpdateDto.Id, DayOfWeek = dtoWh.DayOfWeek };
-                    match.IsClosed = dtoWh.IsClosed;
-                    match.StartTime = dtoWh.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(dtoWh.StartTime);
-                    match.EndTime = dtoWh.IsClosed ? TimeSpan.Zero : TimeSpan.Parse(dtoWh.EndTime);
-                    await workingHourDal.Update(match);
-                }
-            }
             var existingOfferings = await serviceOfferingDal.GetAll(x => x.OwnerId == freeBarberUpdateDto.Id);
-
-            // DTO'dan gelen servisleri Id ile eşleyebiliyorsan Id ile eşle:
             var existingById = existingOfferings.ToDictionary(x => x.Id);
-
             var incomingIds = freeBarberUpdateDto.Offerings
                .Where(o => o.Id != Guid.Empty) 
                .Select(o => o.Id)
                .ToHashSet();
-
             var toDelete = existingOfferings
                 .Where(db => !incomingIds.Contains(db.Id))
                 .ToList();
             foreach (var off in toDelete)
                 await serviceOfferingDal.Remove(off);
-
             foreach (var dtoOffer in freeBarberUpdateDto.Offerings)
             {
                 if (dtoOffer.Id != null && existingById.TryGetValue(dtoOffer.Id.Value, out var entity))
@@ -143,24 +119,6 @@ namespace Business.Concrete
             var result = await freeBarberDal.GetNearbyFreeBarberWithStatsAsync(lat, lng, distance);
             return new SuccessDataResult<List<FreeBarberListDto>>(result);
         }
-
-        private bool WorkingHourChanged(WorkingHour entity, WorkingHourUpdateDto dto)
-        {
-            if (entity.IsClosed != dto.IsClosed)
-                return true;
-
-            if (dto.IsClosed)
-                return false;
-
-            if (!TimeSpan.TryParse(dto.StartTime, out var dtoStart) ||
-                !TimeSpan.TryParse(dto.EndTime, out var dtoEnd))
-            {
-                return true;
-            }
-
-            return entity.StartTime != dtoStart || entity.EndTime != dtoEnd;
-        }
-
 
     }
 }

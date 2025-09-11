@@ -32,6 +32,8 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<BarberStoreManager>().As<IBarberStoreService>().InstancePerLifetimeScope();
             builder.RegisterType<FreeBarberManager>().As<IFreeBarberService>().InstancePerLifetimeScope();
             builder.RegisterType<ManuelBarberManager>().As<IManuelBarberService>().InstancePerLifetimeScope();
+            builder.RegisterType<AppointmentManager>().As<IAppointmentService>().InstancePerLifetimeScope();
+            builder.RegisterType<NotificationOrchestrator>().As<INotificationOrchestrator>().InstancePerLifetimeScope();
             builder.RegisterType<CategoryManager>().As<ICategoryService>().InstancePerLifetimeScope();
             builder.RegisterType<ServiceOfferingManager>().As<IServiceOfferingService>().InstancePerLifetimeScope();
             builder.RegisterType<BarberStoreChairManager>().As<IBarberStoreChairService>().InstancePerLifetimeScope();
@@ -45,6 +47,9 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfServiceOfferingDal>().As<IServiceOfferingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfManuelBarberDal>().As<IManuelBarberDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfAppointmentDal>().As<IAppointmentDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfNotificationDal>().As<INotificationDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfAppointmentServiceOfferingDal>().As<IAppointmentServiceOffering>().InstancePerLifetimeScope();
+
 
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);

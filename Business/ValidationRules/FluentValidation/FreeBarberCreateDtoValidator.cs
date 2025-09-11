@@ -26,15 +26,7 @@ namespace Business.ValidationRules.FluentValidation
                 o.RuleFor(x => x.Price)
                     .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır");
             });
-            RuleForEach(x => x.WorkingHours)
-     .Where(x => !x.IsClosed)
-     .Must(x =>
-     {
-         return TimeSpan.TryParse(x.StartTime, out var start)
-             && TimeSpan.TryParse(x.EndTime, out var end)
-             && start < end;
-     })
-     .WithMessage("başlangıç saati bitiş saatinden büyük veya eşit olmamalı");
+
 
 
             RuleFor(x => x.Address)

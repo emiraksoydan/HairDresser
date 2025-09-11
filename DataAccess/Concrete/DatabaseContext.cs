@@ -62,6 +62,8 @@ namespace DataAccess.Concrete
         public DbSet<FreeBarberListDto> FreeBarberListDtos { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<ServiceOffering> ServiceOfferings { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<AppointmentServiceOffering> AppointmentServiceOfferings { get; set; }
 
     }
 }
