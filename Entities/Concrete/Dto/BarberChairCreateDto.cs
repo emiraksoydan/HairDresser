@@ -13,12 +13,8 @@ namespace Entities.Concrete.Dto
 
     public class BarberChairCreateDto : IDto
     {
-        public ChairMode Type { get; set; }                
-
-        public Guid? ManualBarberId { get; set; }    
-        public Guid? ManualBarberTempId { get; set; }   
+        public string? BarberId { get; set; }
+        public string Id { get; set; }
         public string? Name { get; set; }
-
-
     }
 }

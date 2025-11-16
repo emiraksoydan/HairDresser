@@ -12,9 +12,9 @@ namespace Entities.Concrete.Entities
         public Guid Id { get; set; }
         public Guid AppointmentId { get; set; }
         public Guid ServiceOfferingId { get; set; }   
-        public string ServiceName { get; set; } = string.Empty; 
+        public string ServiceName { get; set; }
         public decimal Price { get; set; }                     
-
         public Appointment Appointment { get; set; }
+        
     }
 }

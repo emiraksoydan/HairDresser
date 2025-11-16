@@ -13,16 +13,17 @@ namespace Entities.Concrete.Entities
     public class BarberStore : IEntity
     {
         public Guid Id { get; set; }
-        public Guid BarberStoreUserId { get; set; }
-        public User BarberStoreUser { get; set; }
+        public Guid BarberStoreOwnerId { get; set; }
         public string StoreName { get; set; }
-        public string StoreImageUrl { get; set; }
+        public string AddressDescription { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
         public BarberType Type { get; set; }
-        public Guid AddressId { get; set; } 
-        public AddressInfo Address { get; set; }
-        public string PricingType { get; set; }
+        public PricingType PricingType { get; set; }
         public double PricingValue { get; set; }
-
-
+        public string TaxDocumentFilePath { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

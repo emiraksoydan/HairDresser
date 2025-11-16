@@ -13,17 +13,16 @@ namespace Entities.Concrete.Entities
         public Guid Id { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }
-        public string Email { get; set; }
-        public byte[] PasswordSalt { get; set; }
-        public byte[] PasswordHash { get; set; }
-        public byte[] IdentityNumberHash { get; set; }
-        public byte[] IdentityNumberSalt { get; set; }
-        public string? ProfileImage { get; set; }
-        public string? CertificateFilePath { get; set; }
-        public string? TaxDocumentFilePath { get; set; }
-        public bool Status { get; set; }
+        public byte[] PhoneEncrypted { get; set; } 
+        public byte[] PhoneEncryptedNonce { get; set; } 
+        public byte[] PhoneSearchToken { get; set; } 
+        public string CertificateFilePath { get; set; }
+        public bool IsActive { get; set; }
+        public Guid? ImageId { get; set; }
+        public Image Image { get; set; }
         public UserType UserType { get; set; }
-
         public ICollection<UserOperationClaim> UserOperationClaims { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

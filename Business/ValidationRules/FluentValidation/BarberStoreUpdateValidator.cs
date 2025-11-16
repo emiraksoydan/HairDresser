@@ -99,19 +99,7 @@ namespace Business.ValidationRules.FluentValidation
            })
            .WithMessage("başlangıç saati bitiş saatinden büyük veya eşit olmamalı");
 
-            RuleFor(x => x.Address)
-    .NotNull().WithMessage("Adres bilgisi zorunludur")
-    .ChildRules(address =>
-    {
-        address.RuleFor(x => x.AddressLine)
-            .NotEmpty().WithMessage("Adres yazısı zorunludur");
-
-        address.RuleFor(x => x.Latitude)
-            .NotNull().WithMessage("Enlem (latitude) bilgisi zorunludur");
-
-        address.RuleFor(x => x.Longitude)
-            .NotNull().WithMessage("Boylam (longitude) bilgisi zorunludur");
-    });
+       
 
         }
     }

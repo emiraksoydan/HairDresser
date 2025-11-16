@@ -17,32 +17,18 @@ namespace Business.Concrete
     {
         public async Task<IDataResult<Guid>> CreateAsync(Guid userId, NotificationType type,Guid correlationId, object payload, string topic = "AppointmentRequest")
         {
-            var n = new Notification
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                Type = type,
-                Topic = topic,
-                Payload = JsonSerializer.Serialize(payload),
-                IsRead = false,
-                CorrelationId = correlationId,
-                CreatedAtUtc = DateTime.Now
-            };
-            await notificationDal.Add(n);
-            var unread = await notificationDal.GetUnreadCountAsync(userId);
-            return new SuccessDataResult<Guid>(n.UserId);
+          
+            return new SuccessDataResult<Guid>();
         }
 
         public async Task<IDataResult<List<Notification>>> GetAllNotify(Guid userId)
         {
-            var getNotifyList = await notificationDal.GetAll(x=>x.UserId == userId);
-            return new SuccessDataResult<List<Notification>>(getNotifyList);
+            return new SuccessDataResult<List<Notification>>();
         }
 
         public async Task<IDataResult<int>> GetUnreadCountAsync(Guid userId)
         {
-            var result = await notificationDal.GetUnreadCountAsync(userId);
-            return new SuccessDataResult<int>(result);
+            return new SuccessDataResult<int>();
         }
     }
 }

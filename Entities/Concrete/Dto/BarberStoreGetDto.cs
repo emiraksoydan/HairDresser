@@ -9,20 +9,23 @@ using Entities.Concrete.Enums;
 
 namespace Entities.Concrete.Dto
 {
-    public class BarberStoreListDto : IDto
+    public class BarberStoreGetDto : IDto
     {
         public Guid Id { get; set; }
         public string StoreName { get; set; }
-        public string StoreImageUrl { get; set; }
         public string PricingType { get; set; }
         public double PricingValue { get; set; }
         public BarberType Type { get; set; }
         public double Rating { get; set; }
-        public int FavoriteCount { get; set; }
-        public bool IsOpenNow { get; set; }
         public double DistanceKm { get; set; }
+        public int FavoriteCount { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public bool IsOpenNow { get; set; }
         public int ReviewCount { get; set; }
-        public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
+        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
+
+        public List<ImageGetDto> ImageList { get; set; }
 
     }
 

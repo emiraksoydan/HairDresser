@@ -16,9 +16,9 @@ namespace Core.Extensions
             claims.Add(new Claim(JwtRegisteredClaimNames.Email, email));
         }
 
-        public static void AddFullName(this ICollection<Claim> claims, string fullName)
+        public static void AddLastName(this ICollection<Claim> claims, string lastName)
         {
-            claims.Add(new Claim("fullName", fullName));
+            claims.Add(new Claim("lastName", lastName));
         }
 
         public static void AddName(this ICollection<Claim> claims, string name)
@@ -27,7 +27,7 @@ namespace Core.Extensions
         }
         public static void AddNameIdentifier(this ICollection<Claim> claims, string nameIdentifier)
         {
-            claims.Add(new Claim("identifier", nameIdentifier));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, nameIdentifier));
         }
 
         public static void AddRoles(this ICollection<Claim> claims, string[] roles)
@@ -38,5 +38,6 @@ namespace Core.Extensions
         {
             claims.Add(new Claim("userType", userType.ToString()));
         }
+      
     }
 }

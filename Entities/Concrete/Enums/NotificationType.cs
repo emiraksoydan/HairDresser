@@ -11,10 +11,14 @@ namespace Entities.Concrete.Enums
         Customer_To_Store_Requested,
         Customer_To_FreeBarber_Requested,
         FreeBarber_To_Store_Requested,
-        FreeBarber_Rejected_ToCustomer,
+        Store_To_FreeBarber_Requested,
         Store_Rejected_ToCustomer,
-        Store_Invite_FreeBarber,
+        FreeBarber_Rejected_ToCustomer,
         FreeBarber_Approved_ToCustomer,
-        FreeBarber_Rejected_To_Store
+        FreeBarber_Approved_ToStore,
+        Store_Approved_ToFreeBarber,
+        Store_Approved_ToCustomer,
+
+
     }
 }

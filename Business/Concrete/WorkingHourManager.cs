@@ -14,13 +14,18 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class WorkingHourManager(IWorkingHourDal workingHourDal,IMapper mapper) : IWorkingHourService
+    public class WorkingHourManager(IWorkingHourDal workingHourDal, IMapper mapper) : IWorkingHourService
     {
         public async Task<IResult> AddAsync(WorkingHourCreateDto dto)
         {
             var entities = dto.Adapt<WorkingHour>();
             await workingHourDal.Add(entities);
             return new SuccessResult("Çalışma saati başarıyla oluşturuldu.");
+        }
+        public async Task<IResult> AddRangeAsync(List<WorkingHour> list)
+        {
+             await workingHourDal.AddRange(list);
+            return new SuccessResult("Çalışma saatleri başarıyla oluşturuldu.");
         }
 
         public async Task<IResult> DeleteAsync(Guid id)

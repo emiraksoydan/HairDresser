@@ -11,9 +11,8 @@ namespace Entities.Concrete.Dto
 
     public class ManuelBarberCreateDto : IDto
     {
-        public Guid TempId { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
+        public string? Id { get; set; }
+        public string? FullName { get; set; }
         public string? ProfileImageUrl { get; set; }
 
     }

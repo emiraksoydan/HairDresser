@@ -6,35 +6,27 @@ using System.Threading.Tasks;
 using Business.Abstract;
 using Core.Utilities.Results;
 using Core.Utilities.Security.Hashing;
+using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Entities.Concrete.Entities;
 
 namespace Business.Concrete
 {
-    public class UserManager(IUserDal userDal) : IUserService
+    public class UserManager(IUserDal userDal,IPhoneService phoneService) : IUserService
     {
         public async Task<IResult> Add(User user)
         {
             await userDal.Add(user);
             return new SuccessResult("Kullanıcı Eklendi");
         }
-
-        public async Task<IDataResult<User>> GetByIdentityNumber(string identityNumber)
+        public async Task<IDataResult<User>> GetByPhone(string phoneNumber)
         {
-            var users = await userDal.GetAll(t => t.IdentityNumberHash != null && t.IdentityNumberSalt != null);
-            var user = users.FirstOrDefault(t =>
-                HashingHelper.verifyValueHash(identityNumber, t.IdentityNumberHash, t.IdentityNumberSalt));
-
+            var e164 = phoneService.NormalizeToE164(phoneNumber);
+            var token = phoneService.ComputeSearchToken(e164);
+            var user = await userDal.Get(u => u.PhoneSearchToken == token);
             return new SuccessDataResult<User>(user);
         }
-
-        public async Task<IDataResult<User>> GetByMail(string email)
-        {
-            var user = await userDal.Get(u => u.Email == email);
-            return new SuccessDataResult<User>(user);
-        }
-
 
         public async Task<IDataResult<List<OperationClaim>>> GetClaims(User user)
         {
@@ -45,6 +37,12 @@ namespace Business.Concrete
         public async Task<IDataResult<User>> GetById(Guid id)
         {
             var user = await userDal.Get(u => u.Id == id);
+            return new SuccessDataResult<User>(user);
+        }
+
+        public async Task<IDataResult<User>> GetByName(string name)
+        {
+            var user = await userDal.Get(u => u.FirstName == name);
             return new SuccessDataResult<User>(user);
         }
     }

@@ -19,13 +19,7 @@ namespace DataAccess.Concrete
             _context = context;
         }
 
-        public async Task<List<BarberChair>> GetAllWithManualBarberAsync(Expression<Func<BarberChair, bool>> filter)
-        {
-            return await _context.BarberChairs
-                .Include(x => x.ManualBarber)
-                .Where(filter)
-                .ToListAsync();
-        }
+  
 
     
     }

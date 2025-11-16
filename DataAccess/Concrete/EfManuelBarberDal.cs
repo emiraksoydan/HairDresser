@@ -26,11 +26,11 @@ namespace DataAccess.Concrete
                                 where barberIds.Contains(mb.Id)
                                 join r in _context.Ratings on mb.Id equals r.TargetId into ratingGroup
                                 from subRating in ratingGroup.DefaultIfEmpty()
-                                group subRating by new { mb.Id, mb.FirstName, mb.LastName } into g
+                                group subRating by new { mb.Id, mb.FullName } into g
                                 select new ManuelBarberRatingDto
                                 {
                                     BarberId = g.Key.Id,
-                                    BarberName = g.Key.FirstName + " " + g.Key.LastName,
+                                    BarberName = g.Key.FullName,
                                     Rating = g.Average(x => x != null ? x.Score : 0)
                                 }).ToListAsync();
 

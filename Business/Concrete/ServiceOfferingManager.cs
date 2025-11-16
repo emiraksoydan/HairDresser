@@ -34,26 +34,26 @@ namespace Business.Concrete
             return new SuccessResult("İşlem silindi.");
         }
 
-        public async Task<IDataResult<List<ServiceOfferingListDto>>> GetAll()
+        public async Task<IDataResult<List<ServiceOfferingGetDto>>> GetAll()
         {
             var offers = await serviceOfferingDal.GetAll();
-            var dto = mapper.Map<List<ServiceOfferingListDto>>(offers);
-            return new SuccessDataResult<List<ServiceOfferingListDto>>(dto);
+            var dto = mapper.Map<List<ServiceOfferingGetDto>>(offers);
+            return new SuccessDataResult<List<ServiceOfferingGetDto>>(dto);
         }
 
-        public async Task<IDataResult<ServiceOfferingListDto>> GetByIdAsync(Guid id)
+        public async Task<IDataResult<ServiceOfferingGetDto>> GetByIdAsync(Guid id)
         {
             var offer = await serviceOfferingDal.Get(x=>x.Id == id);
             if (offer == null)
-                return new ErrorDataResult<ServiceOfferingListDto>("işlem bulunamadı.");
-            var dto = mapper.Map<ServiceOfferingListDto>(offer);
-            return new SuccessDataResult<ServiceOfferingListDto>(dto);
+                return new ErrorDataResult<ServiceOfferingGetDto>("işlem bulunamadı.");
+            var dto = mapper.Map<ServiceOfferingGetDto>(offer);
+            return new SuccessDataResult<ServiceOfferingGetDto>(dto);
         }
 
-        public async Task<IDataResult<List<ServiceOfferingListDto>>> GetServiceOfferingsIdAsync(Guid Id)
+        public async Task<IDataResult<List<ServiceOfferingGetDto>>> GetServiceOfferingsIdAsync(Guid Id)
         {
             var result = await serviceOfferingDal.GetServiceOfferingsByIdAsync(Id);
-            return new SuccessDataResult<List<ServiceOfferingListDto>>(result);
+            return new SuccessDataResult<List<ServiceOfferingGetDto>>(result);
         }
 
 

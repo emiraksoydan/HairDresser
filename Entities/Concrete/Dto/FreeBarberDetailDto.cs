@@ -18,7 +18,6 @@ namespace Entities.Concrete.Dto
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
         public bool IsAvailable { get; set; }
-        public AddressInfo Address { get; set; }
-        public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
+        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
     }
 }

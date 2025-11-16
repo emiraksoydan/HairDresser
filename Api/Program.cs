@@ -1,18 +1,18 @@
 
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
-using Business.Abstract;
 using Business.DependencyResolvers.Autofac;
-using Core.CrossCuttingConcerns.Validation;
 using Core.DependencyResolvers;
 using Core.Extensions;
 using Core.Utilities.IoC;
 using Core.Utilities.Security.Encryption;
 using Core.Utilities.Security.JWT;
+using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Concrete;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
+
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -20,13 +20,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(opt =>
+{
+    var policy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
+    opt.Filters.Add(new AuthorizeFilter(policy));
+});
+
 builder.Services.AddDbContext<DatabaseContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-
+builder.Services.Configure<SecurityOption>(
+    builder.Configuration.GetSection("SecurityOptions"));
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -40,11 +49,11 @@ builder.Services.AddCors(options =>
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-builder.Services.AddControllers();
 var tokenOptions = builder.Configuration.GetSection("TokenOptions").Get<TokenOption>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -53,7 +62,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = tokenOptions.Issuer,
             ValidAudience = tokenOptions.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey)
+            IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey),
         };
     });
 builder.Services.AddDependencyResolvers(new ICoreModule[]
@@ -71,40 +80,7 @@ builder.Host.ConfigureContainer<ContainerBuilder>(options =>
 var app = builder.Build();
 app.UseCors();
 
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.ContentType = "application/json";
-        var exceptionHandler = context.Features.Get<IExceptionHandlerFeature>();
-        var ex = exceptionHandler?.Error;
-        if (ex is ClientValidationException valEx)
-        {
-            context.Response.StatusCode = 400;
-            var errors = valEx.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(
-                    g => $"$.{g.Key}",
-                    g => g.Select(e => e.ErrorMessage).ToArray()
-                );
-            await context.Response.WriteAsJsonAsync(new
-            {
-                title = "Validation failed",
-                status = 400,
-                errors
-            });
-        }
-        else
-        {
-            context.Response.StatusCode = 500;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                title = "Beklenmeyen bir hata oluþtu",
-                status = 500
-            });
-        }
-    });
-});
+
 
 
 // Configure the HTTP request pipeline.

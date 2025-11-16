@@ -1,8 +1,9 @@
-﻿using System.Security.Claims;
-using Business.Abstract;
+﻿using Business.Abstract;
+using Core.Extensions;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Api.Controllers
 {
@@ -11,26 +12,13 @@ namespace Api.Controllers
     public class BarberStoreController : ControllerBase
     {
         private readonly IBarberStoreService _storeService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        public BarberStoreController(IBarberStoreService storeService, IHttpContextAccessor httpContextAccessor)
+        public BarberStoreController(IBarberStoreService storeService)
         {
             _storeService = storeService;
-            _httpContextAccessor = httpContextAccessor;
         }
-        private Guid CurrentUserId
-        {
-            get
-            {
-                var claim = _httpContextAccessor.HttpContext?.User.FindFirst("identifier");
-                if (claim == null || !Guid.TryParse(claim.Value, out var userId))
-                {
-                    throw new UnauthorizedAccessException("Kullanıcı kimliği alınamadı veya geçersiz.");
-                }
-                return userId;
-            }
-        }
+        private Guid CurrentUserId => User.GetUserIdOrThrow();
 
-        [HttpPost]
+        [HttpPost("create-store")]
         public async Task<IActionResult> Add([FromBody] BarberStoreCreateDto dto)
         {
             var result = await _storeService.Add(dto, CurrentUserId);
@@ -62,9 +50,9 @@ namespace Api.Controllers
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
         [HttpGet("nearby")]
-        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng, [FromQuery] double distance = 1.0)
+        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
-            var result = await _storeService.GetNearbyStoresAsync(lat, lng, distance);
+            var result = await _storeService.GetNearbyStoresAsync(lat, lon, distance);
             return result.Success ? Ok(result.Data) : BadRequest(result);
         }
         [HttpGet("mine")]

@@ -13,29 +13,34 @@ namespace DataAccess.Concrete
     {
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<BarberStoreListDto>(eb =>
+            modelBuilder.Entity<User>(b =>
             {
-                eb.HasNoKey().ToView(null);           
-                eb.Ignore(x => x.IsOpenNow);         
-                eb.Ignore(x => x.ServiceOfferings);                                         
-            });
-            modelBuilder.Entity<FreeBarberListDto>().HasNoKey().ToView(null);
-            modelBuilder.Entity<Favorite>()
-            .HasOne(f => f.FavoritedFrom)
-            .WithMany()
-            .HasForeignKey(f => f.FavoritedFromId)
-             .OnDelete(DeleteBehavior.Cascade); 
 
-            modelBuilder.Entity<Favorite>()
-                .HasOne(f => f.FavoritedTo)
-                .WithMany()
-                .HasForeignKey(f => f.FavoritedToId)
-                .OnDelete(DeleteBehavior.Restrict);
-            modelBuilder.Entity<Category>()
-            .HasOne(c => c.Parent)
-            .WithMany() 
-            .HasForeignKey(c => c.ParentId)
-            .OnDelete(DeleteBehavior.Restrict);
+
+                //b.Property(u => u.PhoneEncrypted)
+                //    .IsRequired();                               
+                //b.Property(u => u.PhoneEncryptedNonce)
+                //    .HasMaxLength(12)                           
+                //    .IsRequired();                              
+                //b.Property(u => u.PhoneSearchToken)
+                //    .HasMaxLength(32)                            
+                //    .IsRequired();                               
+                //b.HasIndex(u => u.PhoneSearchToken)
+                // .IsUnique()
+                // .HasDatabaseName("UX_User_PhoneSearchToken");
+            });
+            modelBuilder.Entity<RefreshToken>(e =>
+            {
+                e.ToTable("RefreshTokens");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Fingerprint).HasMaxLength(64).IsRequired();
+                e.Property(x => x.ReplacedByFingerprint).HasMaxLength(64);
+                e.Property(x => x.Device).HasMaxLength(128);
+                e.HasIndex(x => x.Fingerprint).IsUnique();
+                e.HasIndex(x => x.FamilyId);
+                e.HasIndex(x => new { x.UserId, x.RevokedAt, x.ExpiresAt });
+            });
+ 
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -49,7 +54,6 @@ namespace DataAccess.Concrete
         public DbSet<OperationClaim> OperationClaims { get; set; }
         public DbSet<UserOperationClaim> UserOperationClaims { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
-        public DbSet<AddressInfo> AddressInfos { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<BarberStore> BarberStores { get; set; }
         public DbSet<BarberChair> BarberChairs { get; set; }
@@ -58,12 +62,11 @@ namespace DataAccess.Concrete
         public DbSet<ManuelBarber> ManuelBarbers { get; set; }
         public DbSet<Rating> Ratings { get; set; }
         public DbSet<WorkingHour> WorkingHours { get; set; }
-        public DbSet<BarberStoreListDto> BarberStoreListDtos { get; set; }
-        public DbSet<FreeBarberListDto> FreeBarberListDtos { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<ServiceOffering> ServiceOfferings { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AppointmentServiceOffering> AppointmentServiceOfferings { get; set; }
+        public DbSet<Image> Images { get; set; }
 
     }
 }

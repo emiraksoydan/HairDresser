@@ -11,12 +11,12 @@ namespace Entities.Concrete.Entities
     public class Notification : IEntity
     {
         public Guid Id { get; set; }
-        public Guid UserId { get; set; }  
-        public Guid CorrelationId { get; set; }
+        public Guid SenderId { get; set; }  
+        public Guid ReceiverId { get; set; }
         public NotificationType Type { get; set; } 
-        public string Topic { get; set; } = "Appointment";
-        public string Payload { get; set; } = "";  
+        public string Payload { get; set; }  
         public bool IsRead { get; set; }
-        public DateTime CreatedAtUtc { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

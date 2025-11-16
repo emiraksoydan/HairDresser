@@ -17,6 +17,6 @@ namespace DataAccess.Concrete
         {
             _context = context;
         }
-        public Task<int> GetUnreadCountAsync(Guid userId) => _context.Notifications.CountAsync(n => n.UserId == userId && !n.IsRead);
+     
     }
 }

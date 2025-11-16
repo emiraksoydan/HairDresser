@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Autofac;
+﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Abstract;
 using Business.Concrete;
@@ -11,10 +6,12 @@ using Business.Mapping;
 using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
 using Core.Utilities.Security.JWT;
+using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Mapster;
 using MapsterMapper;
+
 
 namespace Business.DependencyResolvers.Autofac
 {
@@ -39,6 +36,9 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<BarberStoreChairManager>().As<IBarberStoreChairService>().InstancePerLifetimeScope();
             builder.RegisterType<SlotManager>().As<ISlotService>().InstancePerLifetimeScope();
             builder.RegisterType<WorkingHourManager>().As<IWorkingHourService>().InstancePerLifetimeScope();
+            builder.RegisterType<UserOperationClaimManager>().As<IUserOperationClaimService>().InstancePerLifetimeScope();
+            builder.RegisterType<OperationClaimManager>().As<IOperationClaimService>().InstancePerLifetimeScope();
+
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfCategoriesDal>().As<ICategoriesDal>().InstancePerLifetimeScope();
@@ -49,8 +49,13 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfAppointmentDal>().As<IAppointmentDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfNotificationDal>().As<INotificationDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfAppointmentServiceOfferingDal>().As<IAppointmentServiceOffering>().InstancePerLifetimeScope();
-
-
+            builder.RegisterType<PhoneService>().As<IPhoneService>().InstancePerLifetimeScope();
+            builder.RegisterType<TwilioVerifyManager>().As<ITwilioVerifyService>().InstancePerLifetimeScope();
+            builder.RegisterType<RefreshTokenService>().As<IRefreshTokenService>().InstancePerLifetimeScope();
+            builder.RegisterType<EfRefreshTokenDal>().As<IRefreshTokenDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfImageDal>().As<IImageDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfUserOperationClaimDal>().As<IUserOperationClaimDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfOperationClaimDal>().As<IOperationClaimDal>().InstancePerLifetimeScope();
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);
 

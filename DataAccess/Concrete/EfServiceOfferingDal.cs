@@ -19,11 +19,11 @@ namespace DataAccess.Concrete
             _context = context;
         }
 
-        public async Task<List<ServiceOfferingListDto>> GetServiceOfferingsByIdAsync(Guid Id)
+        public async Task<List<ServiceOfferingGetDto>> GetServiceOfferingsByIdAsync(Guid Id)
         {
             var offerings = await _context.ServiceOfferings
                .Where(s => s.OwnerId == Id)
-               .Select(s => new ServiceOfferingListDto
+               .Select(s => new ServiceOfferingGetDto
                {
                    Id = s.Id,
                    Price = s.Price,

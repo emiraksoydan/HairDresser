@@ -17,7 +17,6 @@ namespace Entities.Concrete.Dto
         public BarberType Type { get; set; }
         public string PricingType { get; set; }
         public double? PricingValue { get; set; }
-        public AddressInfo Address { get; set; }
         public List<BarberChairUpdateDto> Chairs { get; set; }
         public List<ServiceOfferingUpdateDto> Offerings { get; set; }
         public List<ManuelBarberUpdateDto> ManualBarbers { get; set; }

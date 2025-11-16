@@ -11,7 +11,7 @@ namespace DataAccess.Abstract
 {
     public interface IServiceOfferingDal : IEntityRepository<ServiceOffering>
     {
-        Task<List<ServiceOfferingListDto>> GetServiceOfferingsByIdAsync(Guid Id);
+        Task<List<ServiceOfferingGetDto>> GetServiceOfferingsByIdAsync(Guid Id);
 
         Task<List<ServiceOffering>> GetServiceOfferingsByIdsAsync(IEnumerable<Guid> ids);
 

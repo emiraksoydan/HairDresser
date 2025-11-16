@@ -11,15 +11,10 @@ namespace Entities.Concrete.Entities
     public class ManuelBarber : IEntity
     {
         public Guid Id { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string ProfileImageUrl { get; set; }
-        public double Rating { get; set; } 
-        public bool IsActive { get; set; } = true;
         public Guid StoreId { get; set; }
-
-        [NotMapped]                 
-        public Guid TempId { get; set; }
-
+        public string FullName { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

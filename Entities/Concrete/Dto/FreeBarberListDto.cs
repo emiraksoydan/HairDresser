@@ -22,6 +22,6 @@ namespace Entities.Concrete.Dto
         public bool IsAvailable { get; set; }
         public double DistanceKm { get; set; }
         public int ReviewCount { get; set; }
-        public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
+        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
     }
 }

@@ -15,7 +15,6 @@ namespace Entities.Concrete.Dto
         public string Name { get; set; }
         public string Surname { get; set; }
         public BarberType Type { get; set; }
-        public AddressInfo Address { get; set; }
         public List<ServiceOfferingCreateDto> Offerings { get; set; }
 
     }

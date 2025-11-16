@@ -10,7 +10,7 @@ namespace Entities.Concrete.Entities
     public class Category : IEntity
     {
         public Guid Id { get; set; }
-        public string Name { get; set; } = default!;
+        public string Name { get; set; }
         public Guid? ParentId { get; set; }
         public Category? Parent { get; set; }
     }

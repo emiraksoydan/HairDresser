@@ -18,11 +18,10 @@ namespace Entities.Concrete.Dto
         public string PricingType { get; set; }
         public double PricingValue { get; set; }
 
-        public AddressInfo Address { get; set; }
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
         public int ReviewCount { get; set; }
-        public List<ServiceOfferingListDto> ServiceOfferings { get; set; }
+        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
         public List<WorkingHourDto> WorkingHours { get; set; }
         public bool IsOpenNow { get; set; }
     }

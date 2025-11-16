@@ -11,7 +11,6 @@ namespace DataAccess.Abstract
 {
     public interface IBarberStoreChairDal : IEntityRepository<BarberChair>
     {
-        Task<List<BarberChair>> GetAllWithManualBarberAsync(Expression<Func<BarberChair, bool>> filter);
 
     }
 }

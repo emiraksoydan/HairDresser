@@ -1,122 +1,175 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Entities.Concrete.Dto;
+﻿using Entities.Concrete.Dto;
 using Entities.Concrete.Enums;
 using FluentValidation;
+using System.Globalization;
+using System.Linq;
 
-namespace Business.ValidationRules.FluentValidation
+public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreateDto>
 {
-    public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreateDto>
+    public BarberStoreCreateDtoValidator()
     {
-        public BarberStoreCreateDtoValidator()
+        // Temel alanlar
+        RuleFor(x => x.StoreName)
+            .NotEmpty().WithMessage("İşletme adı zorunludur.");
+
+        RuleFor(x => x.Type)
+            .IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir.");
+
+        RuleFor(x => x.PricingType)
+            .IsInEnum().WithMessage("Geçerli bir koltuk fiyat hizmeti seçilmelidir.");
+
+        RuleFor(x => x.AddressDescription)
+            .NotEmpty().WithMessage("Adres açıklaması zorunludur.");
+
+        RuleFor(x => x.Latitude)
+            .InclusiveBetween(-90, 90).WithMessage("Geçerli bir enlem değeri giriniz (-90..90).");
+
+        RuleFor(x => x.Longitude)
+            .InclusiveBetween(-180, 180).WithMessage("Geçerli bir boylam değeri giriniz (-180..180).");
+
+        RuleFor(x => x.TaxDocumentFilePath)
+            .NotEmpty().WithMessage("Vergi levhası zorunludur.");
+
+        // PricingValue koşullu
+        When(x => x.PricingType == PricingType.Rent, () =>
         {
-            RuleFor(x => x.StoreName)
-                .NotEmpty().WithMessage("İşletme adı zorunludur");
+            RuleFor(x => x.PricingValue)
+                .NotNull().WithMessage("Fiyat girilmelidir.")
+                .GreaterThan(0).WithMessage("Fiyat 0'dan büyük olmalıdır.");
+        });
 
-            RuleFor(x => x.Type)
-                .NotNull().WithMessage("İşletme türü zorunludur")
-                .IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir");
-            RuleFor(x => x.Offerings)
-                 .NotNull().WithMessage("Hizmet listesi zorunludur")
-                 .Must(x => x.Count > 0).WithMessage("En az bir hizmet girilmelidir");
-            RuleForEach(x => x.Offerings).ChildRules(o =>
+        When(x => x.PricingType == PricingType.Percent, () =>
+        {
+            RuleFor(x => x.PricingValue)
+                .NotNull().WithMessage("Yüzdelik girilmelidir.")
+                .GreaterThan(0).WithMessage("Yüzdelik 0'dan büyük olmalıdır.")
+                .LessThanOrEqualTo(100).WithMessage("Yüzdelik 100'ü geçemez.");
+        });
+
+        // Chairs
+        RuleFor(x => x.Chairs)
+            .NotEmpty().WithMessage("En az bir koltuk eklenmelidir.");
+
+        RuleForEach(x => x.Chairs).ChildRules(c =>
+        {
+            // XOR: ya isim var ya BarberId var (ikisinden tam biri dolu)
+            c.RuleFor(ch => new { ch.Name, ch.BarberId })
+             .Must(v => string.IsNullOrWhiteSpace(v.Name) ^ string.IsNullOrWhiteSpace(v.BarberId))
+             .WithMessage("Koltuk ya isimli olmalı ya da bir berbere atanmalı; ikisi birden veya ikisi de boş olamaz.");
+
+            // İsimli koltuk ise isim zorunlu
+            c.When(ch => !string.IsNullOrWhiteSpace(ch.Name), () =>
             {
-                o.RuleFor(x => x.ServiceName)
-                    .NotEmpty().WithMessage("Hizmet adı boş olamaz");
-
-                o.RuleFor(x => x.Price)
-                    .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır");
+                c.RuleFor(ch => ch.Name)
+                 .NotEmpty().WithMessage("Koltuk ismi zorunludur.");
             });
 
-            RuleForEach(x => x.ManualBarbers).ChildRules(b =>
+            // Berbere atanmışsa BarberId format kontrolü
+            c.When(ch => !string.IsNullOrWhiteSpace(ch.BarberId), () =>
             {
-                b.RuleFor(x => x.FirstName)
-                    .NotEmpty().WithMessage("Berber adı zorunludur");
+                c.RuleFor(ch => ch.BarberId!)
+                 .Must(s => Guid.TryParse(s, out var g) && g != Guid.Empty)
+                 .WithMessage("Geçerli bir Berber Id giriniz.");
             });
-            RuleFor(x => x.Chairs)
-                .NotNull().WithMessage("Koltuk listesi boş olamaz")
-                .Must(x => x.Count > 0).WithMessage("En az bir koltuk eklenmelidir");
-            RuleForEach(x => x.Chairs).ChildRules(c =>
+        });
+
+        // Offerings
+        RuleFor(x => x.Offerings)
+            .NotEmpty().WithMessage("En az bir hizmet girilmelidir.");
+
+        RuleForEach(x => x.Offerings).ChildRules(o =>
+        {
+            o.RuleFor(v => v.ServiceName)
+             .NotEmpty().WithMessage("Hizmet adı boş olamaz.");
+
+            o.RuleFor(v => v.Price)
+             .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır.");
+        });
+
+        // Hizmet adları benzersiz (case-insensitive)
+        RuleFor(x => x.Offerings)
+            .Must(list => list.Select(i => i.ServiceName?.Trim().ToLowerInvariant())
+                              .Where(s => !string.IsNullOrWhiteSpace(s))
+                              .GroupBy(s => s!)
+                              .All(g => g.Count() == 1))
+            .WithMessage("Hizmet adları benzersiz olmalıdır.");
+
+        // Working hours
+        RuleFor(x => x.WorkingHours)
+            .NotNull().WithMessage("Çalışma saatleri zorunludur.")
+            .Must(w => w.Count > 0).WithMessage("En az bir çalışma günü girilmelidir.");
+
+        // Aynı güne iki kayıt olmasın
+        RuleFor(x => x.WorkingHours!)
+            .Must(list =>
             {
-                c.RuleFor(x => x.Type)
-                    .Must(type => type == ChairMode.Name || type == ChairMode.Barber).WithMessage("Geçersiz koltuk tipi");
-                c.When(x => x.Type == ChairMode.Name, () =>
-                {
-                    c.RuleFor(x => x.Name)
-                        .NotEmpty().WithMessage("Koltuk ismi zorunludur");
-                });
-                c.When(x => x.Type == ChairMode.Barber, () =>
-                {
-                    c.RuleFor(x => x.ManualBarberTempId)
-                        .NotEmpty().WithMessage("Berber atanması zorunludur");
-                });
-            });
-            RuleFor(x => x.Chairs)
-             .Custom((chairs, context) =>
-             {
-                 if (chairs == null) return;
+                var groups = list.GroupBy(i => i.DayOfWeek);
+                return groups.All(g => g.Count() == 1);
+            })
+            .WithMessage("Her gün için tek bir çalışma kaydı olmalıdır.");
 
-                 var ids = chairs
-                     .Where(c => c.Type == ChairMode.Barber && c.ManualBarberTempId.HasValue)
-                     .Select(c => c.ManualBarberTempId!.Value)
-                     .ToList();
-
-                 var duplicates = ids
-                     .GroupBy(id => id)
-                     .Where(g => g.Count() > 1)
-                     .Select(g => g.Key)
-                     .ToList();
-
-                 if (duplicates.Any())
-                 {
-                     context.AddFailure("Chairs", "Aynı manuel berber birden fazla koltuğa atanamaz.");
-
-
-                 }
-             });
-
-
-            RuleFor(x => x.PricingType)
-                      .NotEmpty()
-                      .WithMessage("Koltuk fiyat hizmeti seçilmelidir");
-
-            When(x => x.PricingType == "rent", () =>
+        // Saat detay kuralları (kapalı olmayan günlerde)
+        RuleForEach(x => x.WorkingHours!)
+            .Where(w => !w.IsClosed)
+            .ChildRules(c =>
             {
-                RuleFor(x => x.PricingValue).NotNull().WithMessage("Fiyat girilmelidir").GreaterThan(0).WithMessage("Fiyat 0 dan büyük olmalıdır");
+                c.RuleFor(w => w.StartTime)
+                    .NotEmpty().WithMessage("Başlangıç saati zorunludur.")
+                    .Must(IsHHmm).WithMessage("Başlangıç saati HH:mm formatında olmalı.");
+
+                c.RuleFor(w => w.EndTime)
+                    .NotEmpty().WithMessage("Bitiş saati zorunludur.")
+                    .Must(IsHHmm).WithMessage("Bitiş saati HH:mm formatında olmalı.");
+
+                c.RuleFor(w => w)
+                    .Must(w => TryParseHHmm(w.StartTime, out var s) &&
+                               TryParseHHmm(w.EndTime, out var e) &&
+                               s < e)
+                    .WithMessage("Başlangıç saati bitiş saatinden küçük olmalı.")
+                    .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
+
+                // 6–18 saat aralığı
+                c.RuleFor(w => w)
+                    .Must(w =>
+                    {
+                        TryParseHHmm(w.StartTime, out var s);
+                        TryParseHHmm(w.EndTime, out var e);
+                        var hours = (e - s).TotalHours;
+                        return hours >= 6 && hours <= 18;
+                    })
+                    .WithMessage("Çalışma süresi en az 6 ve en fazla 18 saat olmalı.")
+                    .When(w =>
+                    {
+                        if (!IsHHmm(w.StartTime) || !IsHHmm(w.EndTime)) return false;
+                        TryParseHHmm(w.StartTime, out var s);
+                        TryParseHHmm(w.EndTime, out var e);
+                        return s < e;
+                    });
             });
 
-            When(x => x.PricingType == "percent", () =>
-            {
-                RuleFor(x => x.PricingValue).NotNull().WithMessage("Yüzdelik seçilmelidir");
-            });
 
-
-            RuleForEach(x => x.WorkingHours)
-           .Where(x => !x.IsClosed)
-           .Must(x =>
-           {
-               return TimeSpan.TryParse(x.StartTime, out var start)
-                   && TimeSpan.TryParse(x.EndTime, out var end)
-                   && start < end;
-           })
-           .WithMessage("başlangıç saati bitiş saatinden büyük veya eşit olmamalı");
-
-            RuleFor(x => x.Address)
-    .NotNull().WithMessage("Adres bilgisi zorunludur")
-    .ChildRules(address =>
-    {
-        address.RuleFor(x => x.AddressLine)
-            .NotEmpty().WithMessage("Adres yazısı zorunludur");
-        address.RuleFor(x => x.Latitude)
-            .NotNull().WithMessage("Enlem (latitude) bilgisi zorunludur");
-
-        address.RuleFor(x => x.Longitude)
-            .NotNull().WithMessage("Boylam (longitude) bilgisi zorunludur");
-    });
-
-        }
     }
+    private static bool TryParseHHmm(string? s, out TimeSpan t)
+    {
+        t = default;
+
+        if (string.IsNullOrWhiteSpace(s))
+            return false;
+
+        // "HH:mm" formatında DateTime olarak parse et
+        if (!DateTime.TryParseExact(
+                s,
+                "HH:mm",                        // tam mesajda yazdığın format
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var dt))
+        {
+            return false;
+        }
+
+        t = dt.TimeOfDay;  // 09:00 -> 09:00 TimeSpan
+        return true;
+    }
+    private static bool IsHHmm(string? s) => TryParseHHmm(s, out _);
+
 }

@@ -11,14 +11,17 @@ namespace Entities.Concrete.Entities
     {
         public Guid Id { get; set; }
         public Guid UserId { get; set; }
+        public byte[] TokenHash { get; set; } = default!;
+        public byte[] TokenSalt { get; set; } = default!;
+        public string Fingerprint { get; set; } = default!;
+        public Guid FamilyId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? CreatedByIp { get; set; }
+        public string? Device { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public DateTime? RevokedAt { get; set; }
+        public string? RevokedByIp { get; set; }
+        public string? ReplacedByFingerprint { get; set; }
 
-        public byte[] TokenHash { get; set; }
-        public byte[] TokenSalt { get; set; }
-
-        public DateTime Expires { get; set; }
-        public DateTime? Revoked { get; set; }
-
-        public bool IsExpired => DateTime.UtcNow >= Expires;
-        public bool IsActive => Revoked == null && !IsExpired;
     }
 }

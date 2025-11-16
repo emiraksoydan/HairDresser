@@ -7,7 +7,7 @@ using Entities.Abstract;
 
 namespace Entities.Concrete.Dto
 {
-    public class ServiceOfferingListDto : IDto
+    public class ServiceOfferingGetDto : IDto
     {
         public Guid Id { get; set; }
         public decimal Price { get; set; }

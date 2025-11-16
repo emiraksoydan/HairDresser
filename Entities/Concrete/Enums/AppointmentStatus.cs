@@ -13,6 +13,7 @@ namespace Entities.Concrete.Enums
         Completed,
         Cancelled,
         Rejected,
+        Unanswered,
   
     }
 }

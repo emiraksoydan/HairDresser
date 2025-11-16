@@ -9,13 +9,11 @@ using FluentValidation;
 
 namespace Business.ValidationRules.FluentValidation
 {
-    public class UserLoginValidator : AbstractValidator<UserForLoginDto>
+    public class UserLoginValidator : AbstractValidator<UserForSendOtpDto>
     {
         public UserLoginValidator()
         {
-
-            RuleFor(x => x.Email).NotEmpty().EmailAddress();
-            RuleFor(x => x.Password).NotEmpty().WithMessage("Şifre boş olamaz");
+            RuleFor(x => x.PhoneNumber).NotEmpty().NotNull().WithMessage("Numara boş olamaz");
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -18,6 +19,15 @@ namespace Core.Extensions
         public static List<string> ClaimRoles(this ClaimsPrincipal claimsPrincipal)
         {
             return claimsPrincipal?.Claims(ClaimTypes.Role);
+        }
+
+        public static Guid GetUserIdOrThrow(this ClaimsPrincipal user)
+        {
+            var raw = user.FindFirst(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(raw?.Value, out var userId))
+                return userId;
+
+            throw new UnauthorizedAccessException("Kullanıcı kimliği alınamadı veya geçersiz.");
         }
     }
 }

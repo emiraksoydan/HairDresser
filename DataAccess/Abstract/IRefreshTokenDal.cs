@@ -10,6 +10,10 @@ namespace DataAccess.Abstract
 {
     public interface IRefreshTokenDal : IEntityRepository<RefreshToken> 
     {
-       Task Revoke(Guid id);               
+        Task Add(RefreshToken token);
+        Task Update(RefreshToken token);
+        Task<RefreshToken?> GetByFingerprintAsync(string fingerprint);
+        Task<List<RefreshToken>> GetActiveByUser(Guid userId);
+        Task RevokeFamilyAsync(Guid familyId, string reason, string? ip);
     }
 }

@@ -11,10 +11,8 @@ namespace Entities.Concrete.Entities
     {
         public Guid Id { get; set; }
         public Guid FavoritedFromId { get; set; } 
-        public User FavoritedFrom { get; set; }
         public Guid FavoritedToId { get; set; }
-        public User FavoritedTo { get; set; }
-
         public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Entities.Concrete.Dto;
+﻿using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Mapster;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Business.Mapping
 {
@@ -14,43 +15,54 @@ namespace Business.Mapping
     {
         public void Register(TypeAdapterConfig config)
         {
-            TypeAdapterConfig<BarberStoreCreateDto, BarberStore>.NewConfig().Ignore(dest => dest.Address.Id);
-            TypeAdapterConfig<BarberStoreUpdateDto, BarberStore>.NewConfig();
-            config.NewConfig<BarberStore, BarberStoreDetailDto>();
-            config.NewConfig<BarberStore, BarberStoreListDto>();
+            TypeAdapterConfig<BarberStoreCreateDto, BarberStore>
+                .NewConfig()
+                .Map(d => d.Id, s => Guid.NewGuid())
+                .Map(d => d.IsActive, s => true)
+                .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+                .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
-            config.NewConfig<FreeBarberCreateDto, FreeBarber>()
-                .Map(dest => dest.FullName, src => $"{src.Name} {src.Surname}")
-                .Map(dest => dest.IsAvailable, src => true)
-                .Ignore(dest => dest.FreeBarberUser);
-            config.NewConfig<FreeBarberUpdateDto, FreeBarber>()
-                .Map(dest => dest.FullName, src => $"{src.Name} {src.Surname}")
-                .Ignore(dest => dest.FreeBarberUser)
-                .Ignore(dest => dest.FreeBarberUserId);
-            config.NewConfig<FreeBarber, FreeBarberDetailDto>();
-            config.NewConfig<FreeBarber, FreeBarberListDto>();
 
-            config.NewConfig<ServiceOfferingCreateDto, ServiceOffering>().Map(dest => dest.CreatedAt, src => DateTime.Now).Map(dest => dest.UpdatedAt, src => DateTime.Now);
-            config.NewConfig<ServiceOfferingUpdateDto, ServiceOffering>().Ignore(dest => dest.OwnerId).Map(dest => dest.UpdatedAt, src => DateTime.Now);
-            config.NewConfig<ServiceOffering, ServiceOfferingListDto>();
+            TypeAdapterConfig<ManuelBarberCreateDto, ManuelBarber>
+                .NewConfig()
+                .Map(d => d.Id,
+                 s => string.IsNullOrWhiteSpace(s.Id) ? Guid.NewGuid() : Guid.Parse(s.Id))
+                 .Map(d => d.IsActive, _ => true)
+                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
+                 .Ignore(d => d.StoreId);
 
-            config.NewConfig<BarberChairCreateDto, BarberChair>().Map(dest => dest.CreatedAtUtc, src => DateTime.Now).Map(dest => dest.UpdatedAtUtc, src => DateTime.Now).Map(dest => dest.IsActive, src => true);
-            config.NewConfig<BarberChairUpdateDto, BarberChair>()
-                .Map(dest => dest.UpdatedAtUtc, src => DateTime.Now);
-            //config.NewConfig<BarberChair, BarberChairDto>()
-            //    .Map(dest => dest.AssignedBarberName, src =>
-            //        src.IsInternalEmployee
-            //            ? src.AssignedBarberUser != null ? src.AssignedBarberUser.FirstName + " " + src.AssignedBarberUser.LastName : null
-            //            : src.ManualBarber != null ? src.ManualBarber.FirstName + " " + src.ManualBarber.LastName : null
-            //    );
 
-            config.NewConfig<WorkingHourCreateDto, WorkingHour>().Map(dest => dest.IsClosed, src => false);            
-            config.NewConfig<WorkingHourUpdateDto, WorkingHour>();
-            config.NewConfig<WorkingHour, WorkingHourDto>();
-            config.NewConfig<ManuelBarberCreateDto, ManuelBarber>();
-            config.NewConfig<ManuelBarberUpdateDto, ManuelBarber>();
-            config.NewConfig<ManuelBarber, ManuelBarberDto>()
-                .Map(dest => dest.FullName, src => src.FirstName + " " + src.LastName);
+            TypeAdapterConfig<BarberChairCreateDto, BarberChair>.NewConfig()
+                .Map(d => d.Id, s => Guid.NewGuid())
+                .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+                .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
+                .Map(d => d.IsAvailable, s => true)
+                .Map(d => d.ManuelBarberId, s => s.BarberId)
+                .Ignore(d => d.StoreId);
+
+            TypeAdapterConfig<ServiceOfferingCreateDto, ServiceOffering>.NewConfig()
+             .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+             .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
+             .Ignore(d => d.OwnerId);
+
+            TypeAdapterConfig<WorkingHourCreateDto, WorkingHour>.NewConfig()
+            .Ignore(d => d.OwnerId)
+            .Map(d => d.StartTime, s => ParseHHmm(s.StartTime))
+            .Map(d => d.EndTime, s => ParseHHmm(s.EndTime));
+            TypeAdapterConfig<CreateImageDto, Image>.NewConfig()
+                .Ignore(d => d.Id)
+                .Ignore(d=>d.ImageOwnerId)
+                .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+                .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+
+
+        }
+        static TimeSpan ParseHHmm(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return TimeSpan.Zero;
+            return TimeSpan.ParseExact(value.Trim(), "hh\\:mm", CultureInfo.InvariantCulture);
         }
     }
 }
