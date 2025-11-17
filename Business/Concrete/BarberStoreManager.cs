@@ -18,7 +18,7 @@ using Twilio.TwiML.Messaging;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberDal _manuelBarberDal, IBarberStoreChairDal barberStoreChairDal, IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IImageDal imageDal) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentDal appointmentDal, IImageService _imageService) : IBarberStoreService
     {
         //[SecuredOperation("BarberStore.Add")]
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
@@ -51,16 +51,16 @@ namespace Business.Concrete
             return new SuccessResult("Dükkan silindi.");
         }
 
-        public async Task<IDataResult<BarberStoreDetailDto>> GetByIdAsync(Guid id)
+        public async Task<IDataResult<BarberStoreMineDto>> GetByIdAsync(Guid id)
         {
 
-            return new SuccessDataResult<BarberStoreDetailDto>();
+            return new SuccessDataResult<BarberStoreMineDto>();
         }
 
-        public async Task<IDataResult<List<BarberStoreDetailDto>>> GetByCurrentUserAsync(Guid currentUserId)
+        public async Task<IDataResult<List<BarberStoreMineDto>>> GetByCurrentUserAsync(Guid currentUserId)
         {
-
-            return new SuccessDataResult<List<BarberStoreDetailDto>>();
+            var result = await barberStoreDal.GetMineStores(currentUserId);
+            return new SuccessDataResult<List<BarberStoreMineDto>>(result);
         }
 
         public async Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance)
@@ -69,11 +69,6 @@ namespace Business.Concrete
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
         }
 
-        public async Task<IDataResult<BarberStoreOperationDetail>> GetByIdStoreOperation(Guid id)
-        {
-
-            return new SuccessDataResult<BarberStoreOperationDetail>();
-        }
 
 
         private IResult BarberAppointmentControl(List<ManuelBarberCreateDto> manuelBarberList, List<BarberChairCreateDto> chairList)
@@ -106,45 +101,42 @@ namespace Business.Concrete
         {
             if (dto.StoreImageList?.Count > 0)
             {
-                var barberStoreImages = dto.StoreImageList.Adapt<List<Image>>();
-                foreach (var itemImage in barberStoreImages)
+                foreach (var itemImage in dto.StoreImageList)
                 {
                     itemImage.ImageOwnerId = storeId;
-                    itemImage.OwnerType = ImageOwnerType.Store;
+
                 }
-                await imageDal.AddRange(barberStoreImages);
+                await _imageService.AddRangeAsync(dto.StoreImageList);
             }
         }
 
         private async Task SaveManuelBarbersAsync(BarberStoreCreateDto dto, Guid storeId)
         {
-            var manuelBarbers = (dto.ManuelBarbers ?? new List<ManuelBarberCreateDto>()).Adapt<List<ManuelBarber>>();
+            var manuelBarberDtos = dto.ManuelBarbers ?? new List<ManuelBarberCreateDto>();
+            if (!manuelBarberDtos.Any())
+                return;
 
-
-            if (manuelBarbers.Any())
+            var manuelBarbers = manuelBarberDtos.Adapt<List<ManuelBarber>>();
+            var imagesToAdd = new List<CreateImageDto>();
+            for (int i = 0; i < manuelBarbers.Count; i++)
             {
-                var imagesToAdd = new List<Image>();
-                for (int i = 0; i < manuelBarbers.Count; i++)
+                var src = dto.ManuelBarbers![i];
+                var ent = manuelBarbers[i];
+                ent.StoreId = storeId;
+                if (!string.IsNullOrWhiteSpace(src.ProfileImageUrl))
                 {
-                    var src = dto.ManuelBarbers![i];
-                    var ent = manuelBarbers[i];
-                    ent.StoreId = storeId;
-                    if (!string.IsNullOrWhiteSpace(src.ProfileImageUrl))
+                    var img = new CreateImageDto
                     {
-                        var img = new Image
-                        {
-                            ImageOwnerId = ent.Id,
-                            OwnerType = ImageOwnerType.ManuelBarber,
-                            ImageUrl = src.ProfileImageUrl,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow,
-                        };
-                        imagesToAdd.Add(img);
-                    }
+                        ImageOwnerId = ent.Id,
+                        OwnerType = ImageOwnerType.ManuelBarber,
+                        ImageUrl = src.ProfileImageUrl,
+                    };
+                    imagesToAdd.Add(img);
                 }
-                await imageDal.AddRange(imagesToAdd);
-                await _manuelBarberDal.AddRange(manuelBarbers);
             }
+            await _imageService.AddRangeAsync(imagesToAdd);
+            await _manuelBarberService.AddRangeAsync(manuelBarbers);
+
         }
 
         private async Task SaveWorkingHoursAsync(BarberStoreCreateDto dto, Guid storeId)
@@ -167,7 +159,7 @@ namespace Business.Concrete
             {
                 foreach (var o in offers)
                     o.OwnerId = storeId;
-                await serviceOfferingDal.AddRange(offers);
+                await _serviceOfferingService.AddRangeAsync(offers);
             }
         }
 
@@ -178,7 +170,7 @@ namespace Business.Concrete
             {
                 foreach (var c in chairs)
                     c.StoreId = storeId;
-                await barberStoreChairDal.AddRange(chairs);
+                await _barberStoreChairService.AddRangeAsync(chairs);
             }
         }
 

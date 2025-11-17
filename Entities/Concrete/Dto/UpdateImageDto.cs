@@ -8,12 +8,10 @@ using System.Threading.Tasks;
 
 namespace Entities.Concrete.Dto
 {
-    public class CreateImageDto : IDto
+    public class UpdateImageDto : IDto
     {
+        public Guid Id { get; set; }
         public ImageOwnerType OwnerType { get; set; }
         public string ImageUrl { get; set; }
-        public Guid? ImageOwnerId { get; set; }
-
     }
 }
-

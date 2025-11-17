@@ -3,7 +3,7 @@ using Business.Abstract;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
-
+using Entities.Concrete.Entities;
 using Mapster;
 using MapsterMapper;
 
@@ -15,6 +15,13 @@ namespace Business.Concrete
         {
            
             return new SuccessResult("Koltuk başarıyla oluşturuldu.");
+        }
+
+        public async Task<IResult> AddRangeAsync(List<BarberChair> list)
+        {
+
+            await barberStoreChairDal.AddRange(list);
+            return new SuccessResult();
         }
 
         public async Task<IResult> DeleteAsync(Guid chairId)

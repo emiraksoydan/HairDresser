@@ -15,6 +15,8 @@ namespace Entities.Concrete.Dto
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
         public bool IsClosed { get; set; }
+
+        public Guid? OwnerId { get; set; }
     }
 
 }

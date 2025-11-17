@@ -14,5 +14,7 @@ namespace DataAccess.Abstract
     {
         Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1.0);
 
+        Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId);
+
     }
 }

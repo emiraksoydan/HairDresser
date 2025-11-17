@@ -25,6 +25,12 @@ namespace Business.Concrete
             return new SuccessResult("İşlem başarıyla oluşturuldu.");
         }
 
+        public async Task<IResult> AddRangeAsync(List<ServiceOffering> list)
+        {
+            await serviceOfferingDal.AddRange(list);
+            return new SuccessResult();
+        }
+
         public async Task<IResult> DeleteAsync(Guid Id, Guid currentUserId)
         {
             var offer = await serviceOfferingDal.Get(x => x.Id == Id && x.OwnerId == currentUserId);

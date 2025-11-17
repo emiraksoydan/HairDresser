@@ -25,7 +25,7 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
-        [HttpPut]
+        [HttpPut("update-store")]
         public async Task<IActionResult> Update([FromBody] BarberStoreUpdateDto dto)
         {
             var result = await _storeService.Update(dto);
@@ -43,12 +43,7 @@ namespace Api.Controllers
             var result = await _storeService.GetByIdAsync(id);
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
-        [HttpGet("operation/{storeid}")]
-        public async Task<IActionResult> GetStoreOperation(Guid storeid)
-        {
-            var result = await _storeService.GetByIdStoreOperation(storeid);
-            return result.Success ? Ok(result.Data) : NotFound(result);
-        }
+
         [HttpGet("nearby")]
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {

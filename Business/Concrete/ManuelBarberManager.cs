@@ -38,5 +38,11 @@ namespace Business.Concrete
             
             return new SuccessDataResult<List<ManuelBarberDto>>();
         }
+
+        public async Task<IResult> AddRangeAsync(List<ManuelBarber> list)
+        {
+             await manuelBarberDal.AddRange(list);
+             return new SuccessResult();
+        }
     }
 }

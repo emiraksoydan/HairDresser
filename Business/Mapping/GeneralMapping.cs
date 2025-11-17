@@ -50,9 +50,14 @@ namespace Business.Mapping
             .Ignore(d => d.OwnerId)
             .Map(d => d.StartTime, s => ParseHHmm(s.StartTime))
             .Map(d => d.EndTime, s => ParseHHmm(s.EndTime));
+
             TypeAdapterConfig<CreateImageDto, Image>.NewConfig()
                 .Ignore(d => d.Id)
-                .Ignore(d=>d.ImageOwnerId)
+                .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+                .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+
+
+            TypeAdapterConfig<UpdateImageDto, Image>.NewConfig()
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
