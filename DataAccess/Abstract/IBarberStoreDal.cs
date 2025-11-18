@@ -16,5 +16,7 @@ namespace DataAccess.Abstract
 
         Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId);
 
+        Task<BarberStoreDetail> GetByIdStore(Guid storeId);
+
     }
 }

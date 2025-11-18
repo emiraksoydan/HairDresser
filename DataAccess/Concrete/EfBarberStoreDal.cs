@@ -24,11 +24,73 @@ namespace DataAccess.Concrete
         {
             _context = context;
         }
+
+        public async Task<BarberStoreDetail> GetByIdStore(Guid storeId)
+        {
+            TimeZoneInfo tz;
+            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
+            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
+
+            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var today = nowLocal.DayOfWeek;   // 0–6
+            var nowTime = nowLocal.TimeOfDay;      // TimeSpan
+
+            // 2) Store'u çek
+            var store = await _context.BarberStores
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == storeId);
+
+            if (store is null)
+                return new BarberStoreDetail();
+
+            // 3) Store'a ait çalışma saatlerini çek
+            var hours = await _context.WorkingHours
+                .AsNoTracking()
+                .Where(w => w.OwnerId == storeId /* && w.TargetType == ... (varsa) */)
+                .OrderBy(w => w.DayOfWeek)
+                .ThenBy(w => w.StartTime)
+                .ToListAsync();
+
+            // 4) Şu an açık mı?
+            var isOpenNow = hours.Any(h =>
+                !h.IsClosed &&
+                h.DayOfWeek == today &&
+                h.StartTime <= nowTime &&
+                nowTime < h.EndTime
+            );
+
+            // 5) WorkingHours'u DTO'ya map et
+            var workingHourDtos = hours.Select(h => new WorkingHourDto
+            {
+                DayOfWeek = h.DayOfWeek,
+                IsClosed = h.IsClosed,
+                StartTime = h.StartTime,
+                EndTime = h.EndTime
+            }).ToList();
+
+            // 6) BarberStoreDetail DTO'sunu doldur
+            var dto = new BarberStoreDetail
+            {
+                Id = store.Id,
+                StoreName = store.StoreName,
+                Latitude = store.Latitude,
+                Longitude = store.Longitude,
+                Type = store.Type,
+                PricingType = store.PricingType.ToString(),
+                PricingValue = store.PricingValue,
+                IsOpenNow = isOpenNow,
+                WorkingHours = workingHourDtos,
+                AddressDescription = store.AddressDescription,
+            };
+
+            return dto;
+        }
+
         public async Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId)
         {
             TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }   // Windows
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }      // Linux
+            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }   
+            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }     
             var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
 
             // 1) Bu kullanıcıya ait dükkanları çek
@@ -39,10 +101,6 @@ namespace DataAccess.Concrete
                 {
                     s.Id,
                     s.StoreName,
-                    s.Latitude,
-                    s.Longitude,
-                    s.PricingType,
-                    s.PricingValue,
                     s.Type
                 })
                 .ToListAsync();
@@ -155,35 +213,17 @@ namespace DataAccess.Concrete
                         ? OpenControl.IsOpenNow(hours, nowLocal)
                         : false;
 
-                    var workingHourDtos = hours != null
-                        ? hours.Select(w => new WorkingHourDto
-                        {
-                            Id = w.Id,
-                            OwnerId = w.OwnerId,
-                            DayOfWeek = w.DayOfWeek,
-                            StartTime = w.StartTime,
-                            EndTime = w.EndTime,
-                            IsClosed = w.IsClosed
-                        })
-                            .ToList()
-                        : new List<WorkingHourDto>();
-
                     return new BarberStoreMineDto
                     {
                         Id = s.Id,
                         StoreName = s.StoreName,
-                        StoreImageUrl = images ?? new List<ImageGetDto>(),
+                        ImageList = images ?? new List<ImageGetDto>(),
                         Type = s.Type,
-                        PricingType = s.PricingType.ToString(),
-                        PricingValue = s.PricingValue,
-                        Latitude = s.Latitude,
-                        Longitude = s.Longitude,
                         Rating = Math.Round(avgRating, 2),
                         FavoriteCount = favoriteCount,
                         ReviewCount = reviewCount,
                         IsOpenNow = isOpenNow,
                         ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
-                        WorkingHours = workingHourDtos
                     };
                 })
                 .ToList();
