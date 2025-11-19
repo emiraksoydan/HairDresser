@@ -1,19 +1,10 @@
 ﻿using Core.DataAccess.EntityFramework;
-using Core.Utilities;
 using Core.Utilities.Helpers;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace DataAccess.Concrete
 {
@@ -62,11 +53,69 @@ namespace DataAccess.Concrete
             // 5) WorkingHours'u DTO'ya map et
             var workingHourDtos = hours.Select(h => new WorkingHourDto
             {
+                Id = h.Id,
+                OwnerId = h.OwnerId,
                 DayOfWeek = h.DayOfWeek,
                 IsClosed = h.IsClosed,
                 StartTime = h.StartTime,
                 EndTime = h.EndTime
             }).ToList();
+
+            var images = await _context.Images.AsNoTracking().Where(i => i.ImageOwnerId == storeId && i.OwnerType == ImageOwnerType.Store).ToListAsync();
+
+            var imageDtos = images.Select(i => new ImageGetDto
+            {
+                Id = i.Id,
+                ImageUrl = i.ImageUrl,
+            }).ToList();
+
+            var serviceOfferings = await _context.ServiceOfferings.AsNoTracking().Where(i => i.OwnerId == storeId).ToListAsync();
+            var serviceOfferingsDto = serviceOfferings.Select(s => new ServiceOfferingGetDto
+            {
+                Id = s.Id,
+                Price = s.Price,
+                ServiceName = s.ServiceName
+            }).ToList();
+
+            var manuelBarberDtos = await _context.ManuelBarbers
+          .AsNoTracking()
+          .Where(b => b.StoreId == storeId)
+          .Select(b => new ManuelBarberDto
+          {
+              Id = b.Id,
+              FullName = b.FullName,
+
+              // Rating ortalaması (hiç rating yoksa 0)
+              Rating = _context.Ratings
+                  .Where(r => r.TargetId == b.Id)
+                  .Select(r => (double?)r.Score)      // nullable’a çevir
+                  .Average() ?? 0,                    // null ise 0
+
+              // İlk resmin url’i
+              ProfileImageUrl = _context.Images
+                  .Where(i => i.ImageOwnerId == b.Id)
+                  .Select(i => i.ImageUrl)
+                  .FirstOrDefault()
+          })
+          .ToListAsync();
+
+
+            var chairs = await _context.BarberChairs
+             .AsNoTracking()
+             .Where(ch => ch.StoreId == storeId)
+             .ToListAsync();
+
+            var barberStoreChairsDto =
+                (from b in manuelBarberDtos
+                 join ch in chairs
+                     on b.Id equals ch.ManuelBarberId into strch
+                 select new BarberChairDto
+                 {
+                     Id = strch.Select(x => x.Id).FirstOrDefault(),
+                     ManualBarberId = b.Id,
+                     Name = strch.Select(x => x.Name).FirstOrDefault(),
+                 })
+                .ToList();
 
             // 6) BarberStoreDetail DTO'sunu doldur
             var dto = new BarberStoreDetail
@@ -81,16 +130,19 @@ namespace DataAccess.Concrete
                 IsOpenNow = isOpenNow,
                 WorkingHours = workingHourDtos,
                 AddressDescription = store.AddressDescription,
+                ImageList = imageDtos,
+                ServiceOfferings = serviceOfferingsDto,
+                ManuelBarbers = manuelBarberDtos,
+                BarberStoreChairs = barberStoreChairsDto,
             };
-
             return dto;
         }
 
         public async Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId)
         {
             TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }   
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }     
+            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
+            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
             var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
 
             // 1) Bu kullanıcıya ait dükkanları çek

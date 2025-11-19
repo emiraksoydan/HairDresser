@@ -51,10 +51,10 @@ namespace Business.Concrete
             return new SuccessResult("Dükkan silindi.");
         }
 
-        public async Task<IDataResult<BarberStoreMineDto>> GetByIdAsync(Guid id)
+        public async Task<IDataResult<BarberStoreDetail>> GetByIdAsync(Guid id)
         {
-
-            return new SuccessDataResult<BarberStoreMineDto>();
+            var result = await barberStoreDal.GetByIdStore(id);
+            return new SuccessDataResult<BarberStoreDetail>(result);
         }
 
         public async Task<IDataResult<List<BarberStoreMineDto>>> GetByCurrentUserAsync(Guid currentUserId)

@@ -13,7 +13,7 @@ namespace Entities.Concrete.Dto
     {
         public Guid Id { get; set; }
         public string StoreName { get; set; }
-        public List<ImageGetDto> StoreImageUrl { get; set; }
+        public List<ImageGetDto> ImageList { get; set; }
         public BarberType Type { get; set; }
         public string PricingType { get; set; }
         public double PricingValue { get; set; }

@@ -12,9 +12,7 @@ namespace Entities.Concrete.Dto
         public Guid Id { get; set; } 
         public string? Name { get; set; }
         public Guid? ManualBarberId { get; set; }
-        public ManuelBarberDto? ManuelBarber { get; set; }
 
-        public Guid StoreId { get; set; }
     }
 
 }
