@@ -124,7 +124,7 @@ namespace DataAccess.Concrete
                 StoreName = store.StoreName,
                 Latitude = store.Latitude,
                 Longitude = store.Longitude,
-                Type = store.Type,
+                Type = store.Type.ToString(),
                 PricingType = store.PricingType.ToString(),
                 PricingValue = store.PricingValue,
                 IsOpenNow = isOpenNow,
@@ -134,6 +134,8 @@ namespace DataAccess.Concrete
                 ServiceOfferings = serviceOfferingsDto,
                 ManuelBarbers = manuelBarberDtos,
                 BarberStoreChairs = barberStoreChairsDto,
+                TaxDocumentFilePath = store.TaxDocumentFilePath,
+
             };
             return dto;
         }
