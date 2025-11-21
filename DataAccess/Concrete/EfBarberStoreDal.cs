@@ -84,14 +84,10 @@ namespace DataAccess.Concrete
           {
               Id = b.Id,
               FullName = b.FullName,
-
-              // Rating ortalaması (hiç rating yoksa 0)
               Rating = _context.Ratings
                   .Where(r => r.TargetId == b.Id)
                   .Select(r => (double?)r.Score)      // nullable’a çevir
                   .Average() ?? 0,                    // null ise 0
-
-              // İlk resmin url’i
               ProfileImageUrl = _context.Images
                   .Where(i => i.ImageOwnerId == b.Id)
                   .Select(i => i.ImageUrl)
