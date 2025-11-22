@@ -11,7 +11,6 @@ namespace Entities.Concrete.Entities
     {
         public Guid Id { get; set; }
         public Guid StoreId { get; set; }
-
         public Guid? ManuelBarberId { get; set; }
         public string? Name { get; set; }
         public bool IsAvailable { get; set; }

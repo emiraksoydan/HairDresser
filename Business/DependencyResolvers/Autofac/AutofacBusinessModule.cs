@@ -21,8 +21,6 @@ namespace Business.DependencyResolvers.Autofac
         {
             
             builder.RegisterType<UserManager>().As<IUserService>().InstancePerLifetimeScope();
-            builder.RegisterType<EfUserDal>().As<IUserDal>().InstancePerLifetimeScope();
-            builder.RegisterType<EfRefreshTokenDal>().As<IRefreshTokenDal>().InstancePerLifetimeScope();
             builder.RegisterType<AuthManager>().As<IAuthService>().InstancePerLifetimeScope();
             builder.RegisterType<JwtHelper>().As<ITokenHelper>();
             builder.RegisterType<Mapper>().As<IMapper>();
@@ -38,6 +36,9 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<WorkingHourManager>().As<IWorkingHourService>().InstancePerLifetimeScope();
             builder.RegisterType<UserOperationClaimManager>().As<IUserOperationClaimService>().InstancePerLifetimeScope();
             builder.RegisterType<OperationClaimManager>().As<IOperationClaimService>().InstancePerLifetimeScope();
+            builder.RegisterType<PhoneService>().As<IPhoneService>().InstancePerLifetimeScope();
+            builder.RegisterType<ImageManager>().As<IImageService>().InstancePerLifetimeScope();
+
 
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();
@@ -49,13 +50,14 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfAppointmentDal>().As<IAppointmentDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfNotificationDal>().As<INotificationDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfAppointmentServiceOfferingDal>().As<IAppointmentServiceOffering>().InstancePerLifetimeScope();
-            builder.RegisterType<PhoneService>().As<IPhoneService>().InstancePerLifetimeScope();
             builder.RegisterType<TwilioVerifyManager>().As<ITwilioVerifyService>().InstancePerLifetimeScope();
             builder.RegisterType<RefreshTokenService>().As<IRefreshTokenService>().InstancePerLifetimeScope();
             builder.RegisterType<EfRefreshTokenDal>().As<IRefreshTokenDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfImageDal>().As<IImageDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfUserOperationClaimDal>().As<IUserOperationClaimDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfOperationClaimDal>().As<IOperationClaimDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfUserDal>().As<IUserDal>().InstancePerLifetimeScope();
+
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);
 

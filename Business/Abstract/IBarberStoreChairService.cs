@@ -11,13 +11,14 @@ namespace Business.Abstract
 {
     public interface IBarberStoreChairService
     {
-        Task<IResult> AddAsync(BarberChairCreateDto dto, Guid storeOwnerId);
+        Task<IResult> AddAsync(BarberChairCreateDto dto);
         Task<IResult> AddRangeAsync(List<BarberChair> list);
 
         Task<IResult> UpdateAsync(BarberChairUpdateDto dto);
-        Task<IResult> DeleteAsync(Guid chairId);
+        Task<IResult> DeleteAsync(Guid id);
+        Task<IDataResult<bool>> AttemptBarberControl(Guid id);
         Task<IDataResult<List<BarberChairDto>>> GetAllByStoreAsync(Guid storeId);
 
-        Task<IDataResult<BarberChairDto>> GetChairById(Guid chairId);
+        Task<IDataResult<BarberChairDto>> GetById(Guid id);
     }
 }

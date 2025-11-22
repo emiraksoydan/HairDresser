@@ -48,30 +48,25 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
 
         // Chairs
         RuleFor(x => x.Chairs)
-            .NotEmpty().WithMessage("En az bir koltuk eklenmelidir.");
+             .NotNull()
+             .NotEmpty()
+             .WithMessage("En az bir koltuk eklenmelidir.");
 
-        RuleForEach(x => x.Chairs).ChildRules(c =>
+        RuleForEach(x => x.Chairs).ChildRules(ch =>
         {
-            // XOR: ya isim var ya BarberId var (ikisinden tam biri dolu)
-            c.RuleFor(ch => new { ch.Name, ch.BarberId })
-             .Must(v => string.IsNullOrWhiteSpace(v.Name) ^ string.IsNullOrWhiteSpace(v.BarberId))
-             .WithMessage("Koltuk ya isimli olmalı ya da bir berbere atanmalı; ikisi birden veya ikisi de boş olamaz.");
-
-            // İsimli koltuk ise isim zorunlu
-            c.When(ch => !string.IsNullOrWhiteSpace(ch.Name), () =>
-            {
-                c.RuleFor(ch => ch.Name)
-                 .NotEmpty().WithMessage("Koltuk ismi zorunludur.");
-            });
-
-            // Berbere atanmışsa BarberId format kontrolü
-            c.When(ch => !string.IsNullOrWhiteSpace(ch.BarberId), () =>
-            {
-                c.RuleFor(ch => ch.BarberId!)
-                 .Must(s => Guid.TryParse(s, out var g) && g != Guid.Empty)
-                 .WithMessage("Geçerli bir Berber Id giriniz.");
-            });
+            ch.RuleFor(c => c.Name)
+              .NotEmpty()
+              .When(c => c.BarberId == null)
+              .WithMessage("Berber atanmadıysa koltuk adı zorunludur.");
         });
+
+        // ManuelBarbers
+        RuleForEach(x => x.ManuelBarbers).ChildRules(b =>
+       {
+           b.RuleFor(m => m.FullName)
+            .NotEmpty()
+            .WithMessage("Manuel berber adı zorunludur.");
+       });
 
         // Offerings
         RuleFor(x => x.Offerings)

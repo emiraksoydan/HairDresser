@@ -16,5 +16,6 @@ namespace Entities.Concrete.Dto
         public string? BarberId { get; set; }
         public string Id { get; set; }
         public string? Name { get; set; }
+        public string? storeId { get; set; }
     }
 }

@@ -11,9 +11,9 @@ namespace Business.Abstract
 {
     public interface IManuelBarberService
     {
-        Task<IResult> AddAsync(ManuelBarberCreateDto dto, Guid storeOwnerId);
+        Task<IResult> AddAsync(ManuelBarberCreateDto dto);
 
-        Task<IResult> AddRangeAsync(List<ManuelBarber> list);
+        Task<IResult> AddRangeAsync(List<ManuelBarberCreateDto> list,Guid storeId);
         Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto);
         Task<IResult> DeleteAsync(Guid id);
         Task<IDataResult<List<ManuelBarberDto>>> GetAllByStoreAsync(Guid storeOwnerId);

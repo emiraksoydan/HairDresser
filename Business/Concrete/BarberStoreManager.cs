@@ -112,31 +112,10 @@ namespace Business.Concrete
 
         private async Task SaveManuelBarbersAsync(BarberStoreCreateDto dto, Guid storeId)
         {
-            var manuelBarberDtos = dto.ManuelBarbers ?? new List<ManuelBarberCreateDto>();
-            if (!manuelBarberDtos.Any())
+            var manuelBarberDtos = dto.ManuelBarbers;
+            if (manuelBarberDtos?.Count == 0)
                 return;
-
-            var manuelBarbers = manuelBarberDtos.Adapt<List<ManuelBarber>>();
-            var imagesToAdd = new List<CreateImageDto>();
-            for (int i = 0; i < manuelBarbers.Count; i++)
-            {
-                var src = dto.ManuelBarbers![i];
-                var ent = manuelBarbers[i];
-                ent.StoreId = storeId;
-                if (!string.IsNullOrWhiteSpace(src.ProfileImageUrl))
-                {
-                    var img = new CreateImageDto
-                    {
-                        ImageOwnerId = ent.Id,
-                        OwnerType = ImageOwnerType.ManuelBarber,
-                        ImageUrl = src.ProfileImageUrl,
-                    };
-                    imagesToAdd.Add(img);
-                }
-            }
-            await _imageService.AddRangeAsync(imagesToAdd);
-            await _manuelBarberService.AddRangeAsync(manuelBarbers);
-
+            await _manuelBarberService.AddRangeAsync(manuelBarberDtos!,storeId);
         }
 
         private async Task SaveWorkingHoursAsync(BarberStoreCreateDto dto, Guid storeId)

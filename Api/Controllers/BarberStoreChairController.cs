@@ -10,19 +10,16 @@ namespace Api.Controllers
     public class BarberStoreChairController : ControllerBase
     {
         private readonly IBarberStoreChairService _barberStoreChairService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        public BarberStoreChairController(IBarberStoreChairService barberStoreChairService, IHttpContextAccessor httpContextAccessor)
+        public BarberStoreChairController(IBarberStoreChairService barberStoreChairService)
         {
             _barberStoreChairService = barberStoreChairService;
-            _httpContextAccessor = httpContextAccessor;
         }
-        private Guid CurrentUserId =>
-            Guid.Parse(_httpContextAccessor.HttpContext?.User.FindFirst("identifier")?.Value!);
+     
 
         [HttpPost]
         public async Task<IActionResult> Add([FromBody] BarberChairCreateDto dto)
         {
-            var result = await _barberStoreChairService.AddAsync(dto, CurrentUserId);
+            var result = await _barberStoreChairService.AddAsync(dto);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 

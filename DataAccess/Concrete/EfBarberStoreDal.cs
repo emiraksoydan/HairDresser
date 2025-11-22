@@ -101,17 +101,14 @@ namespace DataAccess.Concrete
              .Where(ch => ch.StoreId == storeId)
              .ToListAsync();
 
-            var barberStoreChairsDto =
-                (from b in manuelBarberDtos
-                 join ch in chairs
-                     on b.Id equals ch.ManuelBarberId into strch
-                 select new BarberChairDto
-                 {
-                     Id = strch.Select(x => x.Id).FirstOrDefault(),
-                     ManualBarberId = b.Id,
-                     Name = strch.Select(x => x.Name).FirstOrDefault(),
-                 })
-                .ToList();
+            var barberStoreChairsDto = chairs
+          .Select(ch => new BarberChairDto
+          {
+              Id = ch.Id,
+              ManualBarberId = ch.ManuelBarberId, // null olabilir
+              Name = ch.Name,
+          })
+          .ToList();
 
             // 6) BarberStoreDetail DTO'sunu doldur
             var dto = new BarberStoreDetail

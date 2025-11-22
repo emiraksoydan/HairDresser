@@ -1,6 +1,7 @@
 ﻿using Business.Abstract;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
+using Entities.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Mapster;
@@ -36,10 +37,25 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        public async Task<IDataResult<ImageGetDto>> GetImage(Guid id)
+        {
+            var image = await _imageDal.Get(x => x.ImageOwnerId == id);
+            if (image == null)
+                return new ErrorDataResult<ImageGetDto>("Resim bulunamadı.");
+
+            var dto = image.Adapt<ImageGetDto>();
+
+            return new SuccessDataResult<ImageGetDto>(dto);
+        }
+
         public async Task<IResult> UpdateAsync(UpdateImageDto updateImageDto)
         {
-            var getImage = updateImageDto.Adapt<Image>();
-            await _imageDal.Update(getImage);
+            var entity = await _imageDal.Get(i => i.Id == updateImageDto.Id);
+            if (entity == null)
+                return new ErrorResult("Resim bulunamadı.");
+
+            updateImageDto.Adapt(entity);
+            await _imageDal.Update(entity);
             return new SuccessResult();
         }
     }

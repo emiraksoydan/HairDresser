@@ -7,19 +7,16 @@ namespace Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ManuelBarberController(IManuelBarberService manuelBarberService, IHttpContextAccessor accessor) : ControllerBase
+    public class ManuelBarberController(IManuelBarberService manuelBarberService) : ControllerBase
     {
-        private Guid CurrentUserId =>
-      Guid.Parse(accessor.HttpContext?.User.FindFirst("identifier")?.Value!);
 
         [HttpPost]
         public async Task<IActionResult> Add([FromBody] ManuelBarberCreateDto dto)
         {
-            var result = await manuelBarberService.AddAsync(dto, CurrentUserId);
+            var result = await manuelBarberService.AddAsync(dto);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
-        [HttpPut]
         public async Task<IActionResult> Update([FromBody] ManuelBarberUpdateDto dto)
         {
             var result = await manuelBarberService.UpdateAsync(dto);
@@ -33,11 +30,5 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetMyBarbers()
-        {
-            var result = await manuelBarberService.GetAllByStoreAsync(CurrentUserId);
-            return result.Success ? Ok(result) : NotFound(result);
-        }
     }
 }

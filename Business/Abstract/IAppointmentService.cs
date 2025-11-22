@@ -1,15 +1,16 @@
-﻿using System;
+﻿using Core.Utilities.Results;
+using Entities.Concrete.Dto;
+using Entities.Concrete.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Core.Utilities.Results;
-using Entities.Concrete.Enums;
 
 namespace Business.Abstract
 {
     public interface IAppointmentService
     {
-      
+        Task<IDataResult<bool>> AnyControl(Guid id);
     }
 }

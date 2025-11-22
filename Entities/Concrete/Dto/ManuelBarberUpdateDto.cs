@@ -10,9 +10,8 @@ namespace Entities.Concrete.Dto
     public class ManuelBarberUpdateDto  : IDto
     {
         public Guid Id { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string ProfileImageUrl { get; set; }
+        public string FullName { get; set; } = null!;
+        public string? ProfileImageUrl { get; set; }
 
 
     }

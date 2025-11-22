@@ -11,7 +11,6 @@ namespace Entities.Concrete.Dto
     public class UpdateImageDto : IDto
     {
         public Guid Id { get; set; }
-        public ImageOwnerType OwnerType { get; set; }
         public string ImageUrl { get; set; }
     }
 }

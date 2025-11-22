@@ -20,5 +20,17 @@ namespace Core.Utilities.Business
             }
             return null;
         }
+
+        public static async Task<IResult?> RunAsync(params Func<Task<IResult>>[] rules)
+        {
+            foreach (var ruleFunc in rules)
+            {
+                var result = await ruleFunc();   // kuralı çalıştır
+                if (result != null && !result.Success)
+                    return result;              // ilk hata döneni geri ver
+            }
+
+            return null;                        // hepsi başarılıysa null
+        }
     }
 }

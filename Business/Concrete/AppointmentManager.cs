@@ -13,8 +13,13 @@ using Entities.Concrete.Enums;
 
 namespace Business.Concrete
 {
-    public class AppointmentManager(IAppointmentDal appointmentDal, IBarberStoreChairDal barberStoreChairDal, INotificationOrchestrator notificationOrchestrator, IServiceOfferingDal serviceOfferingDal, IAppointmentServiceOffering appointmentServiceOffering, IUserDal userDal, IFreeBarberDal freeBarberDal,IBarberStoreDal barberStoreDal) : IAppointmentService
+    public class AppointmentManager(IAppointmentDal appointmentDal, IBarberStoreChairDal barberStoreChairDal, INotificationOrchestrator notificationOrchestrator, IServiceOfferingDal serviceOfferingDal, IAppointmentServiceOffering appointmentServiceOffering, IUserDal userDal, IFreeBarberDal freeBarberDal, IBarberStoreDal barberStoreDal) : IAppointmentService
     {
-        
+        public async Task<IDataResult<bool>> AnyControl(Guid id)
+        {
+            var hasBlocking = await appointmentDal.AnyAsync(x=>x.WorkerUserId ==  id && (x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved));
+     
+            return new SuccessDataResult<bool>(hasBlocking);
+        }
     }
 }

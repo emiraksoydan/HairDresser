@@ -33,7 +33,7 @@ namespace Business.ValidationRules.FluentValidation
 
             RuleForEach(x => x.ManualBarbers).ChildRules(b =>
             {
-                b.RuleFor(x => x.FirstName)
+                b.RuleFor(x => x.FullName)
                     .NotEmpty().WithMessage("Berber adı zorunludur");
             });
             RuleFor(x => x.Chairs)

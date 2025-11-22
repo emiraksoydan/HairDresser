@@ -25,41 +25,39 @@ namespace Business.Mapping
 
             TypeAdapterConfig<ManuelBarberCreateDto, ManuelBarber>
                 .NewConfig()
-                .Map(d => d.Id,
-                 s => string.IsNullOrWhiteSpace(s.Id) ? Guid.NewGuid() : Guid.Parse(s.Id))
                  .Map(d => d.IsActive, _ => true)
                  .Map(d => d.CreatedAt, s => DateTime.UtcNow)
-                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
-                 .Ignore(d => d.StoreId);
+                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+               
+
+            TypeAdapterConfig<ManuelBarberUpdateDto, ManuelBarber>.NewConfig()
+             .Map(dest => dest.FullName, src => src.FullName.Trim())
+             .Map(dest => dest.UpdatedAt, _ => DateTime.UtcNow);
 
 
             TypeAdapterConfig<BarberChairCreateDto, BarberChair>.NewConfig()
-                .Map(d => d.Id, s => Guid.NewGuid())
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
                 .Map(d => d.IsAvailable, s => true)
-                .Map(d => d.ManuelBarberId, s => s.BarberId)
-                .Ignore(d => d.StoreId);
+                .Map(d => d.ManuelBarberId, s => s.BarberId);
 
             TypeAdapterConfig<ServiceOfferingCreateDto, ServiceOffering>.NewConfig()
              .Map(d => d.CreatedAt, s => DateTime.UtcNow)
-             .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
-             .Ignore(d => d.OwnerId);
+             .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
             TypeAdapterConfig<WorkingHourCreateDto, WorkingHour>.NewConfig()
-            .Ignore(d => d.OwnerId)
             .Map(d => d.StartTime, s => ParseHHmm(s.StartTime))
             .Map(d => d.EndTime, s => ParseHHmm(s.EndTime));
 
             TypeAdapterConfig<CreateImageDto, Image>.NewConfig()
-                .Ignore(d => d.Id)
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
-
 
             TypeAdapterConfig<UpdateImageDto, Image>.NewConfig()
-                .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+
+            TypeAdapterConfig<Image, ImageGetDto>.NewConfig();
+
 
 
         }

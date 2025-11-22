@@ -12,8 +12,10 @@ namespace Entities.Concrete.Dto
     public class ManuelBarberCreateDto : IDto
     {
         public string? Id { get; set; }
-        public string? FullName { get; set; }
+        public string FullName { get; set; }
         public string? ProfileImageUrl { get; set; }
+        public string? StoreId { get; set; }
+
 
     }
 }

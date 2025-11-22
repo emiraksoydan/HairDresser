@@ -2,6 +2,7 @@
 using Business.Abstract;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
+using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Mapster;
@@ -9,9 +10,9 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class BarberStoreChairManager(IBarberStoreChairDal barberStoreChairDal,IBarberStoreDal barberStoreDal,IAppointmentDal appointmentDal, IMapper mapper) : IBarberStoreChairService
+    public class BarberStoreChairManager(IBarberStoreChairDal barberStoreChairDal,IMapper mapper) : IBarberStoreChairService
     {
-        public async Task<IResult> AddAsync(BarberChairCreateDto dto, Guid currentUserId)
+        public async Task<IResult> AddAsync(BarberChairCreateDto dto)
         {
            
             return new SuccessResult("Koltuk başarıyla oluşturuldu.");
@@ -24,7 +25,13 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
-        public async Task<IResult> DeleteAsync(Guid chairId)
+        public async Task<IDataResult<bool>> AttemptBarberControl(Guid id)
+        {
+            var hasAttempt = await barberStoreChairDal.AnyAsync(x => x.ManuelBarberId == id);
+            return new SuccessDataResult<bool>(hasAttempt);
+        }
+
+        public async Task<IResult> DeleteAsync(Guid id)
         {
             
             return new SuccessResult("Koltuk silindi.");
@@ -36,12 +43,9 @@ namespace Business.Concrete
             return new SuccessDataResult<List<BarberChairDto>>();
         }
 
-        public async Task<IDataResult<BarberChairDto>> GetChairById(Guid chairId)
+        public async Task<IDataResult<BarberChairDto>> GetById(Guid id)
         {
-            
             return new SuccessDataResult<BarberChairDto>();
-
-
         }
 
         public async Task<IResult> UpdateAsync(BarberChairUpdateDto dto)

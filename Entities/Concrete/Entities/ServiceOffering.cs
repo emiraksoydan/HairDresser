@@ -14,8 +14,8 @@ namespace Entities.Concrete.Entities
         public Guid Id { get; set; }
         public Guid OwnerId { get; set; }
         public string ServiceName { get; set; }     
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; } 
         public decimal Price { get; set; }
 
     }
