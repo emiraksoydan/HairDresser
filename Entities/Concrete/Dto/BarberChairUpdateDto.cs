@@ -9,9 +9,8 @@ namespace Entities.Concrete.Dto
 {
     public class BarberChairUpdateDto : IDto
     {
-        public Guid StoreId { get; set; }
-        public Guid? Id { get; set; }
+        public Guid Id { get; set; }
         public string? Name { get; set; }
-        public Guid? ManualBarberTempId { get; set; }
+        public Guid? BarberId { get; set; }
     }
 }

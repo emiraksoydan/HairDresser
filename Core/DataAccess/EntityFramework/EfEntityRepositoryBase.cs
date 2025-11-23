@@ -51,6 +51,11 @@ namespace Core.DataAccess.EntityFramework
             context.Set<TEntity>().Update(entity);
             await context.SaveChangesAsync();
         }
+        public async Task UpdateRange(List<TEntity> entities)
+        {
+            context.Set<TEntity>().UpdateRange(entities);
+            await context.SaveChangesAsync();
+        }
 
         public async Task DeleteAll(Expression<Func<TEntity, bool>> filter)
         {

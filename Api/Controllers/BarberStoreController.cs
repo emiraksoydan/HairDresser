@@ -28,7 +28,7 @@ namespace Api.Controllers
         [HttpPut("update-store")]
         public async Task<IActionResult> Update([FromBody] BarberStoreUpdateDto dto)
         {
-            var result = await _storeService.Update(dto);
+            var result = await _storeService.Update(dto, CurrentUserId);
             return result.Success ? Ok(result) : BadRequest(result);
         }
         [HttpDelete("{id}")]

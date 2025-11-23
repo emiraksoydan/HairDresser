@@ -10,7 +10,6 @@ namespace Entities.Concrete.Dto
     public class ServiceOfferingUpdateDto : IDto
     {
         public Guid? Id { get; set; }
-        public Guid StoreId { get; set; }
         public decimal Price { get; set; }
         public string ServiceName { get; set; }
     }

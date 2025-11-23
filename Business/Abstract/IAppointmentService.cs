@@ -12,5 +12,7 @@ namespace Business.Abstract
     public interface IAppointmentService
     {
         Task<IDataResult<bool>> AnyControl(Guid id);
+        Task<IDataResult<bool>> AnyChairControl(Guid id);
+
     }
 }

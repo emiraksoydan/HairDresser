@@ -17,6 +17,7 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
+        [HttpPut]
         public async Task<IActionResult> Update([FromBody] ManuelBarberUpdateDto dto)
         {
             var result = await manuelBarberService.UpdateAsync(dto);

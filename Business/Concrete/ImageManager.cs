@@ -58,5 +58,14 @@ namespace Business.Concrete
             await _imageDal.Update(entity);
             return new SuccessResult();
         }
+
+        public async Task<IResult> UpdateRangeAsync(List<UpdateImageDto> list)
+        {
+            var imageEntities = list.Adapt<List<Image>>();
+            await _imageDal.UpdateRange(imageEntities);
+            return new SuccessResult();
+
+
+        }
     }
 }

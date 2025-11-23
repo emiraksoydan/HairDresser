@@ -55,5 +55,13 @@ namespace Business.Concrete
             await workingHourDal.Update(existing);
             return new SuccessResult("Güncellendi.");
         }
+
+        public async Task<IResult> UpdateRangeAsync(List<WorkingHourUpdateDto> dto)
+        {
+            var entities = dto.Adapt<List<WorkingHour>>();
+            await workingHourDal.UpdateRange(entities);
+            return new SuccessResult("Saatler Güncellendi.");
+
+        }
     }
 }

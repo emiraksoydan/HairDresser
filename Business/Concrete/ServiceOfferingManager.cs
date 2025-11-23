@@ -63,14 +63,24 @@ namespace Business.Concrete
         }
 
 
-        public async Task<IResult> Update(ServiceOfferingUpdateDto serviceOfferingUpdateDto, Guid currentUserId)
+        public async Task<IResult> Update(ServiceOfferingUpdateDto serviceOfferingUpdateDto)
         {
-            var offer = await serviceOfferingDal.Get(x => x.Id == serviceOfferingUpdateDto.Id && x.OwnerId == currentUserId);
+            var offer = await serviceOfferingDal.Get(x => x.Id == serviceOfferingUpdateDto.Id);
             if (offer == null)
                 return new ErrorResult("Güncellenecek işlem bulunamadı.");
             serviceOfferingUpdateDto.Adapt(offer);
             await serviceOfferingDal.Update(offer);
             return new SuccessResult("İşlem güncellendi.");
+        }
+
+
+
+        public async Task<IResult> UpdateRange(List<ServiceOfferingUpdateDto> serviceOfferingUpdateDto)
+        {
+            var offeringEntities = serviceOfferingUpdateDto.Adapt<List<ServiceOffering>>();
+            await serviceOfferingDal.UpdateRange(offeringEntities);
+            return new SuccessResult("İşlemler güncellendi.");
+
         }
     }
 }

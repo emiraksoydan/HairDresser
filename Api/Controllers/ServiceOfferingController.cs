@@ -29,7 +29,7 @@ namespace Api.Controllers
         [HttpPut]
         public async Task<IActionResult> Update([FromBody] ServiceOfferingUpdateDto dto)
         {
-            var result = await _serviceOfferingService.Update(dto, CurrentUserId);
+            var result = await _serviceOfferingService.Update(dto);
             return result.Success ? Ok(result) : BadRequest(result);
         }
         [HttpDelete("{id}")]

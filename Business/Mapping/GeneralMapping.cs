@@ -22,6 +22,9 @@ namespace Business.Mapping
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
+            TypeAdapterConfig<BarberStoreUpdateDto, BarberStore>
+               .NewConfig()
+               .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
             TypeAdapterConfig<ManuelBarberCreateDto, ManuelBarber>
                 .NewConfig()
@@ -41,13 +44,26 @@ namespace Business.Mapping
                 .Map(d => d.IsAvailable, s => true)
                 .Map(d => d.ManuelBarberId, s => s.BarberId);
 
+            TypeAdapterConfig<BarberChairUpdateDto, BarberChair>.NewConfig()
+                .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
+                .Map(d => d.IsAvailable, s => true)
+                .Map(d => d.ManuelBarberId, s => s.BarberId);
+
             TypeAdapterConfig<ServiceOfferingCreateDto, ServiceOffering>.NewConfig()
              .Map(d => d.CreatedAt, s => DateTime.UtcNow)
+             .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+
+            TypeAdapterConfig<ServiceOfferingUpdateDto, ServiceOffering>.NewConfig()
              .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
             TypeAdapterConfig<WorkingHourCreateDto, WorkingHour>.NewConfig()
             .Map(d => d.StartTime, s => ParseHHmm(s.StartTime))
             .Map(d => d.EndTime, s => ParseHHmm(s.EndTime));
+
+            TypeAdapterConfig<WorkingHourUpdateDto, WorkingHour>.NewConfig()
+                .Map(d => d.StartTime, s => ParseHHmm(s.StartTime))
+                .Map(d => d.EndTime, s => ParseHHmm(s.EndTime));
+                
 
             TypeAdapterConfig<CreateImageDto, Image>.NewConfig()
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
@@ -55,6 +71,7 @@ namespace Business.Mapping
 
             TypeAdapterConfig<UpdateImageDto, Image>.NewConfig()
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
+                
 
             TypeAdapterConfig<Image, ImageGetDto>.NewConfig();
 

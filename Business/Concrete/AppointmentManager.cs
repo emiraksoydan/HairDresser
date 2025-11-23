@@ -21,5 +21,12 @@ namespace Business.Concrete
      
             return new SuccessDataResult<bool>(hasBlocking);
         }
+
+        public async Task<IDataResult<bool>> AnyChairControl(Guid id)
+        {
+            var hasBlocking = await appointmentDal.AnyAsync(x => x.ChairId == id && (x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved));
+
+            return new SuccessDataResult<bool>(hasBlocking);
+        }
     }
 }

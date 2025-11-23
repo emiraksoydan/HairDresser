@@ -25,7 +25,7 @@ namespace Business.Concrete
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Add(BarberStoreCreateDto dto, Guid currentUserId)
         {
-            IResult result = BusinessRules.Run(BarberAppointmentControl(dto.ManuelBarbers, dto.Chairs));
+            IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs,c=>c.BarberId));
             if (result != null)
                 return result;
 
@@ -38,9 +38,20 @@ namespace Business.Concrete
             return new SuccessResult("Berber dükkanı başarıyla oluşturuldu.");
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(BarberStoreUpdateDtoValidator))]
-        public async Task<IResult> Update(BarberStoreUpdateDto dto)
+        public async Task<IResult> Update(BarberStoreUpdateDto dto, Guid currentUserId)
         {
+            IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs, c => c.BarberId.ToString()));
+            if (result != null)
+                return result;
+
+            BarberStore store = dto.Adapt<BarberStore>();
+            store.BarberStoreOwnerId = currentUserId;
+            await barberStoreDal.Update(store);
+            await _imageService.UpdateRangeAsync(dto.StoreImageList);
+            //await _serviceOfferingService.UpdateRange(dto.Offerings);
+            await workingHourService.UpdateRangeAsync(dto.WorkingHours);
 
             return new SuccessResult("Berber dükkanı başarıyla güncellendi.");
         }
@@ -71,23 +82,54 @@ namespace Business.Concrete
 
 
 
-        private IResult BarberAppointmentControl(List<ManuelBarberCreateDto> manuelBarberList, List<BarberChairCreateDto> chairList)
+        //private IResult BarberAttemptCreateControl(List<BarberChairCreateDto> chairList)
+        //{
+        //    var assigned = chairList.Select((c, i) => new { Index = i, Chair = c }).Where(x => x.Chair?.BarberId != null &&
+        //        !(x.Chair.BarberId is string s && string.IsNullOrWhiteSpace(s))).ToList();
+        //    var duplicates = assigned
+        //        .GroupBy(x => x.Chair.BarberId).Where(g => g.Count() > 1).Select(g => new
+        //        {
+        //            BarberId = g.Key,
+        //            Chairs = g.Select(x => x.Index).ToList(),
+        //            Count = g.Count()
+        //        }).ToList();
+        //    if (duplicates.Count > 0)
+        //    {
+        //        return new ErrorResult("Bir berber birden fazla koltuğa atanamaz.");
+        //    }
+        //    return new SuccessResult();
+        //}
+
+        private IResult BarberAttemptCore<TChair>(List<TChair>? chairList,Func<TChair, string?> getBarberId)
         {
-            var assigned = chairList.Select((c, i) => new { Index = i, Chair = c }).Where(x => x.Chair?.BarberId != null &&
-                !(x.Chair.BarberId is string s && string.IsNullOrWhiteSpace(s))).ToList();
+            if (chairList == null || chairList.Count == 0)
+                return new SuccessResult();
+
+            // BerberId'si dolu olan koltukları al
+            var assigned = chairList
+                .Select((c, i) => new { Index = i, BarberId = getBarberId(c) })
+                .Where(x => !string.IsNullOrWhiteSpace(x.BarberId))
+                .ToList();
+
+            // Aynı berber birden fazla koltuğa atanmış mı?
             var duplicates = assigned
-                .GroupBy(x => x.Chair.BarberId).Where(g => g.Count() > 1).Select(g => new
+                .GroupBy(x => x.BarberId)
+                .Where(g => g.Count() > 1)
+                .Select(g => new
                 {
                     BarberId = g.Key,
                     Chairs = g.Select(x => x.Index).ToList(),
                     Count = g.Count()
-                }).ToList();
+                })
+                .ToList();
+
             if (duplicates.Count > 0)
             {
                 return new ErrorResult("Bir berber birden fazla koltuğa atanamaz.");
             }
             return new SuccessResult();
         }
+
 
         private async Task<BarberStore> CreateStoreAsync(BarberStoreCreateDto dto, Guid currentUserId)
         {
@@ -115,7 +157,7 @@ namespace Business.Concrete
             var manuelBarberDtos = dto.ManuelBarbers;
             if (manuelBarberDtos?.Count == 0)
                 return;
-            await _manuelBarberService.AddRangeAsync(manuelBarberDtos!,storeId);
+            await _manuelBarberService.AddRangeAsync(manuelBarberDtos!, storeId);
         }
 
         private async Task SaveWorkingHoursAsync(BarberStoreCreateDto dto, Guid storeId)

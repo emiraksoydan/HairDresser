@@ -14,8 +14,8 @@ namespace Entities.Concrete.Dto
     public class BarberChairCreateDto : IDto
     {
         public string? BarberId { get; set; }
-        public string Id { get; set; }
+        public string? Id { get; set; }
         public string? Name { get; set; }
-        public string? storeId { get; set; }
+        public string? StoreId { get; set; }
     }
 }

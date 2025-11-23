@@ -14,6 +14,8 @@ namespace Business.Abstract
     {
         Task<IResult> AddAsync(WorkingHourCreateDto dto);
         Task<IResult> AddRangeAsync(List<WorkingHour> dto);
+
+        Task<IResult> UpdateRangeAsync(List<WorkingHourUpdateDto> dto);
         Task<IResult> UpdateAsync(WorkingHourUpdateDto dto);
         Task<IResult> DeleteAsync(Guid id);
         Task<IDataResult<List<WorkingHourDto>>> GetByTargetAsync(Guid targetId);

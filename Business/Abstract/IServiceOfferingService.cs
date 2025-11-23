@@ -13,8 +13,9 @@ namespace Business.Abstract
     {
         Task<IResult> Add(ServiceOfferingCreateDto serviceOfferingCreateDto, Guid currentUserId);
         Task<IResult> AddRangeAsync(List<ServiceOffering> list);
+        Task<IResult> Update(ServiceOfferingUpdateDto serviceOfferingUpdateDto);
+        Task<IResult> UpdateRange(List<ServiceOfferingUpdateDto> serviceOfferingUpdateDto);
 
-        Task<IResult> Update(ServiceOfferingUpdateDto serviceOfferingUpdateDto, Guid currentUserId);
         Task<IResult> DeleteAsync(Guid Id, Guid currentUserId);
         Task<IDataResult<ServiceOfferingGetDto>> GetByIdAsync(Guid id);
         Task<IDataResult<List<ServiceOfferingGetDto>>> GetAll();
