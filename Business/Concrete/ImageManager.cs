@@ -1,10 +1,14 @@
 ﻿using Business.Abstract;
+using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Transaction;
+using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Mapster;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,13 +63,48 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateRangeAsync(List<UpdateImageDto> list)
         {
-            var imageEntities = list.Adapt<List<Image>>();
-            await _imageDal.UpdateRange(imageEntities);
+            if (list == null || list.Count == 0)
+                return new SuccessResult();
+            var updateDtos = list
+                .Where(d => d.Id != Guid.Empty)
+                .ToList();
+            var newDtos = list
+                .Where(d => d.Id == Guid.Empty)
+                .ToList();
+
+            List<Image> existingImages = new();
+            if (updateDtos.Any())
+            {
+                var updateIds = updateDtos.Select(d => d.Id).ToList();
+                existingImages = await _imageDal.GetAll(x => updateIds.Contains(x.Id));
+            }
+            var imageDict = existingImages.ToDictionary(x => x.Id);
+            foreach (var dto in updateDtos)
+            {
+                if (!imageDict.TryGetValue(dto.Id, out var entity))
+                    continue;
+
+                dto.Adapt(entity);
+            }
+            if (existingImages.Any())
+            {
+                await _imageDal.UpdateRange(existingImages);
+            }
+            if (newDtos.Any())
+            {
+                var newEntities = newDtos.Adapt<List<Image>>();
+                foreach (var entity in newEntities.Where(x=>x.Id == Guid.Empty))
+                {
+                    entity.Id = Guid.NewGuid();
+                    entity.CreatedAt = DateTime.UtcNow;
+                }
+
+                await _imageDal.AddRange(newEntities);
+            }
             return new SuccessResult();
-
-
         }
     }
 }

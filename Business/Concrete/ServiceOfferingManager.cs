@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Business.Abstract;
+﻿using Business.Abstract;
+using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
-using DataAccess.Concrete;
-using Entities.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Mapster;
@@ -49,7 +43,7 @@ namespace Business.Concrete
 
         public async Task<IDataResult<ServiceOfferingGetDto>> GetByIdAsync(Guid id)
         {
-            var offer = await serviceOfferingDal.Get(x=>x.Id == id);
+            var offer = await serviceOfferingDal.Get(x => x.Id == id);
             if (offer == null)
                 return new ErrorDataResult<ServiceOfferingGetDto>("işlem bulunamadı.");
             var dto = mapper.Map<ServiceOfferingGetDto>(offer);
@@ -74,13 +68,56 @@ namespace Business.Concrete
         }
 
 
-
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateRange(List<ServiceOfferingUpdateDto> serviceOfferingUpdateDto)
         {
-            var offeringEntities = serviceOfferingUpdateDto.Adapt<List<ServiceOffering>>();
-            await serviceOfferingDal.UpdateRange(offeringEntities);
-            return new SuccessResult("İşlemler güncellendi.");
+            if (serviceOfferingUpdateDto == null || serviceOfferingUpdateDto.Count == 0)
+                return new SuccessResult("Hizmet bulunamadı.");
 
+            var storeId = serviceOfferingUpdateDto[0].OwnerId;
+
+            var existing = await serviceOfferingDal.GetAll(x => x.OwnerId == storeId);
+
+            var dtoIds = serviceOfferingUpdateDto.Where(d => d.Id.HasValue && d.Id.Value != Guid.Empty).Select(d => d.Id!.Value).ToList();
+
+            var updateDtos = serviceOfferingUpdateDto.Where(d => d.Id.HasValue && d.Id.Value != Guid.Empty).ToList();
+
+            var newDtos = serviceOfferingUpdateDto.Where(d => !d.Id.HasValue || d.Id.Value == Guid.Empty).ToList();
+
+            var toDelete = existing.Where(e => !dtoIds.Contains(e.Id)).ToList();
+
+            if (updateDtos.Any())
+            {
+                var dict = existing.ToDictionary(x => x.Id);
+
+                foreach (var dto in updateDtos)
+                {
+                    if (!dto.Id.HasValue) continue;
+
+                    if (!dict.TryGetValue(dto.Id.Value, out var entity))
+                        continue; 
+
+                    dto.Adapt(entity);   
+                }
+
+                await serviceOfferingDal.UpdateRange(existing.Where(e => dtoIds.Contains(e.Id)).ToList());
+            }
+            if (newDtos.Any())
+            {
+                var newEntities = newDtos.Adapt<List<ServiceOffering>>();
+                foreach (var e in newEntities)
+                {
+                    if (e.Id == Guid.Empty)
+                        e.Id = Guid.NewGuid();
+                    e.CreatedAt = DateTime.UtcNow;
+                }
+                await serviceOfferingDal.AddRange(newEntities);
+            }
+            if (toDelete.Any())
+            {
+                await serviceOfferingDal.DeleteAll(toDelete);
+            }
+            return new SuccessResult("Hizmetler güncellendi.");
         }
     }
 }

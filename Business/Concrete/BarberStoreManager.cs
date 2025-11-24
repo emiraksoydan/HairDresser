@@ -18,7 +18,7 @@ using Twilio.TwiML.Messaging;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentDal appointmentDal, IImageService _imageService) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IImageService _imageService) : IBarberStoreService
     {
         //[SecuredOperation("BarberStore.Add")]
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
@@ -28,7 +28,6 @@ namespace Business.Concrete
             IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs,c=>c.BarberId));
             if (result != null)
                 return result;
-
             var store = await CreateStoreAsync(dto, currentUserId);
             await SaveStoreImagesAsync(dto, store.Id);
             await SaveManuelBarbersAsync(dto, store.Id);
@@ -37,20 +36,22 @@ namespace Business.Concrete
             await SaveWorkingHoursAsync(dto, store.Id);
             return new SuccessResult("Berber dükkanı başarıyla oluşturuldu.");
         }
-
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(BarberStoreUpdateDtoValidator))]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Update(BarberStoreUpdateDto dto, Guid currentUserId)
         {
             IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs, c => c.BarberId.ToString()));
             if (result != null)
                 return result;
-
+            var anyAppointCt = await appointmentService.AnyStoreControl(dto.Id);
+            if (anyAppointCt.Data)
+                return new ErrorResult("Bu dükkana ait aktif veya bekleyen randevu var önce müsait olmalısınız ");
+         
             BarberStore store = dto.Adapt<BarberStore>();
             store.BarberStoreOwnerId = currentUserId;
             await barberStoreDal.Update(store);
             await _imageService.UpdateRangeAsync(dto.StoreImageList);
-            //await _serviceOfferingService.UpdateRange(dto.Offerings);
+            await _serviceOfferingService.UpdateRange(dto.Offerings);
             await workingHourService.UpdateRangeAsync(dto.WorkingHours);
 
             return new SuccessResult("Berber dükkanı başarıyla güncellendi.");

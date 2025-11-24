@@ -13,6 +13,7 @@ namespace Business.Abstract
     {
         Task<IDataResult<bool>> AnyControl(Guid id);
         Task<IDataResult<bool>> AnyChairControl(Guid id);
+        Task<IDataResult<bool>> AnyStoreControl(Guid id);
 
     }
 }

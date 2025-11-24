@@ -57,10 +57,9 @@ namespace Core.DataAccess.EntityFramework
             await context.SaveChangesAsync();
         }
 
-        public async Task DeleteAll(Expression<Func<TEntity, bool>> filter)
+        public async Task DeleteAll(List<TEntity> entities)
         {
-            var items = await GetAll(filter);
-            context.Set<TEntity>().RemoveRange(items);
+            context.Set<TEntity>().RemoveRange(entities);
             await context.SaveChangesAsync();
         }
     }

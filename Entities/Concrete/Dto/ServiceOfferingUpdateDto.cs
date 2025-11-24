@@ -12,5 +12,6 @@ namespace Entities.Concrete.Dto
         public Guid? Id { get; set; }
         public decimal Price { get; set; }
         public string ServiceName { get; set; }
+        public Guid? OwnerId { get; set; }
     }
 }

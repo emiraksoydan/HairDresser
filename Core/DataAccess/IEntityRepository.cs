@@ -17,7 +17,7 @@ namespace Core.DataAccess
         Task UpdateRange(List<T> entities);
         Task Update(T entity);
         Task Remove(T entity);
-        Task DeleteAll(Expression<Func<T, bool>> filter);
+        Task DeleteAll(List<T> entities);
         Task<bool> AnyAsync(Expression<Func<T, bool>> filter);
 
     }
