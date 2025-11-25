@@ -1,20 +1,15 @@
 ﻿
 using Business.Abstract;
-using Business.BusinessAspect.Autofac;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
-using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
-using Entities.Concrete.Enums;
 using Mapster;
-using MapsterMapper;
-using System;
-using Twilio.TwiML.Messaging;
+
 
 namespace Business.Concrete
 {
@@ -80,26 +75,6 @@ namespace Business.Concrete
             var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance);
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
         }
-
-
-
-        //private IResult BarberAttemptCreateControl(List<BarberChairCreateDto> chairList)
-        //{
-        //    var assigned = chairList.Select((c, i) => new { Index = i, Chair = c }).Where(x => x.Chair?.BarberId != null &&
-        //        !(x.Chair.BarberId is string s && string.IsNullOrWhiteSpace(s))).ToList();
-        //    var duplicates = assigned
-        //        .GroupBy(x => x.Chair.BarberId).Where(g => g.Count() > 1).Select(g => new
-        //        {
-        //            BarberId = g.Key,
-        //            Chairs = g.Select(x => x.Index).ToList(),
-        //            Count = g.Count()
-        //        }).ToList();
-        //    if (duplicates.Count > 0)
-        //    {
-        //        return new ErrorResult("Bir berber birden fazla koltuğa atanamaz.");
-        //    }
-        //    return new SuccessResult();
-        //}
 
         private IResult BarberAttemptCore<TChair>(List<TChair>? chairList,Func<TChair, string?> getBarberId)
         {

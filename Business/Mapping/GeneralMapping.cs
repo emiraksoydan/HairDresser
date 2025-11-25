@@ -18,7 +18,6 @@ namespace Business.Mapping
             TypeAdapterConfig<BarberStoreCreateDto, BarberStore>
                 .NewConfig()
                 .Map(d => d.Id, s => Guid.NewGuid())
-                .Map(d => d.IsActive, s => true)
                 .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                 .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
@@ -28,7 +27,6 @@ namespace Business.Mapping
 
             TypeAdapterConfig<ManuelBarberCreateDto, ManuelBarber>
                 .NewConfig()
-                 .Map(d => d.IsActive, _ => true)
                  .Map(d => d.CreatedAt, s => DateTime.UtcNow)
                  .Map(d => d.UpdatedAt, s => DateTime.UtcNow);
                

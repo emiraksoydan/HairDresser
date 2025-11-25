@@ -11,7 +11,7 @@ namespace Entities.Concrete.Dto
 {
     public class FreeBarberCreateDto : IDto
     {
-        public string FreeBarberImageUrl { get; set; }
+        public List<CreateImageDto> FreeBarberImageList { get; set; }
         public string Name { get; set; }
         public string Surname { get; set; }
         public BarberType Type { get; set; }

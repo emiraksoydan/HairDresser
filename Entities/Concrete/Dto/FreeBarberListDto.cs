@@ -10,18 +10,19 @@ using Entities.Concrete.Enums;
 
 namespace Entities.Concrete.Dto
 {
-    public class FreeBarberListDto : IDto
+    public class FreeBarberGetDto : IDto
     {
         public Guid Id { get; set; }
-        public string FreeBarberImageUrl { get; set; }
         public string FullName { get; set; }
         public BarberType Type { get; set; }
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
-        [NotMapped]
         public bool IsAvailable { get; set; }
         public double DistanceKm { get; set; }
         public int ReviewCount { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
     }
 }

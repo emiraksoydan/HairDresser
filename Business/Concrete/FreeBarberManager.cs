@@ -18,7 +18,7 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class FreeBarberManager(IFreeBarberDal freeBarberDal, IWorkingHourDal workingHourDal, IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IMapper _mapper) : IFreeBarberService
+    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IBarberStoreService barberStoreService, IWorkingHourDal workingHourDal, IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IMapper _mapper) : IFreeBarberService
     {
         [ValidationAspect(typeof(FreeBarberCreateDtoValidator))]
         public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
@@ -51,10 +51,10 @@ namespace Business.Concrete
             return new SuccessDataResult<FreeBarberDetailDto>();
         }
 
-        public async Task<IDataResult<List<FreeBarberListDto>>> GetNearbyStoresAsync(double lat, double lng, double distance)
+        public async Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance)
         {
-         
-            return new SuccessDataResult<List<FreeBarberListDto>>();
+            var getFreeBarberResult = freeBarberDal.GetNearbyFreeBarberAsync(lat, lon, distance);
+            return new SuccessDataResult<List<FreeBarberGetDto>>();
         }
 
     }

@@ -11,7 +11,6 @@ namespace DataAccess.Abstract
 {
     public interface IFreeBarberDal : IEntityRepository<FreeBarber>
     {
-        
-
+        Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1.0);
     }
 }

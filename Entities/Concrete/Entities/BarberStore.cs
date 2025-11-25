@@ -22,7 +22,6 @@ namespace Entities.Concrete.Entities
         public PricingType PricingType { get; set; }
         public double PricingValue { get; set; }
         public string TaxDocumentFilePath { get; set; }
-        public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

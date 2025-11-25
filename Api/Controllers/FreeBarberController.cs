@@ -55,9 +55,9 @@ namespace Api.Controllers
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
         [HttpGet("nearby")]
-        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng, [FromQuery] double distance = 1.0)
+        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
-            var result = await _freeBarberService.GetNearbyStoresAsync(lat, lng, distance);
+            var result = await _freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance);
             return result.Success ? Ok(result.Data) : BadRequest(result);
         }
         [HttpGet("mypanel")]

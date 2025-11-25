@@ -11,7 +11,6 @@ namespace Api.Controllers
     public class CategoriesController : ControllerBase
     {
         private readonly ICategoryService _categoryService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
         public CategoriesController(ICategoryService categoryService)
         {
             _categoryService = categoryService;

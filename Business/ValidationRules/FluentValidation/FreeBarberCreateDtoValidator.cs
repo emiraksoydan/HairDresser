@@ -15,9 +15,7 @@ namespace Business.ValidationRules.FluentValidation
             RuleFor(x => x.Name).NotEmpty().WithMessage(" Ad zorunludur");
             RuleFor(x => x.Surname).NotEmpty().WithMessage(" Soyad zorunludur");
             RuleFor(x => x.Type).NotNull().WithMessage("İşletme türü zorunludur").IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir");
-            RuleFor(x => x.Offerings)
-     .NotNull().WithMessage("Hizmet listesi zorunludur")
-     .Must(x => x.Count > 0).WithMessage("En az bir hizmet girilmelidir");
+            RuleFor(x => x.Offerings).NotNull().WithMessage("Hizmet listesi zorunludur").Must(x => x.Count > 0).WithMessage("En az bir hizmet girilmelidir");
             RuleForEach(x => x.Offerings).ChildRules(o =>
             {
                 o.RuleFor(x => x.ServiceName)
