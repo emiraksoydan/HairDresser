@@ -5,11 +5,7 @@ using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace DataAccess.Concrete
 {
@@ -19,6 +15,88 @@ namespace DataAccess.Concrete
         public EfFreeBarberDal(DatabaseContext context) : base(context)
         {
             _context = context;
+        }
+
+        public async Task<FreeBarberDetailDto> GetMyPanel(Guid currentUserId)
+        {
+            var freeBarber = await _context.FreeBarbers
+               .AsNoTracking()
+               .Where(b => b.FreeBarberUserId == currentUserId)
+               .Select(s => new
+               {
+                   s.Id,
+                   s.FreeBarberUserId,
+                   s.Latitude,
+                   s.Longitude,
+                   s.Type,
+                   s.FirstName,
+                   s.LastName,
+                   s.BarberCertificate,
+
+
+               })
+               .FirstOrDefaultAsync();
+
+            if (freeBarber is null)
+                return new FreeBarberDetailDto();
+
+            var avgRating = await _context.Ratings
+            .AsNoTracking()
+            .Where(r => r.TargetId == freeBarber.Id)
+            .Select(r => (double?)r.Score)
+            .AverageAsync() ?? 0.0;
+
+            var reviewCount = await _context.Ratings
+                .AsNoTracking()
+                .CountAsync(r => r.TargetId == freeBarber.Id);
+
+            var favoriteCount = await _context.Favorites
+                .AsNoTracking()
+                .CountAsync(f => f.FavoritedToId == freeBarber.Id);
+
+            var blockingStatuses = new[] { "pending", "approval" };
+
+            var hasBlockingAppointment = await _context.Appointments
+                .AsNoTracking()
+                .AnyAsync(a =>
+                    (a.WorkerUserId == freeBarber.Id || a.AppointmentFromId == freeBarber.Id || a.AppointmentToId == freeBarber.Id) &&
+                    (a.Status == AppointmentStatus.Pending || a.Status == AppointmentStatus.Approved)
+                );
+
+            var isAvailable = !hasBlockingAppointment;
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Select(i => new ImageGetDto
+                {
+                    Id = i.Id,
+                    ImageUrl = i.ImageUrl
+                })
+                .ToListAsync();
+
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => o.OwnerId == freeBarber.Id)
+                .Select(o => new ServiceOfferingGetDto
+                {
+                    Id = o.Id,
+                    ServiceName = o.ServiceName,
+                    Price = o.Price
+                })
+                .ToListAsync();
+
+            return new FreeBarberDetailDto
+            {
+                Id = freeBarber.Id,
+                Type = freeBarber.Type,
+                FullName = freeBarber.FirstName + " " + freeBarber.LastName,
+                IsAvailable = isAvailable,
+                FreeBarberImageList = images,
+                Offerings = offerings,
+                FavoriteCount = favoriteCount,
+                Rating = avgRating,
+                ReviewCount = reviewCount,
+            };
         }
 
         public async Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1)
@@ -41,7 +119,6 @@ namespace DataAccess.Concrete
                     s.FirstName,
                     s.LastName,
                     s.FreeBarberUserId,
-                    s.IsAvailable,
 
                 })
                 .ToListAsync();
@@ -134,14 +211,13 @@ namespace DataAccess.Concrete
                         Id = s.Id,
                         ImageList = images ?? new List<ImageGetDto>(),
                         Type = s.Type,
-                        IsAvailable = s.IsAvailable,
                         Latitude = s.Latitude,
                         Longitude = s.Longitude,
                         FullName = s.FirstName + " " + s.LastName,
                         FavoriteCount = favoriteCount,
                         ReviewCount = reviewCount,
                         Rating = Math.Round(avgRating, 2),
-                        ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
+                        Offerings = offerings ?? new List<ServiceOfferingGetDto>(),
                         DistanceKm = Math.Round(distance, 3)
                     };
                 })

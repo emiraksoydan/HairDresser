@@ -12,12 +12,15 @@ namespace Entities.Concrete.Dto
     public class FreeBarberDetailDto : IDto
     {
         public Guid Id { get; set; }
-        public string FreeBarberImageUrl { get; set; }
         public string FullName { get; set; }
         public BarberType Type { get; set; }
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
         public bool IsAvailable { get; set; }
-        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
+
+        public int ReviewCount { get; set; }
+        public List<ImageGetDto> FreeBarberImageList { get; set; }
+
+        public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
 }

@@ -18,15 +18,15 @@ using MapsterMapper;
 
 namespace Business.Concrete
 {
-    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IBarberStoreService barberStoreService, IWorkingHourDal workingHourDal, IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IMapper _mapper) : IFreeBarberService
+    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IServiceOfferingDal serviceOfferingDal, IAppointmentDal appointmentDal, IMapper _mapper) : IFreeBarberService
     {
-        [ValidationAspect(typeof(FreeBarberCreateDtoValidator))]
+        [ValidationAspect(typeof(FreeBarberDtoValidator))]
         public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
         {
            
             return new SuccessResult("Serbest berber portalı başarıyla oluşturuldu.");
         }
-        [ValidationAspect(typeof(FreeBarberCreateDtoValidator))]
+        [ValidationAspect(typeof(FreeBarberDtoValidator))]
         public async Task<IResult> Update(FreeBarberUpdateDto freeBarberUpdateDto)
         {
             
@@ -37,12 +37,6 @@ namespace Business.Concrete
         {
             
             return new SuccessResult("Serbest berber silindi.");
-        }
-
-        public async Task<IDataResult<FreeBarberDetailDto>> GetByIdAsync(Guid id)
-        {
-           
-            return new SuccessDataResult<FreeBarberDetailDto>();
         }
 
         public async Task<IDataResult<FreeBarberDetailDto>> GetMyPanel(Guid currentUserId)

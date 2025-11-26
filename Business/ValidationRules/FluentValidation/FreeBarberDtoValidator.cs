@@ -8,12 +8,12 @@ using FluentValidation;
 
 namespace Business.ValidationRules.FluentValidation
 {
-    public class FreeBarberCreateDtoValidator : AbstractValidator<FreeBarberCreateDto>
+    public class FreeBarberDtoValidator : AbstractValidator<FreeBarberCreateDto>
     {
-        public FreeBarberCreateDtoValidator()
+        public FreeBarberDtoValidator()
         {
-            RuleFor(x => x.Name).NotEmpty().WithMessage(" Ad zorunludur");
-            RuleFor(x => x.Surname).NotEmpty().WithMessage(" Soyad zorunludur");
+            RuleFor(x => x.FirstName).NotEmpty().WithMessage(" Ad zorunludur");
+            RuleFor(x => x.LastName).NotEmpty().WithMessage(" Soyad zorunludur");
             RuleFor(x => x.Type).NotNull().WithMessage("İşletme türü zorunludur").IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir");
             RuleFor(x => x.Offerings).NotNull().WithMessage("Hizmet listesi zorunludur").Must(x => x.Count > 0).WithMessage("En az bir hizmet girilmelidir");
             RuleForEach(x => x.Offerings).ChildRules(o =>
@@ -24,10 +24,14 @@ namespace Business.ValidationRules.FluentValidation
                 o.RuleFor(x => x.Price)
                     .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır");
             });
+            RuleFor(x => x.Latitude)
+                .InclusiveBetween(-90, 90).WithMessage("Geçerli bir enlem değeri giriniz (-90..90).");
 
+            RuleFor(x => x.Longitude)
+                .InclusiveBetween(-180, 180).WithMessage("Geçerli bir boylam değeri giriniz (-180..180).");
 
-
-           
+            RuleFor(x => x.BarberCertificate)
+                .NotEmpty().WithMessage("Vergi levhası zorunludur.");
 
         }
     }

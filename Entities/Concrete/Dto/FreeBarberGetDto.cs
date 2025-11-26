@@ -23,6 +23,6 @@ namespace Entities.Concrete.Dto
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
-        public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
+        public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
 }

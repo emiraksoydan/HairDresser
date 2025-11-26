@@ -4,11 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Entities.Concrete.Enums
+namespace Entities.Concrete.Dto
 {
-    public enum ChairMode
+    public class FreeBarberMineDto
     {
-        Barber = 0,   
-        Name = 1   
     }
 }
