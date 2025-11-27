@@ -56,6 +56,7 @@ namespace Business.Concrete
             return new SuccessResult("Berber güncellendi.");
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> DeleteAsync(Guid id)
         {
             var barber = await manuelBarberDal.Get(b => b.Id == id);

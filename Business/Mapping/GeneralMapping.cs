@@ -73,6 +73,12 @@ namespace Business.Mapping
 
             TypeAdapterConfig<Image, ImageGetDto>.NewConfig();
 
+            TypeAdapterConfig<FreeBarberCreateDto, FreeBarber>.NewConfig()
+                    .Map(d => d.UpdatedAt, s => DateTime.UtcNow)
+                    .Map(d => d.IsAvailable, s => true)
+                    .Map(d => d.CreatedAt, s => DateTime.UtcNow);
+
+            TypeAdapterConfig<FreeBarberUpdateDto, FreeBarber>.NewConfig().Map(d => d.UpdatedAt, s => DateTime.UtcNow);
 
 
         }

@@ -35,16 +35,22 @@ namespace Business.Concrete
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Update(BarberStoreUpdateDto dto, Guid currentUserId)
         {
+            var getBarber = await barberStoreDal.Get(x=>x.Id == dto.Id);
+
+            if(getBarber.BarberStoreOwnerId != currentUserId)
+                return new ErrorResult("Bu işleme yetkiniz yoktur.");
+
             IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs, c => c.BarberId.ToString()));
             if (result != null)
                 return result;
+
             var anyAppointCt = await appointmentService.AnyStoreControl(dto.Id);
             if (anyAppointCt.Data)
                 return new ErrorResult("Bu dükkana ait aktif veya bekleyen randevu var önce müsait olmalısınız ");
          
-            BarberStore store = dto.Adapt<BarberStore>();
-            store.BarberStoreOwnerId = currentUserId;
-            await barberStoreDal.Update(store);
+
+            dto.Adapt(getBarber);
+            await barberStoreDal.Update(getBarber);
             await _imageService.UpdateRangeAsync(dto.StoreImageList);
             await _serviceOfferingService.UpdateRange(dto.Offerings);
             await workingHourService.UpdateRangeAsync(dto.WorkingHours);

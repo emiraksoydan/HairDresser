@@ -17,7 +17,7 @@ namespace Business.Concrete
     {
         public async Task<IDataResult<bool>> AnyControl(Guid id)
         {
-            var hasBlocking = await appointmentDal.AnyAsync(x=>x.WorkerUserId ==  id && (x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved));
+            var hasBlocking = await appointmentDal.AnyAsync(x=>(x.WorkerUserId ==  id || x.AppointmentFromId == id || x.AppointmentToId == id) && (x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved));
      
             return new SuccessDataResult<bool>(hasBlocking);
         }

@@ -11,9 +11,11 @@ namespace Business.Abstract
     public interface IFreeBarberService
     {
         Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId);
-        Task<IResult> Update(FreeBarberUpdateDto freeBarberUpdateDto);
+        Task<IResult> Update(FreeBarberUpdateDto freeBarberUpdateDto, Guid currentUserId);
         Task<IResult> DeleteAsync(Guid panelId);
         Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance);
-        Task<IDataResult<FreeBarberDetailDto>> GetMyPanel(Guid currentUserId); 
+        Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId);
+
+        Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId);
     }
 }

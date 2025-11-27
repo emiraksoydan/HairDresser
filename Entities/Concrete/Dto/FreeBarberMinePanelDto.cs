@@ -9,7 +9,7 @@ using Entities.Concrete.Enums;
 
 namespace Entities.Concrete.Dto
 {
-    public class FreeBarberDetailDto : IDto
+    public class FreeBarberMinePanelDto : IDto
     {
         public Guid Id { get; set; }
         public string FullName { get; set; }
@@ -17,10 +17,8 @@ namespace Entities.Concrete.Dto
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
         public bool IsAvailable { get; set; }
-
         public int ReviewCount { get; set; }
-        public List<ImageGetDto> FreeBarberImageList { get; set; }
-
+        public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
 }

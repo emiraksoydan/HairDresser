@@ -17,7 +17,8 @@ namespace DataAccess.Concrete
             _context = context;
         }
 
-        public async Task<FreeBarberDetailDto> GetMyPanel(Guid currentUserId)
+
+        public async Task<FreeBarberMinePanelDto> GetMyPanel(Guid currentUserId)
         {
             var freeBarber = await _context.FreeBarbers
                .AsNoTracking()
@@ -32,13 +33,14 @@ namespace DataAccess.Concrete
                    s.FirstName,
                    s.LastName,
                    s.BarberCertificate,
+                   s.IsAvailable,
 
 
                })
                .FirstOrDefaultAsync();
 
             if (freeBarber is null)
-                return new FreeBarberDetailDto();
+                return new FreeBarberMinePanelDto();
 
             var avgRating = await _context.Ratings
             .AsNoTracking()
@@ -54,16 +56,7 @@ namespace DataAccess.Concrete
                 .AsNoTracking()
                 .CountAsync(f => f.FavoritedToId == freeBarber.Id);
 
-            var blockingStatuses = new[] { "pending", "approval" };
-
-            var hasBlockingAppointment = await _context.Appointments
-                .AsNoTracking()
-                .AnyAsync(a =>
-                    (a.WorkerUserId == freeBarber.Id || a.AppointmentFromId == freeBarber.Id || a.AppointmentToId == freeBarber.Id) &&
-                    (a.Status == AppointmentStatus.Pending || a.Status == AppointmentStatus.Approved)
-                );
-
-            var isAvailable = !hasBlockingAppointment;
+  
             var images = await _context.Images
                 .AsNoTracking()
                 .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
@@ -85,13 +78,13 @@ namespace DataAccess.Concrete
                 })
                 .ToListAsync();
 
-            return new FreeBarberDetailDto
+            return new FreeBarberMinePanelDto
             {
                 Id = freeBarber.Id,
                 Type = freeBarber.Type,
                 FullName = freeBarber.FirstName + " " + freeBarber.LastName,
-                IsAvailable = isAvailable,
-                FreeBarberImageList = images,
+                IsAvailable = freeBarber.IsAvailable,
+                ImageList = images,
                 Offerings = offerings,
                 FavoriteCount = favoriteCount,
                 Rating = avgRating,
@@ -119,6 +112,7 @@ namespace DataAccess.Concrete
                     s.FirstName,
                     s.LastName,
                     s.FreeBarberUserId,
+                    s.IsAvailable,
 
                 })
                 .ToListAsync();
@@ -209,6 +203,7 @@ namespace DataAccess.Concrete
                     return new FreeBarberGetDto
                     {
                         Id = s.Id,
+                        IsAvailable = s.IsAvailable,
                         ImageList = images ?? new List<ImageGetDto>(),
                         Type = s.Type,
                         Latitude = s.Latitude,
@@ -219,6 +214,7 @@ namespace DataAccess.Concrete
                         Rating = Math.Round(avgRating, 2),
                         Offerings = offerings ?? new List<ServiceOfferingGetDto>(),
                         DistanceKm = Math.Round(distance, 3)
+                        
                     };
                 })
                 .Where(dto => dto != null)
@@ -227,6 +223,61 @@ namespace DataAccess.Concrete
                 .ToList()!;
 
             return result;
+        }
+
+        public async Task<FreeBarberMinePanelDetailDto> GetPanelDetailById(Guid panelId)
+        {
+            var freeBarber = await _context.FreeBarbers
+               .AsNoTracking()
+               .Where(b => b.Id == panelId)
+               .Select(s => new
+               {
+                   s.Id,
+                   s.FreeBarberUserId,
+                   s.Type,
+                   s.FirstName,
+                   s.LastName,
+                   s.BarberCertificate,
+                   s.IsAvailable,
+
+               })
+               .FirstOrDefaultAsync();
+
+            if (freeBarber is null)
+                return new FreeBarberMinePanelDetailDto();
+
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Select(i => new ImageGetDto
+                {
+                    Id = i.Id,
+                    ImageUrl = i.ImageUrl
+                })
+                .ToListAsync();
+
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => o.OwnerId == freeBarber.Id)
+                .Select(o => new ServiceOfferingGetDto
+                {
+                    Id = o.Id,
+                    ServiceName = o.ServiceName,
+                    Price = o.Price
+                })
+                .ToListAsync();
+
+            return new FreeBarberMinePanelDetailDto
+            {
+                Id = freeBarber.Id,
+                FreeBarberUserId = freeBarber.FreeBarberUserId,
+                Type = freeBarber.Type,
+                FirstName = freeBarber.FirstName,
+                LastName = freeBarber.LastName,
+                IsAvailable = freeBarber.IsAvailable,
+                ImageList = images,
+                Offerings = offerings,
+            };
         }
     }
 }
