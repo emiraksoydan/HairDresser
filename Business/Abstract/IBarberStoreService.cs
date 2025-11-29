@@ -18,5 +18,7 @@ namespace Business.Abstract
         Task<IDataResult<List<BarberStoreMineDto>>> GetByCurrentUserAsync(Guid currentUserId);
         Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance);
 
+        Task<IDataResult<BarberStoreMineDto>> GetBarberStoreForUsers(Guid storeId);
+
     }
 }

@@ -16,6 +16,97 @@ namespace DataAccess.Concrete
             _context = context;
         }
 
+        public async Task<BarberStoreMineDto> GetBarberStoreForUsers(Guid storeId)
+        {
+            TimeZoneInfo tz;
+            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
+            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
+            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+
+            // 1) Store
+            var store = await _context.BarberStores
+                .AsNoTracking()
+                .Where(s => s.Id == storeId)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.StoreName,
+                    s.Type,
+                    s.AddressDescription,
+                    s.PricingValue,
+                    s.PricingType,
+                })
+                .FirstOrDefaultAsync();
+
+            if (store == null)
+                return new BarberStoreMineDto();
+
+            // 2) Rating + review count (tek store)
+            var ratingInfo = await _context.Ratings
+                .AsNoTracking()
+                .Where(r => r.TargetId == store.Id)
+                .GroupBy(r => r.TargetId)
+                .Select(g => new
+                {
+                    AvgRating = g.Average(x => (double)x.Score),
+                    ReviewCount = g.Count()
+                })
+                .FirstOrDefaultAsync();
+
+            // 3) Favorite count
+            var favoriteCount = await _context.Favorites
+                .AsNoTracking()
+                .CountAsync(f => f.FavoritedToId == store.Id);
+
+            // 4) Offerings
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => o.OwnerId == store.Id)
+                .Select(o => new ServiceOfferingGetDto
+                {
+                    Id = o.Id,
+                    ServiceName = o.ServiceName,
+                    Price = o.Price
+                })
+                .ToListAsync();
+
+            // 5) Working hours
+            var hours = await _context.WorkingHours
+                .AsNoTracking()
+                .Where(w => w.OwnerId == store.Id)
+                .ToListAsync();
+
+            // 6) Images
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.OwnerType == ImageOwnerType.Store && i.ImageOwnerId == store.Id)
+                .Select(i => new ImageGetDto
+                {
+                    Id = i.Id,
+                    ImageUrl = i.ImageUrl
+                })
+                .ToListAsync();
+
+            var isOpenNow = OpenControl.IsOpenNow(hours, nowLocal);
+
+            return new BarberStoreMineDto
+            {
+                Id = store.Id,
+                StoreName = store.StoreName,
+                ImageList = images,
+                Type = store.Type,
+                Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2),
+                ReviewCount = ratingInfo?.ReviewCount ?? 0,
+                FavoriteCount = favoriteCount,
+                IsOpenNow = isOpenNow,
+                ServiceOfferings = offerings,
+                AddressDescription = store.AddressDescription,
+                PricingType = store.PricingType.ToString(),
+                PricingValue = store.PricingValue,
+            };
+        }
+
+
         public async Task<BarberStoreDetail> GetByIdStore(Guid storeId)
         {
             TimeZoneInfo tz;
@@ -278,8 +369,6 @@ namespace DataAccess.Concrete
             return result;
         }
 
-
-
         public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1)
         {
             TimeZoneInfo tz;
@@ -426,5 +515,7 @@ namespace DataAccess.Concrete
 
             return result;
         }
+
+       
     }
 }

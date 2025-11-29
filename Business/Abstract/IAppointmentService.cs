@@ -15,5 +15,7 @@ namespace Business.Abstract
         Task<IDataResult<bool>> AnyChairControl(Guid id);
         Task<IDataResult<bool>> AnyStoreControl(Guid id);
 
+        Task<IDataResult<List<ChairSlotDto>>> GetAvailibity(Guid storeId,DateOnly dateOnly, CancellationToken ct = default);
+
     }
 }

@@ -123,6 +123,18 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
                     .WithMessage("Başlangıç saati bitiş saatinden küçük olmalı.")
                     .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
 
+                c.RuleFor(w => w)
+          .Must(w =>
+          {
+              if (!TryParseHHmm(w.StartTime, out var s)) return false;
+              if (!TryParseHHmm(w.EndTime, out var e)) return false;
+
+              var minutes = (e - s).TotalMinutes;
+              return minutes > 0 && minutes % 60 == 0;
+          })
+          .WithMessage("Çalışma aralığı 1 saatlik slotlara tam bölünebilmeli.")
+          .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
+
                 // 6–18 saat aralığı
                 c.RuleFor(w => w)
                     .Must(w =>

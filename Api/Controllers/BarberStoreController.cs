@@ -48,12 +48,19 @@ namespace Api.Controllers
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
             var result = await _storeService.GetNearbyStoresAsync(lat, lon, distance);
-            return result.Success ? Ok(result.Data) : BadRequest(result);
+            return result.Success ? Ok(result.Data) : NotFound(result);
         }
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine()
         {
             var result = await _storeService.GetByCurrentUserAsync(CurrentUserId);
+            return result.Success ? Ok(result.Data) : NotFound(result);
+        }
+
+        [HttpGet("get-store-for-users")]
+        public async Task<IActionResult> GetStoreForUsers([FromQuery] Guid storeId)
+        {
+            var result = await _storeService.GetBarberStoreForUsers(storeId);
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
     }

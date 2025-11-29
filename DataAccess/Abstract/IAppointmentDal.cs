@@ -11,5 +11,7 @@ namespace DataAccess.Abstract
 {
     public interface IAppointmentDal : IEntityRepository<Appointment>
     {
+        Task<List<ChairSlotDto>> GetAvailibilitySlot(Guid storeId,DateOnly dateOnly,CancellationToken ct = default);
+
     }
 }

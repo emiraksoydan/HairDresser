@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
 using Entities.Abstract;
 using Entities.Concrete.Enums;
 
@@ -21,6 +17,7 @@ namespace Entities.Concrete.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public bool IsLinkedAppointment { get; set; }
+        public DateOnly AppointmentDate { get; set; }
         public ICollection<AppointmentServiceOffering> ServiceOfferings { get; set; }
 
     }

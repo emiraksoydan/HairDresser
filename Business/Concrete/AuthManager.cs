@@ -1,22 +1,17 @@
 ﻿
-using Autofac.Core;
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
 using Core.Utilities.Results;
-using Core.Utilities.Security.Hashing;
 using Core.Utilities.Security.JWT;
 using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
-using Microsoft.EntityFrameworkCore.Storage;
-using Newtonsoft.Json.Linq;
-using Twilio.Jwt.AccessToken;
-using Twilio.Types;
+
 
 namespace Business.Concrete
 {
@@ -50,6 +45,7 @@ namespace Business.Concrete
         }
 
         [ValidationAspect(typeof(VerifyOtpValidator))]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<AccessToken>> VerifyOtpAsync(UserForVerifyDto userForVerifyDto, string? ip, string? device)
         {
             var e164 = phoneService.NormalizeToE164(userForVerifyDto.PhoneNumber);
@@ -109,7 +105,7 @@ namespace Business.Concrete
             await refreshTokenDal.Update(token);
             return rotated;
         }
-
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> RevokeAsync(Guid userId, string plainRefresh, string? ip)
         {
             var fp = refreshTokenService.MakeFingerprint(plainRefresh);
@@ -224,8 +220,12 @@ namespace Business.Concrete
         }
         private IResult TokenVerifyConstTime(RefreshToken token, string plainRefresh)
         {
+            if (token is null)
+                return new ErrorDataResult<AccessToken>("Geçersiz refresh token.");
+
             if (!refreshTokenService.Verify(plainRefresh, token.TokenHash, token.TokenSalt))
                 return new ErrorDataResult<AccessToken>("Geçersiz refresh token.");
+
             return new SuccessDataResult<AccessToken>();
         }
         private IResult ExpiryActive(RefreshToken token)

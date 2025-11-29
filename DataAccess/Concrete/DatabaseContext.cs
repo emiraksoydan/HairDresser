@@ -40,7 +40,11 @@ namespace DataAccess.Concrete
                 e.HasIndex(x => x.FamilyId);
                 e.HasIndex(x => new { x.UserId, x.RevokedAt, x.ExpiresAt });
             });
- 
+            modelBuilder.Entity<Appointment>().HasIndex(a => new { a.ChairId, a.AppointmentDate, a.StartTime
+           ,a.EndTime}).IsUnique();
+
+
+
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

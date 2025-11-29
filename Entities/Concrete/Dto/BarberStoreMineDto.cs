@@ -19,6 +19,9 @@ namespace Entities.Concrete.Dto
         public int FavoriteCount { get; set; }
         public int ReviewCount { get; set; }
         public bool IsOpenNow { get; set; }
+        public string? AddressDescription { get; set; }
+        public string? PricingType { get; set; }
+        public double? PricingValue { get; set; }
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
     }
 

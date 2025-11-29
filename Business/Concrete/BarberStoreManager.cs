@@ -82,6 +82,12 @@ namespace Business.Concrete
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
         }
 
+        public async Task<IDataResult<BarberStoreMineDto>> GetBarberStoreForUsers(Guid storeId)
+        {
+            var result = await barberStoreDal.GetBarberStoreForUsers(storeId);
+            return new SuccessDataResult<BarberStoreMineDto>(result);
+        }
+
         private IResult BarberAttemptCore<TChair>(List<TChair>? chairList,Func<TChair, string?> getBarberId)
         {
             if (chairList == null || chairList.Count == 0)
@@ -177,7 +183,6 @@ namespace Business.Concrete
             }
         }
 
-
-
+   
     }
 }

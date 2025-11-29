@@ -17,29 +17,14 @@ namespace Api.Controllers
             _svc = svc;
         }
 
-        private Guid GetUserId()
+
+        [HttpGet("availability")]
+        public async Task<IActionResult> GetAvailability([FromQuery] Guid storeId, [FromQuery] DateOnly dateOnly, CancellationToken ct)
         {
-            var idStr = User.FindFirst("identifier")?.Value;
-            if (string.IsNullOrWhiteSpace(idStr)) throw new UnauthorizedAccessException("identifier claim missing");
-            return Guid.Parse(idStr);
+            var data = await _svc.GetAvailibity(storeId, dateOnly, ct);
+            return Ok(data);
         }
 
-        [HttpPost("freebarber")]
-        public async Task<IActionResult> CreateForFreeBarber()
-        {
-
-            
-
-            return  Ok();
-        }
-
-        [HttpPost("store")]
-        public async Task<IActionResult> CreateForStore()
-        {
-            
-            return  Ok();
-        }
-  
     }
    
 }

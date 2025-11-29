@@ -270,11 +270,11 @@ namespace DataAccess.Concrete
             return new FreeBarberMinePanelDetailDto
             {
                 Id = freeBarber.Id,
-                FreeBarberUserId = freeBarber.FreeBarberUserId,
                 Type = freeBarber.Type,
                 FirstName = freeBarber.FirstName,
                 LastName = freeBarber.LastName,
                 IsAvailable = freeBarber.IsAvailable,
+                BarberCertificate = freeBarber.BarberCertificate,
                 ImageList = images,
                 Offerings = offerings,
             };
