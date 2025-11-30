@@ -21,13 +21,6 @@ namespace Entities.Concrete.Entities
         public bool IsLinkedAppointment { get; set; }
         public ICollection<AppointmentServiceOffering> ServiceOfferings { get; set; } = new List<AppointmentServiceOffering>();
 
-        public AppointmentRequester RequestedBy { get; set; }
-        public bool RequiresStoreApproval { get; set; }
-        public bool RequiresWorkerApproval { get; set; }
-        public DateTime PendingExpiresAtUtc { get; set; } 
-        public DateTime? StoreApprovedAtUtc { get; set; }
-        public DateTime? WorkerApprovedAtUtc { get; set; }
-        public byte[] RowVersion { get; set; } = default!;
 
     }
 }
