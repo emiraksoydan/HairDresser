@@ -11,12 +11,15 @@ namespace Entities.Concrete.Entities
     public class Notification : IEntity
     {
         public Guid Id { get; set; }
-        public Guid SenderId { get; set; }  
-        public Guid ReceiverId { get; set; }
-        public NotificationType Type { get; set; } 
-        public string Payload { get; set; }  
-        public bool IsRead { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public NotificationType Type { get; set; }
+
+        public string Title { get; set; } = default!;
+        public string Body { get; set; } = default!;
+        public string DataJson { get; set; } = "{}";
+        public DateTime CreatedAtUtc { get; set; }
+
+        // idempotency anahtarı (aynı olayı tekrar basmayı engeller)
+        public string CorrelationKey { get; set; } = default!;
     }
 }
+

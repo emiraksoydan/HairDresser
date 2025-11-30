@@ -42,5 +42,19 @@ namespace Business.Concrete
             var res = await appointmentDal.GetAvailibilitySlot(storeId, dateOnly, ct);
             return new SuccessDataResult<List<ChairSlotDto>>(res);
         }
+
+        private static (bool reqStore, bool reqWorker) ComputeApprovals(AppointmentRequester requestedBy, Guid? appointmentToId, Guid? workerUserId)
+        {
+            // appointmentToId store userId ise store onayı fikri çalışır (store->free senaryosunda reqStore=false ayarlıyoruz)
+            var reqStore = appointmentToId != null && requestedBy != AppointmentRequester.Store;
+
+            // worker/free barber onayı (worker varsa ve requester worker değilse)
+            var reqWorker = workerUserId != null && requestedBy != AppointmentRequester.FreeBarber;
+
+            return (reqStore, reqWorker);
+        }
+
+
+
     }
 }
