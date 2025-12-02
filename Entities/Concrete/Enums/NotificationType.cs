@@ -13,6 +13,7 @@ namespace Entities.Concrete.Enums
         AppointmentRejected = 3,
         AppointmentExpired = 4,
         AppointmentCancelled = 5,
-        AppointmentUpdated = 6
+        AppointmentUpdated = 6,
+        AppointmentUnanswered = 7,
     }
 }

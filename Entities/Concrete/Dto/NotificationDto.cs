@@ -6,18 +6,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Entities.Concrete.Entities
+namespace Entities.Concrete.Dto
 {
-    public class Notification : IEntity
+    public class NotificationDto : IDto
     {
         public Guid Id { get; set; }
-        public Guid UserId { get; set; }             
-        public Guid? AppointmentId { get; set; }     
         public NotificationType Type { get; set; }
+        public Guid? AppointmentId { get; set; }
         public string Title { get; set; } = default!;
+        public string Body { get; set; } = default!;
         public string PayloadJson { get; set; } = "{}";
-        public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
-        public DateTime? ReadAt { get; set; }
+
+
     }
 }

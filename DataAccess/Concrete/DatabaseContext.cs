@@ -43,6 +43,23 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<Appointment>().HasIndex(a => new { a.ChairId, a.AppointmentDate, a.StartTime
            ,a.EndTime}).IsUnique();
 
+            modelBuilder.Entity<Appointment>()
+              .HasIndex(x => new { x.Status, x.PendingExpiresAt });
+
+            modelBuilder.Entity<Appointment>().Property(x => x.RowVersion).IsRowVersion();
+
+          
+
+            modelBuilder.Entity<ChatThread>()
+                .HasIndex(x => x.AppointmentId)
+                .IsUnique();
+
+            modelBuilder.Entity<ChatMessage>()
+                .HasIndex(x => new { x.ThreadId, x.CreatedAt });
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAt });
+
 
 
         }
@@ -71,6 +88,9 @@ namespace DataAccess.Concrete
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AppointmentServiceOffering> AppointmentServiceOfferings { get; set; }
         public DbSet<Image> Images { get; set; }
+
+        public DbSet<ChatThread> ChatThreads { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
 
     }
 }

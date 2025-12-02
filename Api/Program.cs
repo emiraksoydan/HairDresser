@@ -1,6 +1,10 @@
 
+using Api.BackgroundServices;
+using Api.Hubs;
+using Api.RealTime;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Business.Abstract;
 using Business.DependencyResolvers.Autofac;
 using Core.DependencyResolvers;
 using Core.Extensions;
@@ -64,6 +68,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey),
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/app"))
+                    context.Token = accessToken;
+
+                return Task.CompletedTask;
+            }
+        };
     });
 builder.Services.AddDependencyResolvers(new ICoreModule[]
 {
@@ -75,9 +92,14 @@ builder.Host.ConfigureContainer<ContainerBuilder>(options =>
 {
     options.RegisterModule(new AutofacBusinessModule());
 });
+builder.Services.AddSingleton<IRealTimePublisher,SignalRRealtimePublisher>();
+builder.Services.AddHostedService<AppointmentTimeoutWorker>();
+
 
 
 var app = builder.Build();
+
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -94,6 +116,8 @@ app.UseCors();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHub<AppHub>("/hubs/app");
+
 app.MapControllers();
 
 app.Run();

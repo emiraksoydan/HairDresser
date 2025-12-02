@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Core.Extensions;
 using DataAccess.Abstract;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,30 +11,15 @@ namespace Api.Controllers
     public class NotificationController : ControllerBase
     {
         private readonly INotificationService _svc;
-        private Guid GetUserId()
-        {
-            var idStr = User.FindFirst("identifier")?.Value;
-            if (string.IsNullOrWhiteSpace(idStr)) throw new UnauthorizedAccessException("identifier claim missing");
-            return Guid.Parse(idStr);
-        }
-
+ 
         public NotificationController( INotificationService svc) {  _svc = svc; }
 
-
-
-        [HttpGet("unread-count")]
-        public async Task<IActionResult> Unread()
+        [HttpPost("read/{id:guid}")]
+        public async Task<IActionResult> MarkRead(Guid id)
         {
-            var result = await _svc.GetUnreadCountAsync(GetUserId());
-            return result.Success ? Ok(result) : NotFound(result);
-
+            var result = await _svc.MarkReadAsync(User.GetUserIdOrThrow(), id);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
-        [HttpGet("getall")]
-        public async Task<IActionResult> GetAllNotifyList()
-        {
-            var result = await _svc.GetAllNotify(GetUserId());
-            return result.Success ? Ok(result) : NotFound(result);
 
-        }
     }
 }
