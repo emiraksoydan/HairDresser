@@ -35,7 +35,7 @@ namespace Business.Concrete
             if (barber == null)
                 return new ErrorResult("Berber bulunamadı.");
 
-            var hasBlockingAppointments = await appointmentService.AnyControl(barber.Id);
+            var hasBlockingAppointments = await appointmentService.AnyManuelBarberControl(barber.Id);
             if (hasBlockingAppointments.Data)
                 return new ErrorResult("Bu berberinize ait beklemekte olan veya aktif olan randevu işlemi vardır.");
 
@@ -113,7 +113,7 @@ namespace Business.Concrete
         // Helpers Method
         private async Task<IResult> CheckBarberHasNoBlockingAppointments(Guid barberId)
         {
-            var hasBlockingAppointments = await appointmentService.AnyControl(barberId);
+            var hasBlockingAppointments = await appointmentService.AnyManuelBarberControl(barberId);
             if (hasBlockingAppointments.Data)
                 return new ErrorResult("Bu berberinize ait beklemekte olan veya aktif olan randevu işlemi vardır.");
 

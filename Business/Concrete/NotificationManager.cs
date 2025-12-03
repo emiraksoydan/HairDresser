@@ -43,6 +43,7 @@ namespace Business.Concrete
                 PayloadJson = n.PayloadJson,
                 CreatedAt = n.CreatedAt
             };
+            await realtime.PushNotificationAsync(userId, dto);
             var badges = await badgeService.GetCountsAsync(userId);
             if (badges.Success)
                 await realtime.PushBadgeAsync(userId, badges.Data);
@@ -68,13 +69,12 @@ namespace Business.Concrete
 
             return new SuccessDataResult<List<NotificationDto>>(dto);
         }
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<int>> GetUnreadCountAsync(Guid userId)
         {
             var count = (await notificationDal.GetAll(x => x.UserId == userId && x.IsRead == false)).Count;
             return new SuccessDataResult<int>(count);
         }
-
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId)
         {
             var n = await notificationDal.Get(x => x.Id == notificationId && x.UserId == userId);

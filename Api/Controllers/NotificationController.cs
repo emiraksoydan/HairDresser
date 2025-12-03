@@ -21,5 +21,13 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.GetAllNotify(userId);
+            return Ok(result);
+        }
+
     }
 }
