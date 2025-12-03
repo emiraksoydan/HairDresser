@@ -28,7 +28,6 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<FreeBarberManager>().As<IFreeBarberService>().InstancePerLifetimeScope();
             builder.RegisterType<ManuelBarberManager>().As<IManuelBarberService>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentManager>().As<IAppointmentService>().InstancePerLifetimeScope();
-            builder.RegisterType<NotificationOrchestrator>().As<INotificationOrchestrator>().InstancePerLifetimeScope();
             builder.RegisterType<CategoryManager>().As<ICategoryService>().InstancePerLifetimeScope();
             builder.RegisterType<ServiceOfferingManager>().As<IServiceOfferingService>().InstancePerLifetimeScope();
             builder.RegisterType<BarberStoreChairManager>().As<IBarberStoreChairService>().InstancePerLifetimeScope();
