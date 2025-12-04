@@ -20,7 +20,7 @@ namespace Business.Concrete
         IRealTimePublisher realtime) : INotificationService
     {
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IDataResult<Guid>> CreateAndPushAsync(Guid userId, NotificationType type, Guid? appointmentId, string title, object payload )
+        public async Task<IDataResult<Guid>> CreateAndPushAsync(Guid userId, NotificationType type, Guid? appointmentId, string title, object payload, string? body = null)
         {
             var n = new Notification
             {
@@ -29,21 +29,27 @@ namespace Business.Concrete
                 AppointmentId = appointmentId,
                 Type = type,
                 Title = title,
+                Body = body,
                 PayloadJson = JsonSerializer.Serialize(payload),
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
+
             await notificationDal.Add(n);
+
             var dto = new NotificationDto
             {
                 Id = n.Id,
                 Type = n.Type,
                 AppointmentId = n.AppointmentId,
                 Title = n.Title,
+                Body = n.Body,
                 PayloadJson = n.PayloadJson,
                 CreatedAt = n.CreatedAt
             };
+
             await realtime.PushNotificationAsync(userId, dto);
+
             var badges = await badgeService.GetCountsAsync(userId);
             if (badges.Success)
                 await realtime.PushBadgeAsync(userId, badges.Data);
@@ -55,14 +61,15 @@ namespace Business.Concrete
         public async Task<IDataResult<List<NotificationDto>>> GetAllNotify(Guid userId)
         {
             var list = await notificationDal.GetAll(x => x.UserId == userId);
-            var dto = list
-                .OrderByDescending(x => x.CreatedAt)
+
+            var dto = list.OrderByDescending(x => x.CreatedAt)
                 .Select(x => new NotificationDto
                 {
                     Id = x.Id,
                     Type = x.Type,
                     AppointmentId = x.AppointmentId,
                     Title = x.Title,
+                    Body = x.Body,
                     PayloadJson = x.PayloadJson,
                     CreatedAt = x.CreatedAt
                 }).ToList();
@@ -71,17 +78,18 @@ namespace Business.Concrete
         }
         public async Task<IDataResult<int>> GetUnreadCountAsync(Guid userId)
         {
-            var count = (await notificationDal.GetAll(x => x.UserId == userId && x.IsRead == false)).Count;
+            var count = (await notificationDal.GetAll(x => x.UserId == userId && !x.IsRead)).Count;
             return new SuccessDataResult<int>(count);
         }
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId)
         {
             var n = await notificationDal.Get(x => x.Id == notificationId && x.UserId == userId);
-            if (n is null) return new ErrorDataResult<bool>(false, "Bildirim bulunuamadı");
+            if (n is null) return new ErrorDataResult<bool>(false, "Bildirim bulunamadı");
 
             n.IsRead = true;
             n.ReadAt = DateTime.UtcNow;
+
             await notificationDal.Update(n);
 
             var badges = await badgeService.GetCountsAsync(userId);

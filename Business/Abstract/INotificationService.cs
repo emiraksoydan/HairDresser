@@ -17,7 +17,7 @@ namespace Business.Abstract
         NotificationType type,
         Guid? appointmentId,
         string title,
-        object payload);
+        object payload,string? body);
 
         Task<IDataResult<int>> GetUnreadCountAsync(Guid userId);
         Task<IDataResult<List<NotificationDto>>> GetAllNotify(Guid userId);

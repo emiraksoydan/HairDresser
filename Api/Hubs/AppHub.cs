@@ -10,9 +10,18 @@ namespace Api.Hubs
     {
         public override async Task OnConnectedAsync()
         {
-            var userId = Context.User!.GetUserIdOrThrow();
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+            var userIdStr = Context?.User?.GetUserIdOrThrow();
+
+            if (Guid.TryParse(userIdStr.ToString(), out var userId))
+                await Groups.AddToGroupAsync(Context?.ConnectionId!, $"user:{userId}");
+
             await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            // istersen remove de yapabilirsin (şart değil)
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

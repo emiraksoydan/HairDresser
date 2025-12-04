@@ -1,4 +1,5 @@
-﻿using DataAccess.Concrete;
+﻿using Business.Abstract;
+using DataAccess.Concrete;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,8 +12,10 @@ namespace Api.BackgroundServices
             while (!stoppingToken.IsCancellationRequested)
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
+
                 var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-                var notification = scope.ServiceProvider.GetRequiredService<Business.Abstract.INotificationService>();
+                var notifySvc = scope.ServiceProvider.GetRequiredService<IAppointmentNotifyService>();
+                var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
 
                 var now = DateTime.UtcNow;
 
@@ -25,28 +28,34 @@ namespace Api.BackgroundServices
                 foreach (var appt in expired)
                 {
                     appt.Status = AppointmentStatus.Unanswered;
+                    appt.PendingExpiresAt = null;
+                    appt.UpdatedAt = DateTime.UtcNow;
+
                     if (appt.StoreDecision == DecisionStatus.Pending)
                         appt.StoreDecision = DecisionStatus.NoAnswer;
+
                     if (appt.FreeBarberDecision == DecisionStatus.Pending)
                         appt.FreeBarberDecision = DecisionStatus.NoAnswer;
 
-                    // herkese noti
-                    var targets = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId, }
-                        .Where(x => x.HasValue)
-                        .Select(x => x!.Value)
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var u in targets)
+                    // freebarber release
+                    if (appt.FreeBarberUserId.HasValue)
                     {
-                        await notification.CreateAndPushAsync(
-                            u,
-                            NotificationType.AppointmentUnanswered,
-                            appt.Id,
-                            "Randevu yanıtlanmadı",
-                            new { appointmentId = appt.Id, status = "Unanswered" }
-                        );
+                        var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == appt.FreeBarberUserId.Value);
+                        if (fb != null)
+                        {
+                            fb.IsAvailable = true;
+                            fb.UpdatedAt = DateTime.UtcNow;
+                            await freeBarberDal.Update(fb);
+                        }
                     }
+
+                    // notify all participants (persist + realtime + badge)
+                    await notifySvc.NotifyAsync(
+                        appt.Id,
+                        NotificationType.AppointmentUnanswered,
+                        actorUserId: null,
+                        extra: new { reason = "timeout_5min", status = "Unanswered" }
+                    );
                 }
 
                 if (expired.Count > 0)

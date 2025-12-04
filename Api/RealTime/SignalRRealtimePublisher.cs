@@ -15,5 +15,9 @@ namespace Api.RealTime
 
         public Task PushBadgeAsync(Guid userId, BadgeCountDto dto) =>
             hub.Clients.Group($"user:{userId}").SendAsync("badge.updated", dto);
+
+
+        public Task PushChatThreadCreatedAsync(Guid userId, ChatThreadListItemDto dto) =>
+            hub.Clients.Group($"user:{userId}").SendAsync("chat.threadCreated", dto);
     }
 }

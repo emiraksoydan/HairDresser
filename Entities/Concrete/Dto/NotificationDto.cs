@@ -13,8 +13,8 @@ namespace Entities.Concrete.Dto
         public Guid Id { get; set; }
         public NotificationType Type { get; set; }
         public Guid? AppointmentId { get; set; }
-        public string Title { get; set; } = default!;
-        public string Body { get; set; } = default!;
+        public string Title { get; set; } = null!;
+        public string? Body { get; set; }
         public string PayloadJson { get; set; } = "{}";
         public DateTime CreatedAt { get; set; }
 

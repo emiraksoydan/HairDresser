@@ -40,7 +40,8 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<NotificationManager>().As<INotificationService>().InstancePerLifetimeScope();
             builder.RegisterType<BadgeManager>().As<IBadgeService>().InstancePerLifetimeScope();
             builder.RegisterType<ChatManager>().As<IChatService>().InstancePerLifetimeScope();
-
+            builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
+            builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
 
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();

@@ -12,5 +12,7 @@ namespace Business.Abstract
         Task PushNotificationAsync(Guid userId, NotificationDto dto);
         Task PushChatMessageAsync(Guid userId, ChatMessageDto dto);
         Task PushBadgeAsync(Guid userId, BadgeCountDto dto);
+        Task PushChatThreadCreatedAsync(Guid userId, ChatThreadListItemDto dto);
+
     }
 }
