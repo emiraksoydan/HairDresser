@@ -17,16 +17,24 @@ namespace DataAccess.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ChairId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    AppointmentFromId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AppointmentToId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    WorkerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     StartTime = table.Column<TimeSpan>(type: "time", nullable: false),
                     EndTime = table.Column<TimeSpan>(type: "time", nullable: false),
+                    AppointmentDate = table.Column<DateOnly>(type: "date", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IsLinkedAppointment = table.Column<bool>(type: "bit", nullable: false),
-                    AppointmentDate = table.Column<DateOnly>(type: "date", nullable: false)
+                    BarberStoreUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    CustomerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    FreeBarberUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    ManuelBarberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    RequestedBy = table.Column<int>(type: "int", nullable: false),
+                    StoreDecision = table.Column<int>(type: "int", nullable: false),
+                    FreeBarberDecision = table.Column<int>(type: "int", nullable: false),
+                    PendingExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CancelledByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -88,6 +96,45 @@ namespace DataAccess.Migrations
                         column: x => x.ParentId,
                         principalTable: "Categories",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ChatMessages",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ThreadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    SenderUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Text = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsSystem = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatMessages", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ChatThreads",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CustomerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    StoreOwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    FreeBarberUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    CustomerUnreadCount = table.Column<int>(type: "int", nullable: false),
+                    StoreUnreadCount = table.Column<int>(type: "int", nullable: false),
+                    FreeBarberUnreadCount = table.Column<int>(type: "int", nullable: false),
+                    LastMessageAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastMessagePreview = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatThreads", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -162,13 +209,15 @@ namespace DataAccess.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SenderId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ReceiverId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     Type = table.Column<int>(type: "int", nullable: false),
-                    Payload = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Body = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PayloadJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsRead = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    ReadAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -346,6 +395,11 @@ namespace DataAccess.Migrations
                 filter: "[ChairId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Appointments_Status_PendingExpiresAt",
+                table: "Appointments",
+                columns: new[] { "Status", "PendingExpiresAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AppointmentServiceOfferings_AppointmentId",
                 table: "AppointmentServiceOfferings",
                 column: "AppointmentId");
@@ -354,6 +408,22 @@ namespace DataAccess.Migrations
                 name: "IX_Categories_ParentId",
                 table: "Categories",
                 column: "ParentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_ThreadId_CreatedAt",
+                table: "ChatMessages",
+                columns: new[] { "ThreadId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatThreads_AppointmentId",
+                table: "ChatThreads",
+                column: "AppointmentId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notifications_UserId_IsRead_CreatedAt",
+                table: "Notifications",
+                columns: new[] { "UserId", "IsRead", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Ratings_RatedFromId",
@@ -406,6 +476,12 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "Categories");
+
+            migrationBuilder.DropTable(
+                name: "ChatMessages");
+
+            migrationBuilder.DropTable(
+                name: "ChatThreads");
 
             migrationBuilder.DropTable(
                 name: "Favorites");

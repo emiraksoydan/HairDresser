@@ -80,6 +80,12 @@ namespace Business.Concrete
             return new SuccessDataResult<FreeBarberMinePanelDetailDto>(result);
         }
 
+        public async Task<IDataResult<FreeBarberMinePanelDto>> GetFreeBarberForUsers(Guid freeBarberId)
+        {
+            var result = await freeBarberDal.GetFreeBarberForUsers(freeBarberId);
+            return new SuccessDataResult<FreeBarberMinePanelDto>(result);
+        }
+
         private async Task SaveFreeBarberImagesAsync(FreeBarberCreateDto dto, Guid panelId)
         {
             if (dto.ImageList?.Count > 0)
@@ -104,5 +110,7 @@ namespace Business.Concrete
                 await _serviceOfferingService.AddRangeAsync(offers);
             }
         }
+
+
     }
 }

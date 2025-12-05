@@ -33,7 +33,10 @@ namespace Business.Concrete
                 .ToList();
 
             // tek seferde summary çek
-            var userMap = await userSummarySvc.GetManyAsync(recipients);
+            var userMapRes = await userSummarySvc.GetManyAsync(recipients);
+            var userMap = (userMapRes.Success && userMapRes.Data is not null)
+                ? userMapRes.Data
+                : new Dictionary<Guid, UserNotifyDto>();
 
             UserNotifyDto? GetUser(Guid? id)
                 => id.HasValue && userMap.TryGetValue(id.Value, out var u) ? u : null;

@@ -16,7 +16,6 @@ namespace Business.Concrete
         IServiceOfferingDal offeringDal,
         IAppointmentServiceOffering apptOfferingDal,
         IChatThreadDal threadDal,
-        IBarberStoreDal storeDal,
         IWorkingHourDal workingHourDal,
         IAppointmentNotifyService notifySvc,
         IRealTimePublisher realtime
@@ -76,7 +75,7 @@ namespace Business.Concrete
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateCustomerToStoreAndFreeBarberControlAsync(Guid customerUserId, CreateAppointmentRequestDto req)
         {
-            var store = await storeDal.Get(x => x.Id == req.StoreId);
+            var store = await barberStoreDal.Get(x => x.Id == req.StoreId);
             if (store is null) return new ErrorDataResult<Guid>("Store not found");
 
             if (!req.ChairId.HasValue) return new ErrorDataResult<Guid>("ChairId is required");
@@ -108,11 +107,36 @@ namespace Business.Concrete
             var overlapRes = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
             if (!overlapRes.Success) return new ErrorDataResult<Guid>(overlapRes.Message);
 
-            // free barber varsa -> sadece availability + lock
+            if (!req.RequestLatitude.HasValue || !req.RequestLongitude.HasValue)
+                return new ErrorDataResult<Guid>("Konum bilgisi gerekli (RequestLatitude/RequestLongitude).");
+
+            var customerLat = req.RequestLatitude.Value;
+            var customerLon = req.RequestLongitude.Value;
+
+            {
+                // store zaten yukarıda "store" değişkeninde var, burada direkt kullan
+                var distRes = EnsureWithinKm(customerLat, customerLon, store.Latitude, store.Longitude, MaxDistanceKm,
+                    "Dükkan 1 km dışında. Yakın değilken randevu oluşturamazsın.");
+                if (!distRes.Success) return new ErrorDataResult<Guid>(distRes.Message);
+            }
+
+            FreeBarber? fbEntity = null;
+
             if (req.FreeBarberUserId.HasValue)
             {
-                var fbRes = await EnsureFreeBarberIsAvailableAsync(req.FreeBarberUserId.Value);
+                var fbRes = await GetFreeBarberCheckedAsync(req.FreeBarberUserId.Value, mustBeAvailable: true);
                 if (!fbRes.Success) return new ErrorDataResult<Guid>(fbRes.Message);
+
+                fbEntity = fbRes.Data;
+
+                var distRes2 = EnsureWithinKm(customerLat, customerLon, fbEntity.Latitude, fbEntity.Longitude, MaxDistanceKm,
+                    "Serbest berber 1 km dışında. Yakın değilken randevu oluşturamazsın.");
+                if (!distRes2.Success) return new ErrorDataResult<Guid>(distRes2.Message);
+
+                // 3) FreeBarber ↔ Store  ✅ (kritik)
+                var distFbStore = EnsureWithinKm(fbEntity.Latitude, fbEntity.Longitude, store.Latitude, store.Longitude, MaxDistanceKm,
+                    "Serbest berber ile dükkan arası 1 km dışında. Bu eşleşmeyle randevu açılamaz.");
+                if (!distFbStore.Success) return new ErrorDataResult<Guid>(distFbStore.Message);
             }
 
             // active rules (customer & free barber single-active, store single active "call" rule)
@@ -163,9 +187,9 @@ namespace Business.Concrete
             }
 
             // FREEBARBER LOCK
-            if (req.FreeBarberUserId.HasValue)
+            if (fbEntity is not null)
             {
-                var lockRes = await SetFreeBarberAvailabilityAsync(req.FreeBarberUserId.Value, false);
+                var lockRes = await SetFreeBarberAvailabilityAsync(fbEntity, false);
                 if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
             }
 
@@ -183,7 +207,7 @@ namespace Business.Concrete
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateFreeBarberToStoreAsync(Guid freeBarberUserId, CreateAppointmentRequestDto req)
         {
-            var store = await storeDal.Get(x => x.Id == req.StoreId);
+            var store = await barberStoreDal.Get(x => x.Id == req.StoreId);
             if (store is null) return new ErrorDataResult<Guid>("Store not found");
 
             if (req.StartTime is null || req.EndTime is null) return new ErrorDataResult<Guid>("StartTime/EndTime is required");
@@ -199,8 +223,14 @@ namespace Business.Concrete
             if (!openRes.Success) return new ErrorDataResult<Guid>(openRes.Message);
 
             // freebarber must be available
-            var fbRes = await EnsureFreeBarberIsAvailableAsync(freeBarberUserId);
+            var fbRes = await GetFreeBarberCheckedAsync(freeBarberUserId, mustBeAvailable: true);
             if (!fbRes.Success) return new ErrorDataResult<Guid>(fbRes.Message);
+
+            var fb = fbRes.Data;
+
+            var distRes = EnsureWithinKm(fb.Latitude, fb.Longitude, store.Latitude, store.Longitude, MaxDistanceKm,
+                "Serbest berber ile dükkan arası 1 km dışında. Bu şekilde randevu açılamaz.");
+            if (!distRes.Success) return new ErrorDataResult<Guid>(distRes.Message);
 
             // chair seçilmişse store’a ait + overlap kontrol
             if (req.ChairId.HasValue)
@@ -243,10 +273,8 @@ namespace Business.Concrete
             await appointmentDal.Add(appt);
 
             // lock free barber
-            {
-                var lockRes = await SetFreeBarberAvailabilityAsync(freeBarberUserId, false);
-                if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
-            }
+            var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
+            if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
 
             await EnsureThreadAndPushCreatedAsync(appt);
 
@@ -267,15 +295,22 @@ namespace Business.Concrete
             var end = (TimeSpan)req.EndTime!;
             if (start >= end) return new ErrorDataResult<Guid>("Başlangıç saati bitişten büyük/eşit olamaz.");
 
-            var store = await storeDal.Get(x => x.Id == req.StoreId && x.BarberStoreOwnerId == storeOwnerUserId);
+            var store = await barberStoreDal.Get(x => x.Id == req.StoreId && x.BarberStoreOwnerId == storeOwnerUserId);
             if (store is null) return new ErrorDataResult<Guid>("Store not found or not owner");
 
             var openRes = await EnsureStoreIsOpenAsync(req.StoreId, req.AppointmentDate, start, end);
             if (!openRes.Success) return new ErrorDataResult<Guid>(openRes.Message);
 
             // freebarber only availability
-            var fbRes = await EnsureFreeBarberIsAvailableAsync(req.FreeBarberUserId.Value);
+            var fbRes = await GetFreeBarberCheckedAsync(req.FreeBarberUserId.Value, mustBeAvailable: true);
             if (!fbRes.Success) return new ErrorDataResult<Guid>(fbRes.Message);
+
+            var fb = fbRes.Data;
+
+            var distRes = EnsureWithinKm(store.Latitude, store.Longitude, fb.Latitude, fb.Longitude, MaxDistanceKm,
+                "Dükkan ile serbest berber arası 1 km dışında. Çağrı/randevu açılamaz.");
+            if (!distRes.Success) return new ErrorDataResult<Guid>(distRes.Message);
+
 
             // store aynı anda sadece 1 active "call" kuralı
             var rule = await EnforceActiveRules(customerId: null, freeBarberId: req.FreeBarberUserId.Value, storeOwnerId: storeOwnerUserId, AppointmentRequester.Store);
@@ -308,10 +343,8 @@ namespace Business.Concrete
             await appointmentDal.Add(appt);
 
             // lock free barber
-            {
-                var lockRes = await SetFreeBarberAvailabilityAsync(req.FreeBarberUserId.Value, false);
-                if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
-            }
+            var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
+            if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
 
             await EnsureThreadAndPushCreatedAsync(appt);
 
@@ -326,9 +359,15 @@ namespace Business.Concrete
         public async Task<IDataResult<bool>> StoreDecisionAsync(Guid storeOwnerUserId, Guid appointmentId, bool approve)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt is null) return new ErrorDataResult<bool>(false, "Appointment not found");
-            if (appt.BarberStoreUserId != storeOwnerUserId) return new ErrorDataResult<bool>(false, "Not authorized");
-            if (appt.Status != AppointmentStatus.Pending) return new ErrorDataResult<bool>(false, "Not pending");
+            if (appt is null) return new ErrorDataResult<bool>(false, "Randevu bulunamadı");
+            if (appt.BarberStoreUserId != storeOwnerUserId) return new ErrorDataResult<bool>(false, "Yetki yok");
+            if (appt.Status != AppointmentStatus.Pending) return new ErrorDataResult<bool>(false, "Bekleme yok");
+            var exp = await EnsurePendingNotExpiredAndHandleAsync(appt);
+            if (!exp.Success) return exp;
+
+            // ekstra: aynı taraf tekrar karar veremesin
+            if (appt.StoreDecision != DecisionStatus.Pending)
+                return new ErrorDataResult<bool>(false, "Dükkan kararı zaten verilmiş.");
 
             appt.StoreDecision = approve ? DecisionStatus.Approved : DecisionStatus.Rejected;
             appt.UpdatedAt = DateTime.UtcNow;
@@ -375,9 +414,15 @@ namespace Business.Concrete
         public async Task<IDataResult<bool>> FreeBarberDecisionAsync(Guid freeBarberUserId, Guid appointmentId, bool approve)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt is null) return new ErrorDataResult<bool>("Appointment not found");
-            if (appt.FreeBarberUserId != freeBarberUserId) return new ErrorDataResult<bool>("Not authorized");
-            if (appt.Status != AppointmentStatus.Pending) return new ErrorDataResult<bool>("Not pending");
+            if (appt is null) return new ErrorDataResult<bool>("Randevu bulunamadı");
+            if (appt.FreeBarberUserId != freeBarberUserId) return new ErrorDataResult<bool>("Yetki yok");
+            if (appt.Status != AppointmentStatus.Pending) return new ErrorDataResult<bool>("Beklemede değil");
+
+            var exp = await EnsurePendingNotExpiredAndHandleAsync(appt);
+            if (!exp.Success) return exp;
+
+            if (appt.FreeBarberDecision != DecisionStatus.Pending)
+                return new ErrorDataResult<bool>(false, "Serbest berber kararı zaten verilmiş.");
 
             appt.FreeBarberDecision = approve ? DecisionStatus.Approved : DecisionStatus.Rejected;
             appt.UpdatedAt = DateTime.UtcNow;
@@ -425,17 +470,17 @@ namespace Business.Concrete
         public async Task<IDataResult<bool>> CancelAsync(Guid userId, Guid appointmentId)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt is null) return new ErrorDataResult<bool>(false, "Appointment not found");
+            if (appt is null) return new ErrorDataResult<bool>(false, "Randevu bulunamadı");
 
             var isParticipant =
                 appt.CustomerUserId == userId ||
                 appt.FreeBarberUserId == userId ||
                 appt.BarberStoreUserId == userId;
 
-            if (!isParticipant) return new ErrorDataResult<bool>(false, "Not authorized");
+            if (!isParticipant) return new ErrorDataResult<bool>(false, "Yetki yok");
 
             if (appt.Status is not (AppointmentStatus.Pending or AppointmentStatus.Approved))
-                return new ErrorDataResult<bool>(false, "Cannot cancel");
+                return new ErrorDataResult<bool>(false, "İptal edilemez");
 
             appt.Status = AppointmentStatus.Cancelled;
             appt.CancelledByUserId = userId;
@@ -457,7 +502,7 @@ namespace Business.Concrete
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
             if (appt is null) return new ErrorDataResult<bool>("Randevu bulunamadı");
             if (appt.BarberStoreUserId != storeOwnerUserId) return new ErrorDataResult<bool>("Yetki yok");
-            if (appt.Status != AppointmentStatus.Approved) return new ErrorDataResult<bool>("Not approved");
+            if (appt.Status != AppointmentStatus.Approved) return new ErrorDataResult<bool>("Kabul edilmemiş randevu");
 
             // TR saati ile "bitti mi?"
             var endTrRes = GetAppointmentEndTr(appt);
@@ -546,14 +591,6 @@ namespace Business.Concrete
         }
 
         // FreeBarber table lookup by FreeBarberUserId
-        private async Task<IResult> EnsureFreeBarberIsAvailableAsync(Guid freeBarberUserId)
-        {
-            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
-            if (fb is null) return new ErrorResult("Serbest berber bulunamadı.");
-            if (!fb.IsAvailable) return new ErrorResult("Serbest berber şu an müsait değil.");
-            return new SuccessResult();
-        }
-
         private IResult EnsureNotPast(DateOnly date, TimeSpan start, int bufferMinutes = 0)
         {
             var tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
@@ -611,7 +648,7 @@ namespace Business.Concrete
             await SetFreeBarberAvailabilityAsync(freeBarberUserId.Value, true);
         }
 
-        // YOL-B: thread create + push
+        //  thread create + push
         private async Task EnsureThreadAndPushCreatedAsync(Appointment appt)
         {
             var existing = (await threadDal.GetAll(t => t.AppointmentId == appt.Id)).FirstOrDefault();
@@ -666,5 +703,92 @@ namespace Business.Concrete
             // customer/freebarber tarafı store’u görsün
             return string.IsNullOrWhiteSpace(storeName) ? "Berber Dükkanı" : storeName!;
         }
+
+        private const double MaxDistanceKm = 1.0;
+
+        private static double ToRad(double val) => Math.PI / 180 * val;
+
+        private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371.0;
+            var dLat = ToRad(lat2 - lat1);
+            var dLon = ToRad(lon2 - lon1);
+
+            var a =
+                Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRad(lat1)) * Math.Cos(ToRad(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
+
+        private static IResult EnsureValidCoords(double lat, double lon, string who)
+        {
+            if (lat == 0 && lon == 0)
+                return new ErrorResult($"{who} konumu ayarlı değil.");
+            if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
+                return new ErrorResult($"{who} konumu geçersiz.");
+            return new SuccessResult();
+        }
+
+        private IResult EnsureWithinKm(double fromLat, double fromLon, double toLat, double toLon, double maxKm, string msg)
+        {
+            var v1 = EnsureValidCoords(fromLat, fromLon, "İstek");
+            if (!v1.Success) return v1;
+
+            var v2 = EnsureValidCoords(toLat, toLon, "Hedef");
+            if (!v2.Success) return v2;
+
+            var km = HaversineKm(fromLat, fromLon, toLat, toLon);
+            if (km > maxKm) return new ErrorResult($"{msg} (Mesafe: {km:0.00} km)");
+            return new SuccessResult();
+        }
+
+        private async Task<IDataResult<FreeBarber>> GetFreeBarberCheckedAsync(Guid freeBarberUserId, bool mustBeAvailable = true)
+        {
+            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
+            if (fb is null)
+                return new ErrorDataResult<FreeBarber>("Serbest berber bulunamadı.");
+
+            var v = EnsureValidCoords(fb.Latitude, fb.Longitude, "Serbest berber");
+            if (!v.Success)
+                return new ErrorDataResult<FreeBarber>(v.Message);
+
+            if (mustBeAvailable && !fb.IsAvailable)
+                return new ErrorDataResult<FreeBarber>("Serbest berber şu an müsait değil.");
+
+            return new SuccessDataResult<FreeBarber>(fb);
+        }
+
+        private async Task<IResult> SetFreeBarberAvailabilityAsync(FreeBarber fb, bool isAvailable)
+        {
+            fb.IsAvailable = isAvailable;
+            fb.UpdatedAt = DateTime.UtcNow;
+            await freeBarberDal.Update(fb);
+            return new SuccessResult();
+        }
+
+        private async Task<IDataResult<bool>> EnsurePendingNotExpiredAndHandleAsync(Appointment appt)
+        {
+            // PendingExpiresAt null ise (ör: eski kayıtlar) istersen “expire yok” kabul edebilirsin.
+            if (appt.PendingExpiresAt.HasValue && appt.PendingExpiresAt.Value <= DateTime.UtcNow)
+            {
+                appt.Status = AppointmentStatus.Unanswered;
+                appt.PendingExpiresAt = null;
+                appt.UpdatedAt = DateTime.UtcNow;
+
+                await appointmentDal.Update(appt);
+
+                await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
+                await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
+
+                return new ErrorDataResult<bool>(false, "Randevu süresi dolmuş (yanıtlanmadı).");
+            }
+
+            return new SuccessDataResult<bool>(true);
+        }
+
+
     }
 }

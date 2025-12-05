@@ -17,6 +17,77 @@ namespace DataAccess.Concrete
             _context = context;
         }
 
+        public async Task<FreeBarberMinePanelDto> GetFreeBarberForUsers(Guid freeBarberId)
+        {
+            var freeBarber = await _context.FreeBarbers
+              .AsNoTracking()
+              .Where(b => b.Id == freeBarberId)
+              .Select(s => new
+              {
+                  s.Id,
+                  s.FreeBarberUserId,
+                  s.Latitude,
+                  s.Longitude,
+                  s.Type,
+                  s.FirstName,
+                  s.LastName,
+                  s.BarberCertificate,
+                  s.IsAvailable,
+              })
+              .FirstOrDefaultAsync();
+
+            if (freeBarber is null)
+                return new FreeBarberMinePanelDto();
+
+            var avgRating = await _context.Ratings
+            .AsNoTracking()
+            .Where(r => r.TargetId == freeBarber.Id)
+            .Select(r => (double?)r.Score)
+            .AverageAsync() ?? 0.0;
+
+            var reviewCount = await _context.Ratings
+                .AsNoTracking()
+                .CountAsync(r => r.TargetId == freeBarber.Id);
+
+            var favoriteCount = await _context.Favorites
+                .AsNoTracking()
+                .CountAsync(f => f.FavoritedToId == freeBarber.Id);
+
+
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Select(i => new ImageGetDto
+                {
+                    Id = i.Id,
+                    ImageUrl = i.ImageUrl
+                })
+                .ToListAsync();
+
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => o.OwnerId == freeBarber.Id)
+                .Select(o => new ServiceOfferingGetDto
+                {
+                    Id = o.Id,
+                    ServiceName = o.ServiceName,
+                    Price = o.Price
+                })
+                .ToListAsync();
+
+            return new FreeBarberMinePanelDto
+            {
+                Id = freeBarber.Id,
+                Type = freeBarber.Type,
+                FullName = freeBarber.FirstName + " " + freeBarber.LastName,
+                IsAvailable = freeBarber.IsAvailable,
+                ImageList = images,
+                Offerings = offerings,
+                FavoriteCount = favoriteCount,
+                Rating = avgRating,
+                ReviewCount = reviewCount,
+            };
+        }
 
         public async Task<FreeBarberMinePanelDto> GetMyPanel(Guid currentUserId)
         {

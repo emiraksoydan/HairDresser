@@ -21,7 +21,7 @@ namespace Api.Controllers
         public async Task<IActionResult> Get()
         {
             var result = await _svc.GetCountsAsync(User.GetUserIdOrThrow());
-            return Ok(result);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
     }
 }

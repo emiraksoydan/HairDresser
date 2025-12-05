@@ -3,6 +3,7 @@ using Core.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
@@ -48,6 +49,8 @@ namespace Api.Controllers
     }
     public class SendMessageRequest
     {
+        [Required]
+        [MinLength(1)]
         public string Text { get; set; } = "";
     }
 }

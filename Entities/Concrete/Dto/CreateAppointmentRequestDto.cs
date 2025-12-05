@@ -17,5 +17,9 @@ namespace Entities.Concrete.Dto
         public TimeSpan? EndTime { get; set; }
         public Guid? FreeBarberUserId { get; set; } 
         public List<Guid> ServiceOfferingIds { get; set; } = new();
+
+        public double? RequestLatitude { get; set; }
+        public double? RequestLongitude { get; set; }
+
     }
 }

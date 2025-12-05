@@ -15,7 +15,7 @@ namespace Business.Abstract
         Task<IResult> DeleteAsync(Guid panelId);
         Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance);
         Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId);
-
         Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId);
+        Task<IDataResult<FreeBarberMinePanelDto>> GetFreeBarberForUsers(Guid freeBarberId);
     }
 }

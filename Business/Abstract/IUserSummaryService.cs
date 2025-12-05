@@ -1,4 +1,5 @@
-﻿using Entities.Concrete.Dto;
+﻿using Core.Utilities.Results;
+using Entities.Concrete.Dto;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace Business.Abstract
 {
     public interface IUserSummaryService
     {
-        Task<UserNotifyDto?> GetAsync(Guid userId);
-        Task<Dictionary<Guid, UserNotifyDto>> GetManyAsync(IEnumerable<Guid> userIds);
+        Task<IDataResult<UserNotifyDto?>> TryGetAsync(Guid userId);
+        Task<IDataResult<Dictionary<Guid, UserNotifyDto>>> GetManyAsync(IEnumerable<Guid> userIds);
     }
 }

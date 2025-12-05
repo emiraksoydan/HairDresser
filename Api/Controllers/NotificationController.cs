@@ -26,7 +26,7 @@ namespace Api.Controllers
         {
             var userId = User.GetUserIdOrThrow();
             var result = await _svc.GetAllNotify(userId);
-            return Ok(result);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
     }

@@ -54,5 +54,12 @@ namespace Api.Controllers
             var result = await _freeBarberService.GetMyPanel(CurrentUserId);
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
+
+        [HttpGet("get-freebarber-for-users")]
+        public async Task<IActionResult> GetFreeBarberForUsers([FromQuery] Guid freeBarberId)
+        {
+            var result = await _freeBarberService.GetFreeBarberForUsers(freeBarberId);
+            return result.Success ? Ok(result.Data) : NotFound(result);
+        }
     }
 }
