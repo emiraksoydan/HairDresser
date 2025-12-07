@@ -113,7 +113,7 @@ app.ConfigureCustomExceptionMiddleware();
 
 app.UseCors();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHub<AppHub>("/hubs/app");

@@ -22,6 +22,8 @@ namespace Entities.Concrete.Dto
         public string? AddressDescription { get; set; }
         public string? PricingType { get; set; }
         public double? PricingValue { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
     }
 

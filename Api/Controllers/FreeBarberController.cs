@@ -61,5 +61,12 @@ namespace Api.Controllers
             var result = await _freeBarberService.GetFreeBarberForUsers(freeBarberId);
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
+        [HttpPost("update-location")]
+        public async Task<IActionResult> UpdateLocation([FromBody] UpdateLocationDto req)
+        {
+            // Sadece Latitude ve Longitude günceller
+            var result = await _freeBarberService.UpdateLocationAsync(req.Id, req.Latitude, req.Longitude);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
     }
 }

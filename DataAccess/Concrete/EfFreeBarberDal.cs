@@ -241,7 +241,7 @@ namespace DataAccess.Concrete
 
             var imageGroups = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.OwnerType == ImageOwnerType.Store
+                .Where(i => i.OwnerType == ImageOwnerType.FreeBarber
                          && freeBarberIds.Contains(i.ImageOwnerId))
                 .GroupBy(i => i.ImageOwnerId)
                 .Select(g => new
@@ -310,6 +310,8 @@ namespace DataAccess.Concrete
                    s.LastName,
                    s.BarberCertificate,
                    s.IsAvailable,
+                   s.Latitude,
+                   s.Longitude,
 
                })
                .FirstOrDefaultAsync();
@@ -348,6 +350,8 @@ namespace DataAccess.Concrete
                 BarberCertificate = freeBarber.BarberCertificate,
                 ImageList = images,
                 Offerings = offerings,
+                Latitude = freeBarber.Latitude,
+                Longitude = freeBarber.Longitude,
             };
         }
     }

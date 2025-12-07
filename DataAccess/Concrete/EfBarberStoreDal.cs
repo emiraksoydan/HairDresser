@@ -239,7 +239,10 @@ namespace DataAccess.Concrete
                 {
                     s.Id,
                     s.StoreName,
-                    s.Type
+                    s.Type,
+                    s.Latitude,
+                    s.Longitude,
+                    s.AddressDescription,
                 })
                 .ToListAsync();
 
@@ -362,6 +365,9 @@ namespace DataAccess.Concrete
                         ReviewCount = reviewCount,
                         IsOpenNow = isOpenNow,
                         ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
+                        Latitude = s.Latitude,
+                        Longitude = s.Longitude,
+                        AddressDescription = s.AddressDescription,
                     };
                 })
                 .ToList();

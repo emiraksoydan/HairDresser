@@ -56,6 +56,21 @@ namespace Business.Concrete
             return new SuccessResult("Serbest berber silindi.");
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        public async Task<IResult> UpdateLocationAsync(Guid id, double lat, double lon)
+        {
+            var getBarber = await freeBarberDal.Get(x=>x.Id == id);
+            if (getBarber == null)
+                return new ErrorResult("Berber bulunamadı");
+
+            getBarber.Latitude = lat;
+            getBarber.Longitude = lon;
+
+            await freeBarberDal.Update(getBarber);
+
+            return new SuccessResult("Konum başarıyla güncellendi");
+
+        }
         public async Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId)
         {
             var result = await freeBarberDal.GetMyPanel(currentUserId);
@@ -111,6 +126,6 @@ namespace Business.Concrete
             }
         }
 
-
+      
     }
 }

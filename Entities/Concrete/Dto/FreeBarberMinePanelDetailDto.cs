@@ -15,6 +15,8 @@ namespace Entities.Concrete.Dto
         public BarberType Type { get; set; }
         public bool IsAvailable { get; set; }
         public string BarberCertificate { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
 

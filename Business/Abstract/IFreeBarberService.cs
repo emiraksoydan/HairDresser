@@ -17,5 +17,8 @@ namespace Business.Abstract
         Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId);
         Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId);
         Task<IDataResult<FreeBarberMinePanelDto>> GetFreeBarberForUsers(Guid freeBarberId);
+        Task<IResult> UpdateLocationAsync(Guid id,double lat, double lon);
+
+
     }
 }
