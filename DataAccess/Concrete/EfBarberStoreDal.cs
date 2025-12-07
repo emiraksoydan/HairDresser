@@ -394,7 +394,8 @@ namespace DataAccess.Concrete
                     s.Longitude,
                     s.PricingType,
                     s.PricingValue,
-                    s.Type
+                    s.Type,
+                    s.AddressDescription
                 })
                 .ToListAsync();
 
@@ -507,6 +508,7 @@ namespace DataAccess.Concrete
                         IsOpenNow = isOpenNow,
                         Latitude = s.Latitude,
                         Longitude = s.Longitude,
+                        AddressDescription = s.AddressDescription,
                         FavoriteCount = favoriteCount,
                         ReviewCount = reviewCount,
                         Rating = Math.Round(avgRating, 2),

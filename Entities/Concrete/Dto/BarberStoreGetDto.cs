@@ -21,6 +21,7 @@ namespace Entities.Concrete.Dto
         public int FavoriteCount { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+        public string AddressDescription { get; set; }
         public bool IsOpenNow { get; set; }
         public int ReviewCount { get; set; }
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }

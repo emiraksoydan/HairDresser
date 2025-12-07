@@ -107,6 +107,7 @@ namespace DataAccess.Concrete
                    s.IsAvailable,
 
 
+
                })
                .FirstOrDefaultAsync();
 
@@ -160,6 +161,8 @@ namespace DataAccess.Concrete
                 FavoriteCount = favoriteCount,
                 Rating = avgRating,
                 ReviewCount = reviewCount,
+                Latitude = freeBarber.Latitude,
+                Longitude = freeBarber.Longitude,
             };
         }
 

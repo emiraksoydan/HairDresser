@@ -18,6 +18,8 @@ namespace Entities.Concrete.Dto
         public int FavoriteCount { get; set; }
         public bool IsAvailable { get; set; }
         public int ReviewCount { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
