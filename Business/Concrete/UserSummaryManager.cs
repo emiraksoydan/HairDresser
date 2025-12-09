@@ -2,6 +2,8 @@
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
+using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
 
 public class UserSummaryManager(
     IUserDal userDal,
@@ -12,62 +14,95 @@ public class UserSummaryManager(
     public async Task<IDataResult<UserNotifyDto?>> TryGetAsync(Guid userId)
     {
         var u = await userDal.Get(x => x.Id == userId);
-        if (u is not null)
+
+        if (u is null) return new SuccessDataResult<UserNotifyDto?>((UserNotifyDto?)null);
+
+        // Eğer kullanıcı FreeBarber ise, detayları FreeBarber tablosundan alalım
+        if (u.UserType == UserType.FreeBarber)
         {
-            return new SuccessDataResult<UserNotifyDto?>(new UserNotifyDto
+            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == userId);
+            if (fb is not null)
             {
-                UserId = u.Id,
-                DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
-                AvatarUrl = await TryGetUserAvatarAsync(u.Id),
-                RoleHint = "user",
-            });
+                return new SuccessDataResult<UserNotifyDto?>(new UserNotifyDto
+                {
+                    UserId = u.Id,
+                    DisplayName = BuildName(fb.FirstName, fb.LastName, "Serbest Berber"),
+                    AvatarUrl = await TryGetFreeBarberAvatarAsync(fb.Id), // Berber fotoları
+                    RoleHint = "freebarber"
+                });
+            }
         }
 
-        var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == userId);
-        if (fb is not null)
+        return new SuccessDataResult<UserNotifyDto?>(new UserNotifyDto
         {
-            return new SuccessDataResult<UserNotifyDto?>(new UserNotifyDto
-            {
-                UserId = fb.FreeBarberUserId, // payload’larda userId mantığı
-                DisplayName = BuildName(fb.FirstName, fb.LastName, "Serbest Berber"),
-                AvatarUrl = await TryGetFreeBarberAvatarAsync(fb.Id), // 🔥 ImageOwnerId = panelId
-                RoleHint = "freebarber",
-            });
-        }
-
-        // Ambiguous ctor hatasını önlemek için:
-        return new SuccessDataResult<UserNotifyDto?>((UserNotifyDto?)null);
+            UserId = u.Id,
+            DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
+            AvatarUrl = await TryGetUserAvatarAsync(u.Id),
+            RoleHint = "user"
+        });
     }
 
     public async Task<IDataResult<Dictionary<Guid, UserNotifyDto>>> GetManyAsync(IEnumerable<Guid> userIds)
     {
         var ids = userIds.Distinct().ToList();
         var dict = new Dictionary<Guid, UserNotifyDto>();
-
         var users = await userDal.GetAll(u => ids.Contains(u.Id));
+
+        var freeBarberUserIds = users
+            .Where(u => u.UserType == UserType.FreeBarber)
+            .Select(u => u.Id)
+            .ToList();
+
+        List<FreeBarber> freeBarbers = new();
+        if (freeBarberUserIds.Count > 0)
+        {
+            freeBarbers = await freeBarberDal.GetAll(fb => freeBarberUserIds.Contains(fb.FreeBarberUserId));
+        }
+        var imageOwnerIds = new HashSet<Guid>();
         foreach (var u in users)
         {
-            dict[u.Id] = new UserNotifyDto
+            var fbDetail = freeBarbers.FirstOrDefault(f => f.FreeBarberUserId == u.Id);
+            if (fbDetail != null)
             {
-                UserId = u.Id,
-                DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
-                AvatarUrl = await TryGetUserAvatarAsync(u.Id),
-                RoleHint = "user",
-            };
+                imageOwnerIds.Add(fbDetail.Id); 
+            }
+            else
+            {
+                imageOwnerIds.Add(u.Id);
+            }
         }
+        var allImages = await imageDal.GetAll(img => imageOwnerIds.Contains(img.ImageOwnerId));
+        var imageLookup = allImages
+            .GroupBy(img => img.ImageOwnerId) 
+            .ToDictionary(
+                g => g.Key, 
+                g => g.OrderByDescending(img => img.CreatedAt).First().ImageUrl // Value = En son resmin URL'i
+            );
 
-        var missing = ids.Where(id => !dict.ContainsKey(id)).ToList();
-        if (missing.Count > 0)
+        string? GetAvatarUrlFromCache(Guid ownerId) =>
+            imageLookup.TryGetValue(ownerId, out var url) ? url : null;
+        foreach (var u in users)
         {
-            var fbs = await freeBarberDal.GetAll(f => missing.Contains(f.FreeBarberUserId));
-            foreach (var fb in fbs)
+            var fbDetail = freeBarbers.FirstOrDefault(f => f.FreeBarberUserId == u.Id);
+
+            if (fbDetail is not null)
             {
-                dict[fb.FreeBarberUserId] = new UserNotifyDto
+                dict[u.Id] = new UserNotifyDto
                 {
-                    UserId = fb.FreeBarberUserId,
-                    DisplayName = BuildName(fb.FirstName, fb.LastName, "Serbest Berber"),
-                    AvatarUrl = await TryGetFreeBarberAvatarAsync(fb.Id), // 🔥 panelId
-                    RoleHint = "freebarber",
+                    UserId = u.Id,
+                    DisplayName = BuildName(fbDetail.FirstName, fbDetail.LastName, "Serbest Berber"),
+                    AvatarUrl = GetAvatarUrlFromCache(fbDetail.Id),
+                    RoleHint = "freebarber"
+                };
+            }
+            else
+            {
+                dict[u.Id] = new UserNotifyDto
+                {
+                    UserId = u.Id,
+                    DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
+                    AvatarUrl = GetAvatarUrlFromCache(u.Id),
+                    RoleHint = "user"
                 };
             }
         }
