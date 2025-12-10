@@ -167,7 +167,21 @@ namespace Business.Concrete
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await appointmentDal.Add(appt);
+            try
+            {
+                await appointmentDal.Add(appt);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            {
+                // Unique constraint violation (aynı chair/date/start/end kombinasyonu)
+                // Son kontrol: overlap tekrar kontrol et
+                var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
+                if (!finalOverlap.Success)
+                    return new ErrorDataResult<Guid>(finalOverlap.Message);
+                
+                // Eğer hala overlap yoksa, başka bir unique constraint ihlali olabilir
+                return new ErrorDataResult<Guid>("Bu randevu zamanı başka bir kullanıcı tarafından alındı. Lütfen başka bir saat seçin.");
+            }
 
             // offerings snapshot
             if (req.ServiceOfferingIds.Count > 0)
@@ -270,7 +284,20 @@ namespace Business.Concrete
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await appointmentDal.Add(appt);
+            try
+            {
+                await appointmentDal.Add(appt);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            {
+                if (req.ChairId.HasValue)
+                {
+                    var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
+                    if (!finalOverlap.Success)
+                        return new ErrorDataResult<Guid>(finalOverlap.Message);
+                }
+                return new ErrorDataResult<Guid>("Bu randevu zamanı başka bir kullanıcı tarafından alındı. Lütfen başka bir saat seçin.");
+            }
 
             // lock free barber
             var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
@@ -340,7 +367,20 @@ namespace Business.Concrete
                 UpdatedAt = DateTime.UtcNow
             };
 
-            await appointmentDal.Add(appt);
+            try
+            {
+                await appointmentDal.Add(appt);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            {
+                if (req.ChairId.HasValue)
+                {
+                    var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
+                    if (!finalOverlap.Success)
+                        return new ErrorDataResult<Guid>(finalOverlap.Message);
+                }
+                return new ErrorDataResult<Guid>("Bu randevu zamanı başka bir kullanıcı tarafından alındı. Lütfen başka bir saat seçin.");
+            }
 
             // lock free barber
             var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
@@ -517,6 +557,7 @@ namespace Business.Concrete
 
             await appointmentDal.Update(appt);
 
+            // FreeBarber müsaitliğini serbest bırak
             await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
 
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCompleted, actorUserId: storeOwnerUserId);
