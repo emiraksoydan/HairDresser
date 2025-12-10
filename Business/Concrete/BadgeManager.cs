@@ -10,7 +10,8 @@ namespace Business.Concrete
     {
         public async Task<IDataResult<BadgeCountDto>> GetCountsAsync(Guid userId)
         {
-            var unreadNoti = (await notificationDal.GetAll(x => x.UserId == userId && x.IsRead == false)).Count;
+            // Performance: Use CountAsync instead of GetAll().Count
+            var unreadNoti = await notificationDal.CountAsync(x => x.UserId == userId && x.IsRead == false);
 
             var threads = await chatThreadDal.GetAll(t =>
                 t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId);

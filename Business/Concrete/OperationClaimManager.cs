@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Business.Resources;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Entities;
@@ -18,7 +19,7 @@ namespace Business.Concrete
             if (claims != null) {
                 return new SuccessDataResult<List<OperationClaim>>(claims);
             }
-            return new ErrorDataResult<List<OperationClaim>>(null!,"Yetkiler getirilemedi");
+            return new ErrorDataResult<List<OperationClaim>>(null!, Messages.OperationClaimsGetFailed);
         }
     }
 }

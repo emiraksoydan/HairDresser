@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Business.Resources;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
@@ -23,7 +24,7 @@ namespace Business.Concrete
             object? extra = null)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt is null) return new ErrorResult("Randevu bulunamadı");
+            if (appt is null) return new ErrorResult(Messages.AppointmentNotFound);
 
             // recipients (customer, storeOwner, freebarber)
             var recipients = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
@@ -158,16 +159,16 @@ namespace Business.Concrete
             return type switch
             {
                 NotificationType.AppointmentCreated =>
-                    role == "store" ? "Yeni randevu talebi" :
-                    role == "freebarber" ? "Yeni randevu isteği" :
-                    "Randevun oluşturuldu",
+                    role == "store" ? Messages.NotificationNewAppointmentRequestForStore :
+                    role == "freebarber" ? Messages.NotificationNewAppointmentRequest :
+                    Messages.AppointmentCreatedNotification,
 
-                NotificationType.AppointmentApproved => "Randevu onaylandı",
-                NotificationType.AppointmentRejected => "Randevu reddedildi",
-                NotificationType.AppointmentCancelled => "Randevu iptal edildi",
-                NotificationType.AppointmentCompleted => "Randevu tamamlandı",
-                NotificationType.AppointmentUnanswered => "Randevu yanıtlanmadı",
-                _ => "Bildirim"
+                NotificationType.AppointmentApproved => Messages.AppointmentApprovedNotification,
+                NotificationType.AppointmentRejected => Messages.AppointmentRejectedNotification,
+                NotificationType.AppointmentCancelled => Messages.AppointmentCancelledNotification,
+                NotificationType.AppointmentCompleted => Messages.AppointmentCompletedNotification,
+                NotificationType.AppointmentUnanswered => Messages.AppointmentUnansweredNotification,
+                _ => Messages.NotificationDefault
             };
         }
     }

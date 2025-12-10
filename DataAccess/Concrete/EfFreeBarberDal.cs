@@ -168,10 +168,7 @@ namespace DataAccess.Concrete
 
         public async Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1)
         {
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }   // Windows
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }      // Linux
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(lat, lon, radiusKm);
             var freeBarbers = await _context.FreeBarbers
                 .AsNoTracking()

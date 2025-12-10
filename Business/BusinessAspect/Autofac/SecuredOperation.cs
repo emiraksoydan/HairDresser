@@ -1,40 +1,30 @@
 ﻿using Castle.DynamicProxy;
+using Core.Exceptions;
 using Core.Extensions;
 using Core.Utilities.Interceptors;
-using Core.Utilities.IoC;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Business.BusinessAspect.Autofac
 {
     public class SecuredOperation : MethodInterception
     {
-        private string[] _roles;
-        private IHttpContextAccessor _httpContextAccessor;
+        private readonly string[] _roles;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public SecuredOperation(string roles)
+        public SecuredOperation(string roles, IHttpContextAccessor httpContextAccessor)
         {
             _roles = roles.Split(',');
-            _httpContextAccessor = ServiceTool.ServiceProvider.GetService<IHttpContextAccessor>();
-
+            _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
         }
         protected override void OnBefore(IInvocation invocation)
         {
             var roleClaims = _httpContextAccessor.HttpContext.User.ClaimRoles();
-            foreach (var role in roleClaims)
+            if (!_roles.Any(requiredRole => roleClaims.Contains(requiredRole)))
             {
-                if (roleClaims.Contains(role))
-                {
-                    return;
-                }
-
+                throw new UnauthorizedOperationException(Business.Resources.Messages.UnauthorizedOperation);
             }
-            throw new Exception("İşleme yetkiniz bulunmamaktadır");
         }
     }
 }

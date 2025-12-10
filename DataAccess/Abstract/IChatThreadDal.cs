@@ -1,5 +1,7 @@
 ﻿using Core.DataAccess;
+using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,5 +12,10 @@ namespace DataAccess.Abstract
 {
     public interface IChatThreadDal : IEntityRepository<ChatThread>
     {
+        /// <summary>
+        /// Gets chat threads for a user with appointment status filtering
+        /// Note: Title is set to empty string - should be set in business layer
+        /// </summary>
+        Task<List<ChatThreadListItemDto>> GetThreadsForUserAsync(Guid userId, AppointmentStatus[] allowedStatuses);
     }
 }

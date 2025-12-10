@@ -1,22 +1,15 @@
 ﻿using Business.Abstract;
+using Business.Resources;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
-using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Business.Concrete
 {
     public class ChatManager(
-             DatabaseContext db,
              IAppointmentDal appointmentDal,
              IChatThreadDal threadDal,
              IChatMessageDal messageDal,
@@ -31,13 +24,13 @@ namespace Business.Concrete
         public async Task<IDataResult<ChatMessageDto>> SendMessageAsync(Guid senderUserId, Guid appointmentId, string text)
         {
             text = (text ?? "").Trim();
-            if (text.Length == 0) return new ErrorDataResult<ChatMessageDto>("Empty message");
+            if (text.Length == 0) return new ErrorDataResult<ChatMessageDto>(Messages.EmptyMessage);
 
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt is null) return new ErrorDataResult<ChatMessageDto>("Appointment not found");
+            if (appt is null) return new ErrorDataResult<ChatMessageDto>(Messages.AppointmentNotFound);
 
             if (appt.Status is not (AppointmentStatus.Pending or AppointmentStatus.Approved))
-                return new ErrorDataResult<ChatMessageDto>("Chat is only allowed for Pending/Approved appointments");
+                return new ErrorDataResult<ChatMessageDto>(Messages.ChatOnlyForActiveAppointments);
 
             // yetki: sender katılımcı mı?
             var isParticipant =
@@ -45,10 +38,14 @@ namespace Business.Concrete
                 appt.FreeBarberUserId == senderUserId ||
                 appt.BarberStoreUserId == senderUserId;
 
-            if (!isParticipant) return new ErrorDataResult<ChatMessageDto>("Not a participant");
+            if (!isParticipant) return new ErrorDataResult<ChatMessageDto>(Messages.NotAParticipant);
 
-            var thread = (await threadDal.GetAll(t => t.AppointmentId == appointmentId)).FirstOrDefault();
+            // Performance: Use Get instead of GetAll().FirstOrDefault()
+            var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
             var barberStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
+            if (barberStore is null)
+                return new ErrorDataResult<ChatMessageDto>(Messages.StoreNotFound);
+            
             if (thread is null)
             {
                 thread = new ChatThread
@@ -132,13 +129,14 @@ namespace Business.Concrete
 
         public async Task<IDataResult<bool>> MarkThreadReadAsync(Guid userId, Guid appointmentId)
         {
-            var thread = (await threadDal.GetAll(t => t.AppointmentId == appointmentId)).FirstOrDefault();
-            if (thread is null) return new ErrorDataResult<bool>(false, "Sohbet bulunamadı");
+            // Performance: Use Get instead of GetAll().FirstOrDefault()
+            var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
+            if (thread is null) return new ErrorDataResult<bool>(false, Messages.ChatNotFound);
 
             if (thread.CustomerUserId == userId) thread.CustomerUnreadCount = 0;
             else if (thread.StoreOwnerUserId == userId) thread.StoreUnreadCount = 0;
             else if (thread.FreeBarberUserId == userId) thread.FreeBarberUnreadCount = 0;
-            else return new ErrorDataResult<bool>(false, "Katılımcı bulunamadı");
+            else return new ErrorDataResult<bool>(false, Messages.ParticipantNotFound);
 
             await threadDal.Update(thread);
 
@@ -156,32 +154,31 @@ namespace Business.Concrete
             // sadece Pending + Approved
             var allowed = new[] { AppointmentStatus.Pending, AppointmentStatus.Approved };
 
-            var threads = await db.ChatThreads.AsNoTracking()
-                .Join(db.Appointments.AsNoTracking(),
-                      t => t.AppointmentId,
-                      a => a.Id,
-                      (t, a) => new { t, a })
-                .Where(x =>
-                    allowed.Contains(x.a.Status) &&
-                    (x.t.CustomerUserId == userId || x.t.StoreOwnerUserId == userId || x.t.FreeBarberUserId == userId))
-                .OrderByDescending(x => x.t.LastMessageAt ?? x.t.CreatedAt)
-                .Select(x => new ChatThreadListItemDto
-                {
-                    AppointmentId = x.a.Id,
-                    Status = x.a.Status,
-                    Title = x.t.StoreOwnerUserId == userId
-                        ? (x.t.CustomerUserId.HasValue ? "Müşteri" : "Serbest Berber")
-                        : "Berber Dükkanı",
+            var threads = await threadDal.GetThreadsForUserAsync(userId, allowed);
 
-                    LastMessagePreview = x.t.LastMessagePreview,
-                    LastMessageAt = x.t.LastMessageAt,
-                    UnreadCount = x.t.CustomerUserId == userId ? x.t.CustomerUnreadCount :
-                                  x.t.StoreOwnerUserId == userId ? x.t.StoreUnreadCount :
-                                  x.t.FreeBarberUserId == userId ? x.t.FreeBarberUnreadCount : 0
-                })
-                .ToListAsync();
+            // Set Title for each thread (business logic should be in business layer, not DAL)
+            foreach (var thread in threads)
+            {
+                var appt = await appointmentDal.Get(x => x.Id == thread.AppointmentId);
+                if (appt is null) continue;
+
+                var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
+                thread.Title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
+            }
 
             return new SuccessDataResult<List<ChatThreadListItemDto>>(threads);
+        }
+
+        private static string BuildThreadTitleForUser(Guid userId, Appointment appt, string? storeName)
+        {
+            if (appt.BarberStoreUserId == userId)
+            {
+                // store owner kendi listesinde karşı taraf
+                return appt.CustomerUserId.HasValue ? Messages.ChatThreadTitleCustomer : Messages.ChatThreadTitleFreeBarber;
+            }
+
+            // customer/freebarber tarafı store'u görsün
+            return string.IsNullOrWhiteSpace(storeName) ? Messages.ChatThreadTitleBarberStore : storeName!;
         }
 
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -190,40 +187,25 @@ namespace Business.Concrete
             Guid userId, Guid appointmentId, DateTime? beforeUtc)
         {
 
-            var appt = await db.Appointments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == appointmentId);
-            if (appt is null) return new ErrorDataResult<List<ChatMessageItemDto>>("Appointment not found");
+            // Performance: Use repository instead of direct DbContext access
+            var appt = await appointmentDal.Get(x => x.Id == appointmentId);
+            if (appt is null) return new ErrorDataResult<List<ChatMessageItemDto>>(Messages.AppointmentNotFound);
 
             // sadece Pending + Approved sohbet gösterimi
             if (appt.Status is not (AppointmentStatus.Pending or AppointmentStatus.Approved))
-                return new ErrorDataResult<List<ChatMessageItemDto>>("Chat is only available for Pending/Approved");
+                return new ErrorDataResult<List<ChatMessageItemDto>>(Messages.ChatOnlyForActiveAppointments);
 
             // katılımcı mı?
-            var thread = await db.ChatThreads.AsNoTracking().FirstOrDefaultAsync(t => t.AppointmentId == appointmentId);
+            // Performance: Use repository instead of direct DbContext access
+            var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
             if (thread is null) return new SuccessDataResult<List<ChatMessageItemDto>>();
 
             var isParticipant =
                 thread.CustomerUserId == userId || thread.StoreOwnerUserId == userId || thread.FreeBarberUserId == userId;
 
-            if (!isParticipant) return new ErrorDataResult<List<ChatMessageItemDto>>("Not a participant");
+            if (!isParticipant) return new ErrorDataResult<List<ChatMessageItemDto>>(Messages.NotAParticipant);
 
-            var query = db.ChatMessages.AsNoTracking()
-                .Where(m => m.AppointmentId == appointmentId);
-
-            if (beforeUtc.HasValue)
-                query = query.Where(m => m.CreatedAt < beforeUtc.Value);
-
-            var msgs = await query
-                .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new ChatMessageItemDto
-                {
-                    MessageId = m.Id,
-                    SenderUserId = m.SenderUserId,
-                    Text = m.Text,
-                    CreatedAt = m.CreatedAt
-                })
-                .ToListAsync();
-
-            msgs.Reverse();
+            var msgs = await messageDal.GetMessagesForAppointmentAsync(appointmentId, beforeUtc);
 
             return new SuccessDataResult<List<ChatMessageItemDto>>(msgs);
         }

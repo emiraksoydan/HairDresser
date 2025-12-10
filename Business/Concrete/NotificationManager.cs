@@ -45,7 +45,8 @@ namespace Business.Concrete
                 Title = n.Title,
                 Body = n.Body,
                 PayloadJson = n.PayloadJson,
-                CreatedAt = n.CreatedAt
+                CreatedAt = n.CreatedAt,
+                IsRead = n.IsRead
             };
 
             await realtime.PushNotificationAsync(userId, dto);
@@ -71,7 +72,8 @@ namespace Business.Concrete
                     Title = x.Title,
                     Body = x.Body,
                     PayloadJson = x.PayloadJson,
-                    CreatedAt = x.CreatedAt
+                    CreatedAt = x.CreatedAt,
+                    IsRead = x.IsRead
                 }).ToList();
 
             return new SuccessDataResult<List<NotificationDto>>(dto);

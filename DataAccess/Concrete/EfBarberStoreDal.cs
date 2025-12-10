@@ -18,10 +18,7 @@ namespace DataAccess.Concrete
 
         public async Task<BarberStoreMineDto> GetBarberStoreForUsers(Guid storeId)
         {
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
 
             // 1) Store
             var store = await _context.BarberStores
@@ -109,11 +106,7 @@ namespace DataAccess.Concrete
 
         public async Task<BarberStoreDetail> GetByIdStore(Guid storeId)
         {
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
-
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var today = nowLocal.DayOfWeek;   // 0–6
             var nowTime = nowLocal.TimeOfDay;      // TimeSpan
 
@@ -226,10 +219,7 @@ namespace DataAccess.Concrete
 
         public async Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId)
         {
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
 
             // 1) Bu kullanıcıya ait dükkanları çek
             var stores = await _context.BarberStores
@@ -377,10 +367,7 @@ namespace DataAccess.Concrete
 
         public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1)
         {
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }   // Windows
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }      // Linux
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(lat, lon, radiusKm);
             var stores = await _context.BarberStores
                 .AsNoTracking()

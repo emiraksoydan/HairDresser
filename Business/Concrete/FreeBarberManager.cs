@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Business.Resources;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
@@ -38,10 +39,10 @@ namespace Business.Concrete
         {
             var existingEntity = await freeBarberDal.Get(x=>x.Id == freeBarberUpdateDto.Id);
             if (existingEntity.FreeBarberUserId != currentUserId)
-                return new ErrorResult("Bu paneli güncellemeye yetkiniz yoktur.");
+                return new ErrorResult(Messages.FreeBarberUpdateUnauthorized);
             var appointCont = await _appointmentService.AnyControl(freeBarberUpdateDto.Id);
             if(appointCont.Data)
-                return new ErrorResult("Randevu işleminiz bulunmaktadır. Lütfen işlemden sonra güncelleyiniz");
+                return new ErrorResult(Messages.FreeBarberHasActiveAppointmentUpdate);
 
             freeBarberUpdateDto.Adapt(existingEntity);
             await freeBarberDal.Update(existingEntity);

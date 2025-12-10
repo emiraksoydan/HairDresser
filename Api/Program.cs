@@ -8,17 +8,17 @@ using Business.Abstract;
 using Business.DependencyResolvers.Autofac;
 using Core.DependencyResolvers;
 using Core.Extensions;
-using Core.Utilities.IoC;
 using Core.Utilities.Security.Encryption;
 using Core.Utilities.Security.JWT;
 using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Concrete;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,16 +38,52 @@ builder.Services.AddDbContext<DatabaseContext>(options => options.UseSqlServer(b
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Response Compression
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Optimal;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Optimal;
+});
+
 builder.Services.Configure<SecurityOption>(
     builder.Configuration.GetSection("SecurityOptions"));
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
+    if (builder.Environment.IsDevelopment())
     {
-        policy.AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowAnyOrigin(); // Geli˛tirme a˛amas˝nda bu yeterli
-    });
+        // Development: Allow all origins for easier testing
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowAnyOrigin();
+        });
+    }
+    else
+    {
+        // Production: Restrict to specific origins
+        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+            ?? Array.Empty<string>();
+        
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // SignalR i√ßin gerekli
+        });
+    }
 });
 
 
@@ -82,7 +118,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
-builder.Services.AddDependencyResolvers(new ICoreModule[]
+builder.Services.AddDependencyResolvers(new Core.Utilities.IoC.ICoreModule[]
 {
     new CoreModule(),
 });
@@ -111,9 +147,15 @@ if (app.Environment.IsDevelopment())
 }
 app.ConfigureCustomExceptionMiddleware();
 
+// Response Compression (CORS'tan √∂nce)
+app.UseResponseCompression();
+
 app.UseCors();
 
-//app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHub<AppHub>("/hubs/app");

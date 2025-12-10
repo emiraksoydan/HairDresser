@@ -1,4 +1,5 @@
 ﻿using Core.DataAccess.EntityFramework;
+using Core.Utilities.Helpers;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
@@ -70,11 +71,7 @@ namespace DataAccess.Concrete
                 : BuildSlots(wh.StartTime, wh.EndTime, slotMinutes);
 
             // 4) TR zamanı (IsPast)
-            TimeZoneInfo tz;
-            try { tz = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time"); }
-            catch { tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul"); }
-
-            var nowLocal = TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz);
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var today = DateOnly.FromDateTime(nowLocal);
 
             // 5) Manuel berber isimleri

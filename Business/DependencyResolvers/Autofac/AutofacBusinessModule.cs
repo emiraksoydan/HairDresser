@@ -11,6 +11,7 @@ using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Mapster;
 using MapsterMapper;
+using Microsoft.AspNetCore.Http;
 
 
 namespace Business.DependencyResolvers.Autofac
@@ -63,6 +64,8 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfChatThreadDal>().As<IChatThreadDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatMessageDal>().As<IChatMessageDal>().InstancePerLifetimeScope();
 
+            // Register IHttpContextAccessor for SecuredOperation
+            builder.RegisterType<HttpContextAccessor>().As<IHttpContextAccessor>().SingleInstance();
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);
 

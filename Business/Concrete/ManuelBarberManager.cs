@@ -1,11 +1,11 @@
 ﻿using Business.Abstract;
+using Business.Resources;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
-
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
@@ -25,7 +25,7 @@ namespace Business.Concrete
             await imageService.AddAsync(new CreateImageDto { ImageOwnerId = barber.Id, ImageUrl = dto.ProfileImageUrl, OwnerType = ImageOwnerType.ManuelBarber });
             await manuelBarberDal.Add(barber);
 
-            return new SuccessResult("Manuel berber eklendi.");
+            return new SuccessResult(Messages.ManuelBarberAddedSuccess);
         }
         [ValidationAspect(typeof(ManuelBarberUpdateValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -33,11 +33,11 @@ namespace Business.Concrete
         {
             var barber = await manuelBarberDal.Get(b => b.Id == dto.Id);
             if (barber == null)
-                return new ErrorResult("Berber bulunamadı.");
+                return new ErrorResult(Messages.ManuelBarberNotFound);
 
             var hasBlockingAppointments = await appointmentService.AnyManuelBarberControl(barber.Id);
             if (hasBlockingAppointments.Data)
-                return new ErrorResult("Bu berberinize ait beklemekte olan veya aktif olan randevu işlemi vardır.");
+                return new ErrorResult(Messages.ManuelBarberHasActiveAppointments);
 
             var updatedBarber = dto.Adapt(barber);
             await manuelBarberDal.Update(updatedBarber);
@@ -53,7 +53,7 @@ namespace Business.Concrete
                     await imageService.UpdateAsync(new UpdateImageDto { Id = getBarberImage!.Data.Id, ImageUrl = dto.ProfileImageUrl });
                 }
             }
-            return new SuccessResult("Berber güncellendi.");
+            return new SuccessResult(Messages.ManuelBarberUpdatedSuccess);
         }
 
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -63,7 +63,7 @@ namespace Business.Concrete
             
 
             if (barber == null)
-                return new ErrorResult("Berber bulunamadı.");
+                return new ErrorResult(Messages.ManuelBarberNotFound);
 
             var ruleResult = await BusinessRules.RunAsync(() => CheckBarberHasNoBlockingAppointments(barber.Id),() => CheckBarberNotAssignedToAnyChair(barber.Id));
             if (ruleResult != null && !ruleResult.Success)
@@ -74,7 +74,7 @@ namespace Business.Concrete
             if (getBarberImage.Data != null)
                 await imageService.DeleteAsync(getBarberImage.Data.Id);
 
-            return new SuccessResult("Berber silindi.");
+            return new SuccessResult(Messages.ManuelBarberDeletedSuccess);
 
         }
 
@@ -115,7 +115,7 @@ namespace Business.Concrete
         {
             var hasBlockingAppointments = await appointmentService.AnyManuelBarberControl(barberId);
             if (hasBlockingAppointments.Data)
-                return new ErrorResult("Bu berberinize ait beklemekte olan veya aktif olan randevu işlemi vardır.");
+                return new ErrorResult(Messages.ManuelBarberHasActiveAppointments);
 
             return new SuccessResult();
         }
@@ -124,7 +124,7 @@ namespace Business.Concrete
         {
             var isAttemptChair = await barberStoreChairService.AttemptBarberControl(barberId);
             if (isAttemptChair.Data)
-                return new ErrorResult("Bu berberiniz bir koltuğa atanmış. Önce koltuk ayarını değiştiriniz.");
+                return new ErrorResult(Messages.BarberAssignedToChair);
 
             return new SuccessResult();
         }

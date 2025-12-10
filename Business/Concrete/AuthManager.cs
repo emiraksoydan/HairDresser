@@ -11,13 +11,21 @@ using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
+using Microsoft.Extensions.Configuration;
 
 
 namespace Business.Concrete
 {
-    public class AuthManager(IUserService userService, ITokenHelper tokenHelper, IPhoneService phoneService, ITwilioVerifyService twilioVerify,
-    IRefreshTokenService refreshTokenService,
-    IRefreshTokenDal refreshTokenDal, IOperationClaimService operationClaimService,IUserOperationClaimService userOperationClaimService) : IAuthService
+    public class AuthManager(
+        IUserService userService, 
+        ITokenHelper tokenHelper, 
+        IPhoneService phoneService, 
+        ITwilioVerifyService twilioVerify,
+        IRefreshTokenService refreshTokenService,
+        IRefreshTokenDal refreshTokenDal, 
+        IOperationClaimService operationClaimService,
+        IUserOperationClaimService userOperationClaimService,
+        IConfiguration configuration) : IAuthService
     {
 
         [ValidationAspect(typeof(SendOtpValidator))]
@@ -185,7 +193,9 @@ namespace Business.Concrete
         {
             var claims = await userService.GetClaims(user);
             var access = tokenHelper.CreateToken(user, claims.Data);
-            var rt = refreshTokenService.CreateNew(30);
+            // Get refresh token expiration from configuration (default: 30 days)
+            var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
+            var rt = refreshTokenService.CreateNew(refreshDays);
             var fam = familyId ?? Guid.NewGuid();
             var entity = new RefreshToken
             {

@@ -1,5 +1,6 @@
 ﻿
 using Business.Abstract;
+using Business.Resources;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
@@ -29,7 +30,7 @@ namespace Business.Concrete
             await SaveChairsAsync(dto, store.Id);
             await SaveOfferingsAsync(dto, store.Id);
             await SaveWorkingHoursAsync(dto, store.Id);
-            return new SuccessResult("Berber dükkanı başarıyla oluşturuldu.");
+            return new SuccessResult(Messages.StoreCreatedSuccess);
         }
         [ValidationAspect(typeof(BarberStoreUpdateDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -38,7 +39,7 @@ namespace Business.Concrete
             var getBarber = await barberStoreDal.Get(x=>x.Id == dto.Id);
 
             if(getBarber.BarberStoreOwnerId != currentUserId)
-                return new ErrorResult("Bu işleme yetkiniz yoktur.");
+                return new ErrorResult(Messages.UnauthorizedOperation);
 
             IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs, c => c.BarberId.ToString()));
             if (result != null)
@@ -46,7 +47,7 @@ namespace Business.Concrete
 
             var anyAppointCt = await appointmentService.AnyStoreControl(dto.Id);
             if (anyAppointCt.Data)
-                return new ErrorResult("Bu dükkana ait aktif veya bekleyen randevu var önce müsait olmalısınız ");
+                return new ErrorResult(Messages.StoreHasActiveAppointments);
          
 
             dto.Adapt(getBarber);
@@ -113,7 +114,7 @@ namespace Business.Concrete
 
             if (duplicates.Count > 0)
             {
-                return new ErrorResult("Bir berber birden fazla koltuğa atanamaz.");
+                return new ErrorResult(Messages.BarberAssignedToMultipleChairs);
             }
             return new SuccessResult();
         }

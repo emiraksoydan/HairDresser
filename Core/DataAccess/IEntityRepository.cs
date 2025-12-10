@@ -19,6 +19,6 @@ namespace Core.DataAccess
         Task Remove(T entity);
         Task DeleteAll(List<T> entities);
         Task<bool> AnyAsync(Expression<Func<T, bool>> filter);
-
+        Task<int> CountAsync(Expression<Func<T, bool>> filter);
     }
 }
