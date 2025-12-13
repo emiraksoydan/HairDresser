@@ -80,6 +80,13 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(hasBlocking);
         }
 
+
+        public async Task<IDataResult<List<AppointmentGetDto>>> GetAllAppointmentByFilter(Guid currentUserId, AppointmentFilter appointmentFilter)
+        {
+            var result = await appointmentDal.GetAllAppointmentByFilter(currentUserId, appointmentFilter);
+            return new SuccessDataResult<List<AppointmentGetDto>>(result);
+        }
+
         // ---------------- CREATE: CUSTOMER -> STORE (+ optional FREEBARBER) ----------------
 
         [TransactionScopeAspect]
@@ -995,6 +1002,6 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
-
+        
     }
 }

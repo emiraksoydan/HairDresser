@@ -68,6 +68,15 @@ namespace Api.BackgroundServices
                             await freeBarberDal.Update(fb);
                         }
                     }
+                    var existingNotifications = await db.Notifications
+                        .Where(n => n.AppointmentId == appt.Id
+                                 && n.Type == NotificationType.AppointmentCreated)
+                        .ToListAsync(stoppingToken);
+
+                    foreach (var notif in existingNotifications)
+                    {
+                        notif.Type = NotificationType.AppointmentUnanswered;                     
+                    }
 
                     // notify all participants (persist + realtime + badge)
                     await notifySvc.NotifyAsync(

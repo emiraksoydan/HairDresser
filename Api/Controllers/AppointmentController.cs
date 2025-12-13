@@ -19,6 +19,15 @@ namespace Api.Controllers
             _svc = svc;
         }
 
+        [HttpGet("getallbyfilter")]
+        public async Task<IActionResult> GetAllByFilter([FromQuery] AppointmentFilter filter)
+        {
+
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.GetAllAppointmentByFilter(userId, filter);
+            return result.Success ? Ok(result) : BadRequest(result);
+
+        }
 
         [HttpGet("availability")]
         public async Task<IActionResult> GetAvailability([FromQuery] Guid storeId, [FromQuery] DateOnly dateOnly, CancellationToken ct)

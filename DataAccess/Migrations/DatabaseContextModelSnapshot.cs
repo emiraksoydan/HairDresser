@@ -102,7 +102,7 @@ namespace DataAccess.Migrations
 
                     b.HasIndex("ChairId", "AppointmentDate", "StartTime", "EndTime")
                         .IsUnique()
-                        .HasFilter("[ChairId] IS NOT NULL");
+                        .HasFilter("[Status] IN (0, 1)");
 
                     b.ToTable("Appointments");
                 });
@@ -492,6 +492,9 @@ namespace DataAccess.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AppointmentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Comment")

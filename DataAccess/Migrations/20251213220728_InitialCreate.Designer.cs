@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20251211224335_InitialCreate")]
+    [Migration("20251213220728_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -92,11 +92,20 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BarberStoreUserId", "Status")
+                        .HasFilter("[Status] IN (0, 1)");
+
+                    b.HasIndex("CustomerUserId", "Status")
+                        .HasFilter("[Status] IN (0, 1)");
+
+                    b.HasIndex("FreeBarberUserId", "Status")
+                        .HasFilter("[Status] IN (0, 1)");
+
                     b.HasIndex("Status", "PendingExpiresAt");
 
                     b.HasIndex("ChairId", "AppointmentDate", "StartTime", "EndTime")
                         .IsUnique()
-                        .HasFilter("[ChairId] IS NOT NULL");
+                        .HasFilter("[Status] IN (0, 1)");
 
                     b.ToTable("Appointments");
                 });
@@ -366,6 +375,11 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FreeBarberUserId")
+                        .IsUnique();
+
+                    b.HasIndex("IsAvailable", "Latitude", "Longitude");
+
                     b.ToTable("FreeBarbers");
                 });
 
@@ -483,6 +497,9 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Comment")
                         .HasColumnType("nvarchar(max)");
 
@@ -504,6 +521,8 @@ namespace DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("RatedFromId");
+
+                    b.HasIndex("TargetId", "Score");
 
                     b.ToTable("Ratings");
                 });

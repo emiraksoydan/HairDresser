@@ -18,5 +18,6 @@ namespace Entities.Concrete.Entities
         public string? Comment { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public Guid AppointmentId { get; set; }
     }
 }

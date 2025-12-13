@@ -349,7 +349,8 @@ namespace DataAccess.Migrations
                     Score = table.Column<double>(type: "float", nullable: false),
                     Comment = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -388,11 +389,29 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Appointments_BarberStoreUserId_Status",
+                table: "Appointments",
+                columns: new[] { "BarberStoreUserId", "Status" },
+                filter: "[Status] IN (0, 1)");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Appointments_ChairId_AppointmentDate_StartTime_EndTime",
                 table: "Appointments",
                 columns: new[] { "ChairId", "AppointmentDate", "StartTime", "EndTime" },
                 unique: true,
-                filter: "[ChairId] IS NOT NULL");
+                filter: "[Status] IN (0, 1)");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Appointments_CustomerUserId_Status",
+                table: "Appointments",
+                columns: new[] { "CustomerUserId", "Status" },
+                filter: "[Status] IN (0, 1)");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Appointments_FreeBarberUserId_Status",
+                table: "Appointments",
+                columns: new[] { "FreeBarberUserId", "Status" },
+                filter: "[Status] IN (0, 1)");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Appointments_Status_PendingExpiresAt",
@@ -421,6 +440,17 @@ namespace DataAccess.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_FreeBarbers_FreeBarberUserId",
+                table: "FreeBarbers",
+                column: "FreeBarberUserId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_FreeBarbers_IsAvailable_Latitude_Longitude",
+                table: "FreeBarbers",
+                columns: new[] { "IsAvailable", "Latitude", "Longitude" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Notifications_UserId_IsRead_CreatedAt",
                 table: "Notifications",
                 columns: new[] { "UserId", "IsRead", "CreatedAt" });
@@ -429,6 +459,11 @@ namespace DataAccess.Migrations
                 name: "IX_Ratings_RatedFromId",
                 table: "Ratings",
                 column: "RatedFromId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Ratings_TargetId_Score",
+                table: "Ratings",
+                columns: new[] { "TargetId", "Score" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_FamilyId",
