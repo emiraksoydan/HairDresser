@@ -24,6 +24,7 @@ namespace Business.Abstract
 
         Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId);
 
+        Task<IDataResult<bool>> MarkReadByAppointmentIdAsync(Guid userId, Guid appointmentId);
 
     }
 }

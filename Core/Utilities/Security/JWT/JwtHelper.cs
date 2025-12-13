@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
@@ -63,8 +64,12 @@ namespace Core.Utilities.Security.JWT
             claims.AddName($"{user.FirstName}");
             claims.AddLastName($"{user.LastName}");
             claims.AddRoles(operationClaims?.Select(c => c.Name).ToArray() ?? []);
+            
+            // userType claim'ini ekle - enum.ToString() "Customer", "FreeBarber", "BarberStore" döndürür
             claims.AddUserType(user.UserType);
-
+            
+            // Debug: userType değerini logla
+            Debug.WriteLine($"[JwtHelper] Setting userType claim: {user.UserType} (ToString: {user.UserType.ToString()})");
 
             return claims;
         }

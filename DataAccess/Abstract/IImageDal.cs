@@ -1,5 +1,6 @@
 ﻿using Core.DataAccess;
 using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,5 +11,6 @@ namespace DataAccess.Abstract
 {
     public interface IImageDal : IEntityRepository<Image>
     {
+        Task<Image?> GetLatestImageAsync(Guid ownerId, ImageOwnerType ownerType);
     }
 }

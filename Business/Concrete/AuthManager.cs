@@ -12,6 +12,7 @@ using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
 
 
 namespace Business.Concrete
@@ -134,29 +135,75 @@ namespace Business.Concrete
         }
 
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IResult> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device)
+        public async Task<IDataResult<AccessToken>> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device)
         {
+            // Login için isme göre arama yapılmalı (şimdilik telefon yerine isim kontrolü)
+            // Telefon numarası hala gönderiliyor ve kaydediliyor ama kontrol isme göre yapılıyor
+            var firstName = userForVerifyDto.FirstName ?? string.Empty;
+            var lastName = userForVerifyDto.LastName ?? string.Empty;
+            var existing = await userService.GetByName(firstName, lastName);
+            
+            // Telefon numarasını normalize et (kayıt için gerekli)
+            var e164 = phoneService.NormalizeToE164(userForVerifyDto.PhoneNumber);
+            
+            // Mode kontrolü: "register" ise yeni kullanıcı, "login" ise mevcut kullanıcı
+            var isRegister = string.Equals(userForVerifyDto.Mode, "register", StringComparison.OrdinalIgnoreCase);
+            
             User user;
-            var existing = await userService.GetByName(userForVerifyDto.FirstName);
-            if (existing.Data is not null) user = existing.Data;
+            if (existing.Data is not null) 
+            {
+                // Mevcut kullanıcı bulundu
+                if (isRegister)
+                {
+                    // Register modunda ama kullanıcı zaten var - hata
+                    user = existing.Data;
+
+                    await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
+                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Register mode but user already exists. UserId: {existing.Data.Id}, UserType: {existing.Data.UserType}");
+                }
+                
+                // Login modunda mevcut kullanıcının userType'ını kullan (gönderilen userType'ı ignore et)
+                user = existing.Data;
+          
+                Debug.WriteLine($"[AuthManager] LoginWithPassword: Existing user found (Login mode). UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
+            }
             else
             {
+                // Kullanıcı bulunamadı
+                if (!isRegister)
+                {
+                    // Login modunda ama kullanıcı yok - hata
+                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Login mode but user not found for name: {firstName} {lastName}");
+                    return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı. Lütfen önce kayıt olun.");
+                }
+                
+                // Register modunda yeni kullanıcı oluştur
+                // UserType kontrolü: Geçerli bir UserType olmalı (Customer=0, FreeBarber=1, BarberStore=2)
+                if (userForVerifyDto.UserType < UserType.Customer || userForVerifyDto.UserType > UserType.BarberStore)
+                {
+                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Invalid UserType: {userForVerifyDto.UserType}");
+                    return new ErrorDataResult<AccessToken>("Geçersiz kullanıcı tipi.");
+                }
+                
+                var (cipher, nonce) = phoneService.Encrypt(e164);
                 user = new User
                 {
-                    FirstName = userForVerifyDto.FirstName,
-                    LastName = userForVerifyDto.LastName,
-                    UserType = userForVerifyDto.UserType,
-                    PhoneEncrypted = [],
-                    PhoneEncryptedNonce = [],
-                    PhoneSearchToken = phoneService.ComputeSearchToken(""),
+                    FirstName = firstName,
+                    LastName = lastName,
+                    UserType = userForVerifyDto.UserType, // Register modunda gönderilen userType kullanılır
+                    PhoneEncrypted = cipher,
+                    PhoneEncryptedNonce = nonce,
+                    PhoneSearchToken = phoneService.ComputeSearchToken(e164),
                     IsActive = true,
-                    CertificateFilePath = userForVerifyDto.CertificateFilePath,
+                    CertificateFilePath = userForVerifyDto.CertificateFilePath ?? string.Empty,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-
                 };
                 await userService.Add(user);
+                Debug.WriteLine($"[AuthManager] LoginWithPassword: New user created (Register mode). UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
             }
+            
+            // Claims atama
             if (user.UserType == UserType.BarberStore)
                 await AssignClaimsByPrefixAsync(user.Id, "barberstore");
             else if(user.UserType == UserType.FreeBarber)
@@ -164,7 +211,12 @@ namespace Business.Concrete
             else if (user.UserType == UserType.Customer)
                 await AssignClaimsByPrefixAsync(user.Id, "customer");
 
-            return await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
+            var result = await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
+            
+            // Debug: Token oluşturulduktan sonra userType'ı logla
+            Debug.WriteLine($"[AuthManager] LoginWithPassword: Token created successfully for UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
+            
+            return result;
         }
 
         private async Task AssignClaimsByPrefixAsync(Guid userId, string prefix)
@@ -191,8 +243,15 @@ namespace Business.Concrete
 
         private async Task<IDataResult<AccessToken>> CreateAccessAndRefreshAsync(User user, string? ip, string? device, Guid? familyId)
         {
+            // Debug: Token oluşturulmadan önce user bilgilerini logla
+            Debug.WriteLine($"[AuthManager] CreateAccessAndRefreshAsync: Creating token for UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
+            
             var claims = await userService.GetClaims(user);
             var access = tokenHelper.CreateToken(user, claims.Data);
+            
+            // Debug: Token oluşturulduktan sonra logla
+            Debug.WriteLine($"[AuthManager] CreateAccessAndRefreshAsync: Token created successfully for UserId: {user.Id}, UserType: {user.UserType}");
+            
             // Get refresh token expiration from configuration (default: 30 days)
             var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
             var rt = refreshTokenService.CreateNew(refreshDays);
@@ -240,6 +299,9 @@ namespace Business.Concrete
         }
         private IResult ExpiryActive(RefreshToken token)
         {
+            if (token is null)
+                return new ErrorDataResult<AccessToken>("Geçersiz refresh token.");
+            
             if (token.RevokedAt is not null || token.ExpiresAt <= DateTime.UtcNow)
                 return new ErrorDataResult<AccessToken>("Süresi dolmuş veya iptal edilmiş token.");
             return new SuccessDataResult<AccessToken>();

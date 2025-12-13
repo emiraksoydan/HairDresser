@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
@@ -36,7 +37,12 @@ namespace Core.Extensions
         }
         public static void AddUserType(this ICollection<Claim> claims, UserType userType)
         {
-            claims.Add(new Claim("userType", userType.ToString()));
+            // Enum.ToString() "Customer", "FreeBarber", "BarberStore" döndürür
+            var userTypeString = userType.ToString();
+            claims.Add(new Claim("userType", userTypeString));
+            
+            // Debug: claim'in eklendiğini doğrula
+            Debug.WriteLine($"[ClaimExtensions] Added userType claim: \"userType\" = \"{userTypeString}\"");
         }
       
     }

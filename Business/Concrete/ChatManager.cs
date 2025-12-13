@@ -156,13 +156,36 @@ namespace Business.Concrete
 
             var threads = await threadDal.GetThreadsForUserAsync(userId, allowed);
 
-            // Set Title for each thread (business logic should be in business layer, not DAL)
+            // PERFORMANCE FIX: N+1 Query problemi çözüldü - Batch queries
+            if (threads.Count == 0)
+                return new SuccessDataResult<List<ChatThreadListItemDto>>(threads);
+
+            // Tüm appointment ID'leri topla
+            var appointmentIds = threads.Select(t => t.AppointmentId).ToList();
+            
+            // Tek sorguda tüm appointment'ları çek
+            var appointments = await appointmentDal.GetAll(x => appointmentIds.Contains(x.Id));
+            var apptDict = appointments.ToDictionary(a => a.Id);
+
+            // Tüm store owner ID'leri topla
+            var storeOwnerIds = appointments
+                .Where(a => a.BarberStoreUserId.HasValue)
+                .Select(a => a.BarberStoreUserId!.Value)
+                .Distinct()
+                .ToList();
+
+            // Tek sorguda tüm store'ları çek
+            var stores = storeOwnerIds.Count > 0
+                ? await barberStoreDal.GetAll(x => storeOwnerIds.Contains(x.BarberStoreOwnerId))
+                : new List<BarberStore>();
+            var storeDict = stores.ToDictionary(s => s.BarberStoreOwnerId);
+
+            // Set Title for each thread (batch queries ile optimize edildi)
             foreach (var thread in threads)
             {
-                var appt = await appointmentDal.Get(x => x.Id == thread.AppointmentId);
-                if (appt is null) continue;
+                if (!apptDict.TryGetValue(thread.AppointmentId, out var appt)) continue;
 
-                var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
+                storeDict.TryGetValue(appt.BarberStoreUserId ?? Guid.Empty, out var store);
                 thread.Title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
             }
 

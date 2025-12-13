@@ -31,6 +31,12 @@ builder.Services.AddControllers(opt =>
         .Build();
 
     opt.Filters.Add(new AuthorizeFilter(policy));
+})
+.AddJsonOptions(options =>
+{
+    // JSON serialization için camelCase kullan
+    options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.JsonSerializerOptions.WriteIndented = false;
 });
 
 builder.Services.AddDbContext<DatabaseContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -58,6 +64,10 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 
 builder.Services.Configure<SecurityOption>(
     builder.Configuration.GetSection("SecurityOptions"));
+builder.Services.Configure<Core.Utilities.Configuration.AppointmentSettings>(
+    builder.Configuration.GetSection("AppointmentSettings"));
+builder.Services.Configure<Core.Utilities.Configuration.BackgroundServicesSettings>(
+    builder.Configuration.GetSection("BackgroundServices"));
 builder.Services.AddCors(options =>
 {
     if (builder.Environment.IsDevelopment())
@@ -130,6 +140,17 @@ builder.Host.ConfigureContainer<ContainerBuilder>(options =>
 });
 builder.Services.AddSingleton<IRealTimePublisher,SignalRRealtimePublisher>();
 builder.Services.AddHostedService<AppointmentTimeoutWorker>();
+
+// SignalR için JSON serialization ayarları - camelCase kullan
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+})
+.AddJsonProtocol(options =>
+{
+    options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.PayloadSerializerOptions.WriteIndented = false;
+});
 
 
 

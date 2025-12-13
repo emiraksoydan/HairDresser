@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,5 +13,6 @@ namespace Entities.Concrete.Dto
         public string? ChairName { get; set; }
         public Guid? ManuelBarberId { get; set; }
         public string? ManuelBarberName { get; set; }
+        public string? ManuelBarberImageUrl { get; set; }
     }
 }

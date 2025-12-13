@@ -2,22 +2,59 @@
 using Business.Abstract;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.SignalR;
+using System;
 
 namespace Api.RealTime
 {
     public class SignalRRealtimePublisher(IHubContext<AppHub> hub) : IRealTimePublisher
     {
-        public Task PushNotificationAsync(Guid userId, NotificationDto dto) =>
-            hub.Clients.Group($"user:{userId}").SendAsync("notification.received", dto);
+        public async Task PushNotificationAsync(Guid userId, NotificationDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("notification.received", dto);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - notification is already in DB
+                // Consider adding ILogger<T> for proper logging
+            }
+        }
 
-        public Task PushChatMessageAsync(Guid userId, ChatMessageDto dto) =>
-            hub.Clients.Group($"user:{userId}").SendAsync("chat.message", dto);
+        public async Task PushChatMessageAsync(Guid userId, ChatMessageDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.message", dto);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - message is already in DB
+            }
+        }
 
-        public Task PushBadgeAsync(Guid userId, BadgeCountDto dto) =>
-            hub.Clients.Group($"user:{userId}").SendAsync("badge.updated", dto);
+        public async Task PushBadgeAsync(Guid userId, BadgeCountDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("badge.updated", dto);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - badge count can be refetched
+            }
+        }
 
-
-        public Task PushChatThreadCreatedAsync(Guid userId, ChatThreadListItemDto dto) =>
-            hub.Clients.Group($"user:{userId}").SendAsync("chat.threadCreated", dto);
+        public async Task PushChatThreadCreatedAsync(Guid userId, ChatThreadListItemDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.threadCreated", dto);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - thread is already in DB
+            }
+        }
     }
 }

@@ -1,12 +1,25 @@
-﻿using Business.Abstract;
+using Business.Abstract;
+using Core.Aspect.Autofac.Transaction;
+using Core.Utilities.Configuration;
 using DataAccess.Concrete;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System;
 
 namespace Api.BackgroundServices
 {
-    public class AppointmentTimeoutWorker(IServiceScopeFactory scopeFactory) : BackgroundService
+    public class AppointmentTimeoutWorker(
+        IServiceScopeFactory scopeFactory,
+        IOptions<BackgroundServicesSettings> backgroundServicesSettings,
+        ILogger<AppointmentTimeoutWorker> logger
+    ) : BackgroundService
     {
+        private readonly BackgroundServicesSettings _settings = backgroundServicesSettings.Value;
+        private readonly ILogger<AppointmentTimeoutWorker> _logger = logger;
+
+        [TransactionScopeAspect]
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -16,6 +29,7 @@ namespace Api.BackgroundServices
                 var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
                 var notifySvc = scope.ServiceProvider.GetRequiredService<IAppointmentNotifyService>();
                 var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
+                var realtime = scope.ServiceProvider.GetRequiredService<IRealTimePublisher>();
 
                 var now = DateTime.UtcNow;
 
@@ -25,6 +39,12 @@ namespace Api.BackgroundServices
                              && a.PendingExpiresAt <= now)
                     .ToListAsync(stoppingToken);
 
+                if (expired.Any())
+                {
+                    _logger.LogInformation("AppointmentTimeoutWorker: Found {Count} expired appointments", expired.Count);
+                }
+
+                // Her appointment için işlem yap
                 foreach (var appt in expired)
                 {
                     appt.Status = AppointmentStatus.Unanswered;
@@ -61,7 +81,7 @@ namespace Api.BackgroundServices
                 if (expired.Count > 0)
                     await db.SaveChangesAsync(stoppingToken);
 
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(_settings.AppointmentTimeoutWorkerIntervalSeconds), stoppingToken);
             }
         }
     }

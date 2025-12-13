@@ -13,13 +13,9 @@ namespace Business.Concrete
             // Performance: Use CountAsync instead of GetAll().Count
             var unreadNoti = await notificationDal.CountAsync(x => x.UserId == userId && x.IsRead == false);
 
-            var threads = await chatThreadDal.GetAll(t =>
-                t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId);
-
-            var unreadMsg = threads.Sum(t =>
-                t.CustomerUserId == userId ? t.CustomerUnreadCount :
-                t.StoreOwnerUserId == userId ? t.StoreUnreadCount :
-                t.FreeBarberUserId == userId ? t.FreeBarberUnreadCount : 0);
+            // PERFORMANCE FIX: Database-level sum instead of in-memory sum
+            // This avoids loading all threads into memory
+            var unreadMsg = await chatThreadDal.GetUnreadMessageCountAsync(userId);
 
             return new SuccessDataResult<BadgeCountDto>(new BadgeCountDto
             {

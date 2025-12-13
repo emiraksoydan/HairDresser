@@ -14,7 +14,7 @@ namespace Business.Abstract
         Task<IResult> Add(User user);
         Task<IDataResult<User>> GetByPhone(string phoneNumber);
         Task<IDataResult<User>> GetById(Guid id);
-        Task<IDataResult<User>> GetByName(string name);
+        Task<IDataResult<User>> GetByName(string firstName, string lastName);
 
 
     }

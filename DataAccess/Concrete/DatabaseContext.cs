@@ -46,6 +46,19 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<Appointment>()
               .HasIndex(x => new { x.Status, x.PendingExpiresAt });
 
+            // Performance indexes for active appointment queries
+            modelBuilder.Entity<Appointment>()
+                .HasIndex(x => new { x.CustomerUserId, x.Status })
+                .HasFilter("[Status] IN (0, 1)"); // Pending, Approved
+
+            modelBuilder.Entity<Appointment>()
+                .HasIndex(x => new { x.FreeBarberUserId, x.Status })
+                .HasFilter("[Status] IN (0, 1)");
+
+            modelBuilder.Entity<Appointment>()
+                .HasIndex(x => new { x.BarberStoreUserId, x.Status })
+                .HasFilter("[Status] IN (0, 1)");
+
             modelBuilder.Entity<Appointment>().Property(x => x.RowVersion).IsRowVersion();
 
           
@@ -59,6 +72,18 @@ namespace DataAccess.Concrete
 
             modelBuilder.Entity<Notification>()
                 .HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAt });
+
+            // FreeBarber indexes for performance
+            modelBuilder.Entity<FreeBarber>()
+                .HasIndex(x => x.FreeBarberUserId)
+                .IsUnique();
+
+            modelBuilder.Entity<FreeBarber>()
+                .HasIndex(x => new { x.IsAvailable, x.Latitude, x.Longitude });
+
+            // Rating index for manuel barber rating queries
+            modelBuilder.Entity<Rating>()
+                .HasIndex(x => new { x.TargetId, x.Score });
 
 
 

@@ -17,5 +17,10 @@ namespace DataAccess.Abstract
         /// Note: Title is set to empty string - should be set in business layer
         /// </summary>
         Task<List<ChatThreadListItemDto>> GetThreadsForUserAsync(Guid userId, AppointmentStatus[] allowedStatuses);
+        
+        /// <summary>
+        /// Gets unread message count for a user (database-level sum for performance)
+        /// </summary>
+        Task<int> GetUnreadMessageCountAsync(Guid userId);
     }
 }

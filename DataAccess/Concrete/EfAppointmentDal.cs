@@ -1,10 +1,12 @@
 ﻿using Core.DataAccess.EntityFramework;
+using Core.Utilities.Configuration;
 using Core.Utilities.Helpers;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,14 +19,17 @@ namespace DataAccess.Concrete
     public class EfAppointmentDal : EfEntityRepositoryBase<Appointment, DatabaseContext>, IAppointmentDal
     {
         private readonly DatabaseContext _context;
-        public EfAppointmentDal(DatabaseContext context) : base(context)
+        private readonly AppointmentSettings _settings;
+        
+        public EfAppointmentDal(DatabaseContext context, IOptions<AppointmentSettings> appointmentSettings) : base(context)
         {
             _context = context;
+            _settings = appointmentSettings.Value;
         }
 
         public async Task<List<ChairSlotDto>> GetAvailibilitySlot(Guid storeId, DateOnly dateOnly, CancellationToken ct)
         {
-            const int slotMinutes = 60;
+            var slotMinutes = _settings.SlotMinutes;
 
             // 1) Koltuklar
             var chairs = await _context.BarberChairs.AsNoTracking()

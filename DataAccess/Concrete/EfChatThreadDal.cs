@@ -40,5 +40,18 @@ namespace DataAccess.Concrete
                 })
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Gets unread message count for a user (database-level sum for performance)
+        /// </summary>
+        public async Task<int> GetUnreadMessageCountAsync(Guid userId)
+        {
+            return await Context.ChatThreads
+                .Where(t => t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId)
+                .SumAsync(t =>
+                    t.CustomerUserId == userId ? t.CustomerUnreadCount :
+                    t.StoreOwnerUserId == userId ? t.StoreUnreadCount :
+                    t.FreeBarberUserId == userId ? t.FreeBarberUnreadCount : 0);
+        }
     }
 }

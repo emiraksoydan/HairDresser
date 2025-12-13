@@ -40,9 +40,9 @@ namespace Business.Concrete
             return new SuccessDataResult<User>(user);
         }
 
-        public async Task<IDataResult<User>> GetByName(string name)
+        public async Task<IDataResult<User>> GetByName(string firstName, string lastName)
         {
-            var user = await userDal.Get(u => u.FirstName == name);
+            var user = await userDal.Get(u => u.FirstName == firstName && u.LastName == lastName);
             return new SuccessDataResult<User>(user);
         }
     }

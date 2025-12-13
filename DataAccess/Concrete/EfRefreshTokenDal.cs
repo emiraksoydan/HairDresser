@@ -17,15 +17,16 @@ namespace DataAccess.Concrete
         {
             _context = context;
         }
-        public async Task Add(RefreshToken token)
+        // ÖNEMLİ: SaveChanges çağrılmıyor - TransactionScopeAspect tarafından otomatik çağrılacak
+        // Transaction içinde bu metodlar çağrılırsa SaveChanges transaction sonunda yapılır
+        public new async Task Add(RefreshToken token)
         {
-            _context.Set<RefreshToken>().Add(token);
-            await _context.SaveChangesAsync();
+            await base.Add(token); // TransactionScopeAspect SaveChanges'i çağıracak
         }
-        public async Task Update(RefreshToken token)
+        
+        public new async Task Update(RefreshToken token)
         {
-            _context.Set<RefreshToken>().Update(token);
-            await _context.SaveChangesAsync();
+            await base.Update(token); // TransactionScopeAspect SaveChanges'i çağıracak
         }
 
         public async Task<List<RefreshToken>> GetActiveByUser(Guid userId) =>

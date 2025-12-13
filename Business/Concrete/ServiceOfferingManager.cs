@@ -68,7 +68,6 @@ namespace Business.Concrete
         }
 
 
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateRange(List<ServiceOfferingUpdateDto> serviceOfferingUpdateDto)
         {
             if (serviceOfferingUpdateDto == null || serviceOfferingUpdateDto.Count == 0)

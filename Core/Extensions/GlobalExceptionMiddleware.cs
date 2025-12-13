@@ -9,10 +9,12 @@ namespace Core.Extensions
     public class GlobalExceptionMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly ILogger<GlobalExceptionMiddleware> _logger;
 
-        public GlobalExceptionMiddleware(RequestDelegate next)
+        public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
         {
             _next = next;
+            _logger = logger;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -24,6 +26,7 @@ namespace Core.Extensions
             catch (ValidationException ex)
             {
                 // FluentValidation.ValidationException
+                _logger.LogWarning(ex, "Validation error occurred: {Path}", context.Request.Path);
 
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 context.Response.ContentType = "application/json";
@@ -46,6 +49,8 @@ namespace Core.Extensions
             catch (Exception ex)
             {
                 // Diğer tüm beklenmeyen hatalar
+                _logger.LogError(ex, "Unhandled exception occurred: {Path} {Method}", 
+                    context.Request.Path, context.Request.Method);
 
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 context.Response.ContentType = "application/json";

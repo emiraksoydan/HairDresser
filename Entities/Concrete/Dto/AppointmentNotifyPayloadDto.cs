@@ -1,4 +1,5 @@
 ﻿using Entities.Abstract;
+using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +21,14 @@ namespace Entities.Concrete.Dto
         public UserNotifyDto? FreeBarber { get; set; }
         public StoreNotifyDto? Store { get; set; }
         public ChairNotifyDto? Chair { get; set; }
+
+        // Status bilgileri - Frontend'de filtreleme için gerekli
+        public AppointmentStatus? Status { get; set; }
+        public DecisionStatus? StoreDecision { get; set; }
+        public DecisionStatus? FreeBarberDecision { get; set; }
+
+        // Service offerings - Frontend'de hizmet butonlarını göstermek için
+        public List<ServiceOfferingGetDto>? ServiceOfferings { get; set; }
 
         public object? Extra { get; set; }              
     }

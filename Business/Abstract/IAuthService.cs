@@ -20,6 +20,6 @@ namespace Business.Abstract
         Task<IResult> SendOtpAsync(string phoneNumber, UserType? userType,OtpPurpose otpPurpose);
         Task<IResult> RevokeAsync(Guid userId, string refreshToken, string? ip);
 
-        Task<IResult> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device);
+        Task<IDataResult<Core.Utilities.Security.JWT.AccessToken>> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device);
     }
 }

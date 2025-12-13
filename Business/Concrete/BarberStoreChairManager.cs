@@ -1,6 +1,7 @@
-﻿
+
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
 using Core.Utilities.Results;
@@ -18,6 +19,7 @@ namespace Business.Concrete
     {
 
         [ValidationAspect(typeof(BarberStoreChairCreateValidator))]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> AddAsync(BarberChairCreateDto dto)
         {
             Guid? barberId = null;
@@ -48,6 +50,7 @@ namespace Business.Concrete
             return new SuccessResult();
         }
         [ValidationAspect(typeof(BarberStoreChairUpdateValidator))]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateAsync(BarberChairUpdateDto dto)
         {
             var ruleResult = await BusinessRules.RunAsync(() => EnsureBarberNotAssignedToAnotherChairAsync(dto.BarberId, dto.Id));

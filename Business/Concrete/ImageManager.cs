@@ -58,7 +58,6 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateRangeAsync(List<UpdateImageDto> list)
         {
             if (list == null || list.Count == 0)

@@ -1,5 +1,4 @@
-﻿using Business.Abstract;
-using Core.Aspect.Autofac.Transaction;
+using Business.Abstract;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
@@ -19,7 +18,9 @@ namespace Business.Concrete
         IBadgeService badgeService,
         IRealTimePublisher realtime) : INotificationService
     {
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
+        // (AppointmentManager içindeki TransactionScopeAspect içinde)
+        // İç içe transaction scope'lar sorun yaratabilir ve notification'lar commit edilmeyebilir
         public async Task<IDataResult<Guid>> CreateAndPushAsync(Guid userId, NotificationType type, Guid? appointmentId, string title, object payload, string? body = null)
         {
             var n = new Notification
@@ -30,7 +31,11 @@ namespace Business.Concrete
                 Type = type,
                 Title = title,
                 Body = body,
-                PayloadJson = JsonSerializer.Serialize(payload),
+                PayloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false
+                }),
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -49,14 +54,22 @@ namespace Business.Concrete
                 IsRead = n.IsRead
             };
 
+            // Real-time push - Global exception middleware hataları yakalayacak
             await realtime.PushNotificationAsync(userId, dto);
 
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-                await realtime.PushBadgeAsync(userId, badges.Data);
+            // Badge güncelle ve SignalR ile tetikle
+            try
+            {
+                var badges = await badgeService.GetCountsAsync(userId);
+                if (badges.Success)
+                    await realtime.PushBadgeAsync(userId, badges.Data);
+            }
+            catch
+            {
+                // Badge güncelleme hatası bildirim gönderimini etkilememeli
+            }
 
             return new SuccessDataResult<Guid>(n.Id);
-
         }
 
         public async Task<IDataResult<List<NotificationDto>>> GetAllNotify(Guid userId)
@@ -83,7 +96,6 @@ namespace Business.Concrete
             var count = (await notificationDal.GetAll(x => x.UserId == userId && !x.IsRead)).Count;
             return new SuccessDataResult<int>(count);
         }
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId)
         {
             var n = await notificationDal.Get(x => x.Id == notificationId && x.UserId == userId);
@@ -94,6 +106,32 @@ namespace Business.Concrete
 
             await notificationDal.Update(n);
 
+            // Badge güncelle ve SignalR ile tetikle
+            var badges = await badgeService.GetCountsAsync(userId);
+            if (badges.Success)
+                await realtime.PushBadgeAsync(userId, badges.Data);
+
+            return new SuccessDataResult<bool>(true);
+        }
+
+        public async Task<IDataResult<bool>> MarkReadByAppointmentIdAsync(Guid userId, Guid appointmentId)
+        {
+            var notifications = await notificationDal.GetAll(x => x.UserId == userId && x.AppointmentId == appointmentId && !x.IsRead);
+            
+            if (notifications == null || !notifications.Any())
+                return new SuccessDataResult<bool>(true); // Zaten okunmuş veya yok
+
+            // Range ile toplu güncelleme
+            var now = DateTime.UtcNow;
+            foreach (var n in notifications)
+            {
+                n.IsRead = true;
+                n.ReadAt = now;
+            }
+            
+            await notificationDal.UpdateRange(notifications);
+
+            // Badge güncelle ve SignalR ile tetikle
             var badges = await badgeService.GetCountsAsync(userId);
             if (badges.Success)
                 await realtime.PushBadgeAsync(userId, badges.Data);
