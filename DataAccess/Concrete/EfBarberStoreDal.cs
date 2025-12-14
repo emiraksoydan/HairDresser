@@ -1,4 +1,4 @@
-﻿using Core.DataAccess.EntityFramework;
+using Core.DataAccess.EntityFramework;
 using Core.Utilities.Helpers;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
@@ -50,10 +50,10 @@ namespace DataAccess.Concrete
                 })
                 .FirstOrDefaultAsync();
 
-            // 3) Favorite count
+            // 3) Favorite count (sadece aktif favoriler)
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
-                .CountAsync(f => f.FavoritedToId == store.Id);
+                .CountAsync(f => f.FavoritedToId == store.Id && f.IsActive);
 
             // 4) Offerings
             var offerings = await _context.ServiceOfferings
@@ -263,12 +263,12 @@ namespace DataAccess.Concrete
             // 3) Favoriler
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
-                .Where(f => storeIds.Contains(f.FavoritedToId))
+                .Where(f => storeIds.Contains(f.FavoritedToId) && f.IsActive)
                 .GroupBy(f => f.FavoritedToId)
                 .Select(g => new
                 {
                     StoreId = g.Key,
-                    FavoriteCount = g.Count()
+                    FavoriteCount = g.Count(f => f.IsActive)
                 })
                 .ToListAsync();
 
@@ -405,12 +405,12 @@ namespace DataAccess.Concrete
                 .ToDictionary(x => x.StoreId, x => new { x.AvgRating, x.ReviewCount });
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
-                .Where(f => storeIds.Contains(f.FavoritedToId))
+                .Where(f => storeIds.Contains(f.FavoritedToId) && f.IsActive)
                 .GroupBy(f => f.FavoritedToId)
                 .Select(g => new
                 {
                     StoreId = g.Key,
-                    FavoriteCount = g.Count()
+                    FavoriteCount = g.Count(f => f.IsActive)
                 })
                 .ToListAsync();
 

@@ -1,4 +1,4 @@
-﻿using Core.DataAccess;
+using Core.DataAccess;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
@@ -13,13 +13,24 @@ namespace DataAccess.Abstract
     public interface IChatThreadDal : IEntityRepository<ChatThread>
     {
         /// <summary>
-        /// Gets chat threads for a user with appointment status filtering
-        /// Note: Title is set to empty string - should be set in business layer
+        /// Gets chat threads for a user (both appointment and favorite threads)
+        /// Note: Title and Participants will be set in business layer
         /// </summary>
         Task<List<ChatThreadListItemDto>> GetThreadsForUserAsync(Guid userId, AppointmentStatus[] allowedStatuses);
         
         /// <summary>
+        /// Gets favorite threads for a user (where user is either FavoriteFromUserId or FavoriteToUserId)
+        /// </summary>
+        Task<List<ChatThread>> GetFavoriteThreadsForUserAsync(Guid userId);
+        
+        /// <summary>
+        /// Gets or creates a favorite thread between two users
+        /// </summary>
+        Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId);
+        
+        /// <summary>
         /// Gets unread message count for a user (database-level sum for performance)
+        /// Includes both appointment and favorite threads
         /// </summary>
         Task<int> GetUnreadMessageCountAsync(Guid userId);
     }

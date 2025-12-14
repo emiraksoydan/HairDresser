@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +12,7 @@ namespace Entities.Concrete.Entities
         public Guid Id { get; set; }
         public Guid FavoritedFromId { get; set; } 
         public Guid FavoritedToId { get; set; }
+        public bool IsActive { get; set; } = true; // Favori aktif mi değil mi kontrolü
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

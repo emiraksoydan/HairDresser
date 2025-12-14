@@ -1,4 +1,4 @@
-﻿using Core.Extensions;
+using Core.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Text.RegularExpressions;
@@ -27,6 +27,18 @@ namespace Api.Hubs
                 await Groups.RemoveFromGroupAsync(Context?.ConnectionId!, $"user:{userId}");
             }
             await base.OnDisconnectedAsync(exception);
+        }
+
+        // Typing indicator için hub metodu (frontend'den çağrılacak)
+        public async Task NotifyTyping(string threadId, bool isTyping)
+        {
+            var userIdStr = Context?.User?.GetUserIdOrThrow();
+            if (!Guid.TryParse(userIdStr?.ToString(), out var userId) || !Guid.TryParse(threadId, out var threadIdGuid))
+                return;
+
+            // Bu metod için ChatService üzerinden typing event'i göndermek daha mantıklı
+            // Ama hub üzerinden direkt de yapılabilir - frontend'den çağrılacak
+            // Backend'den ChatService.NotifyTypingAsync metodu çağrılacak (API Controller üzerinden)
         }
     }
 }

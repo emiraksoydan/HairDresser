@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -65,9 +65,17 @@ namespace DataAccess.Concrete
 
           
 
+            // AppointmentId artık nullable (favori thread'ler için null)
+            // Unique index sadece AppointmentId null değilse geçerli olmalı
             modelBuilder.Entity<ChatThread>()
                 .HasIndex(x => x.AppointmentId)
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("[AppointmentId] IS NOT NULL");
+
+            // Favori thread'ler için composite index (her iki yönü desteklemek için)
+            modelBuilder.Entity<ChatThread>()
+                .HasIndex(x => new { x.FavoriteFromUserId, x.FavoriteToUserId })
+                .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
             modelBuilder.Entity<ChatMessage>()
                 .HasIndex(x => new { x.ThreadId, x.CreatedAt });
@@ -87,7 +95,14 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<Rating>()
                 .HasIndex(x => new { x.TargetId, x.Score });
 
+            // Price precision ve scale ayarları
+            modelBuilder.Entity<ServiceOffering>()
+                .Property(x => x.Price)
+                .HasPrecision(18, 2);
 
+            modelBuilder.Entity<AppointmentServiceOffering>()
+                .Property(x => x.Price)
+                .HasPrecision(18, 2);
 
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

@@ -18,6 +18,7 @@ namespace DataAccess.Concrete
 
         public async Task<Favorite> GetByUsersAsync(Guid favoritedFromId, Guid favoritedToId)
         {
+            // Aktif veya pasif fark etmeksizin favoriyi getir (toggle için)
             return await _context.Favorites
                 .FirstOrDefaultAsync(f => 
                     f.FavoritedFromId == favoritedFromId && 
@@ -26,10 +27,12 @@ namespace DataAccess.Concrete
 
         public async Task<bool> ExistsAsync(Guid favoritedFromId, Guid favoritedToId)
         {
+            // Sadece aktif favorileri kontrol et
             return await _context.Favorites
                 .AnyAsync(f => 
                     f.FavoritedFromId == favoritedFromId && 
-                    f.FavoritedToId == favoritedToId);
+                    f.FavoritedToId == favoritedToId &&
+                    f.IsActive);
         }
     }
 }

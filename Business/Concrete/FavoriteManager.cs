@@ -23,6 +23,7 @@ namespace Business.Concrete
         private readonly IFreeBarberDal _freeBarberDal;
         private readonly IAppointmentDal _appointmentDal;
         private readonly IManuelBarberDal _manuelBarberDal;
+        private readonly IChatService _chatService;
         private readonly DatabaseContext _context;
 
         public FavoriteManager(
@@ -32,6 +33,7 @@ namespace Business.Concrete
             IFreeBarberDal freeBarberDal,
             IAppointmentDal appointmentDal,
             IManuelBarberDal manuelBarberDal,
+            IChatService chatService,
             DatabaseContext context)
         {
             _favoriteDal = favoriteDal;
@@ -40,6 +42,7 @@ namespace Business.Concrete
             _freeBarberDal = freeBarberDal;
             _appointmentDal = appointmentDal;
             _manuelBarberDal = manuelBarberDal;
+            _chatService = chatService;
             _context = context;
         }
 
@@ -72,41 +75,83 @@ namespace Business.Concrete
                     return new ErrorDataResult<bool>("Randevu sayfasından favorileme için randevunun tamamlanmış veya iptal edilmiş olması gerekir.");
             }
 
-            // Mevcut favori kontrolü
-            var existingFavorite = await _favoriteDal.GetByUsersAsync(userId, dto.TargetId);
+            // TargetId'nin UserId'sini bul (Store için BarberStoreOwnerId, FreeBarber için FreeBarberUserId, Customer için direkt userId)
+            Guid targetUserId = Guid.Empty;
+            if (store != null)
+                targetUserId = store.BarberStoreOwnerId;
+            else if (freeBarber != null)
+                targetUserId = freeBarber.FreeBarberUserId;
+            else if (customerUser != null)
+                targetUserId = customerUser.Id;
+            else if (manuelBarber != null)
+            {
+                // ManuelBarber için store'dan owner'ı bul
+                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
+                if (manuelBarberStore != null)
+                    targetUserId = manuelBarberStore.BarberStoreOwnerId;
+            }
+
+            if (targetUserId == Guid.Empty)
+                return new ErrorDataResult<bool>(Messages.TargetUserNotFound);
+
+            // Mevcut favori kontrolü - TargetId (Store ID veya FreeBarber ID) ile kontrol et
+            // FavoritedToId Store ID veya FreeBarber ID olabilir, User ID değil
+            var existingFavorite = await _favoriteDal.Get(x => x.FavoritedFromId == userId && x.FavoritedToId == dto.TargetId);
 
             if (existingFavorite != null)
             {
-                // Favori varsa sadece UpdatedAt'i güncelle (silme)
+                // Favori varsa IsActive durumunu toggle et
+                existingFavorite.IsActive = !existingFavorite.IsActive;
                 existingFavorite.UpdatedAt = DateTime.UtcNow;
                 await _favoriteDal.Update(existingFavorite);
-                return new SuccessDataResult<bool>(true, Messages.FavoriteUpdatedSuccess);
+                
+                // Favori aktif edildiyse thread oluştur veya güncelle
+                if (existingFavorite.IsActive)
+                {
+                    // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
+                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserId);
+                }
+                // Favori pasif edildiyse thread görünmez olacak (GetThreadsAsync'te aktif favori kontrolü var)
+                
+                var message = existingFavorite.IsActive 
+                    ? Messages.FavoriteAddedSuccess 
+                    : Messages.FavoriteRemovedSuccess;
+                    
+                return new SuccessDataResult<bool>(existingFavorite.IsActive, message);
             }
             else
             {
-                // Favori yoksa ekle
+                // Favori yoksa ekle (IsActive = true ile)
                 var favorite = new Favorite
                 {
                     Id = Guid.NewGuid(),
                     FavoritedFromId = userId,
                     FavoritedToId = dto.TargetId,
+                    IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
                 await _favoriteDal.Add(favorite);
+                
+                // Favori eklendiğinde thread oluştur (eğer yoksa)
+                await _chatService.EnsureFavoriteThreadAsync(userId, targetUserId);
+                
                 return new SuccessDataResult<bool>(true, Messages.FavoriteAddedSuccess);
             }
         }
 
         public async Task<IDataResult<bool>> IsFavoriteAsync(Guid userId, Guid targetId)
         {
-            var exists = await _favoriteDal.ExistsAsync(userId, targetId);
-            return new SuccessDataResult<bool>(exists);
+            // targetId Store ID, FreeBarber ID veya Customer User ID olabilir
+            // FavoritedToId ile direkt kontrol et (aktif favoriler)
+            var favorite = await _favoriteDal.Get(x => x.FavoritedFromId == userId && x.FavoritedToId == targetId && x.IsActive);
+            return new SuccessDataResult<bool>(favorite != null);
         }
 
         public async Task<IDataResult<List<FavoriteGetDto>>> GetMyFavoritesAsync(Guid userId)
         {
-            var favorites = await _favoriteDal.GetAll(x => x.FavoritedFromId == userId);
+            // Sadece aktif favorileri getir
+            var favorites = await _favoriteDal.GetAll(x => x.FavoritedFromId == userId && x.IsActive);
             
             if (!favorites.Any())
                 return new SuccessDataResult<List<FavoriteGetDto>>(new List<FavoriteGetDto>());
@@ -138,10 +183,10 @@ namespace Business.Concrete
                     .ToListAsync();
                 var ratingDict = ratingStats.ToDictionary(x => x.StoreId, x => new { x.AvgRating, x.ReviewCount });
 
-                // Favorite count
+                // Favorite count (sadece aktif favoriler)
                 var favoriteStats = await _context.Favorites
                     .AsNoTracking()
-                    .Where(f => storeIdsList.Contains(f.FavoritedToId))
+                    .Where(f => storeIdsList.Contains(f.FavoritedToId) && f.IsActive)
                     .GroupBy(f => f.FavoritedToId)
                     .Select(g => new { StoreId = g.Key, FavoriteCount = g.Count() })
                     .ToListAsync();
@@ -229,10 +274,10 @@ namespace Business.Concrete
                     .ToListAsync();
                 var fbRatingDict = fbRatingStats.ToDictionary(x => x.FreeBarberId, x => new { x.AvgRating, x.ReviewCount });
 
-                // Favorite count
+                // Favorite count (sadece aktif favoriler)
                 var fbFavoriteStats = await _context.Favorites
                     .AsNoTracking()
-                    .Where(f => fbIdsList.Contains(f.FavoritedToId))
+                    .Where(f => fbIdsList.Contains(f.FavoritedToId) && f.IsActive)
                     .GroupBy(f => f.FavoritedToId)
                     .Select(g => new { FreeBarberId = g.Key, FavoriteCount = g.Count() })
                     .ToListAsync();

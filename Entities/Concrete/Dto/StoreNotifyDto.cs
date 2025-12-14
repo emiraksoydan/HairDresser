@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
@@ -15,5 +15,6 @@ namespace Entities.Concrete.Dto
         public string? StoreName { get; set; }
         public string? ImageUrl { get; set; }
         public BarberType? Type { get; set; }
+        public bool? IsInFavorites { get; set; } // Bu dükkan favorilerde mi?
     }
 }

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20251214124535_mig-1")]
+    [Migration("20251214154126_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -325,6 +325,9 @@ namespace DataAccess.Migrations
 
                     b.Property<Guid>("FavoritedToId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");

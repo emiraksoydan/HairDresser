@@ -20,7 +20,9 @@ namespace Business.Concrete
         INotificationService notificationSvc,
         IAppointmentServiceOffering appointmentServiceOfferingDal,
         IBadgeService badgeService,
-        IRealTimePublisher realtime
+        IRealTimePublisher realtime,
+        IFavoriteService favoriteService,
+        IFreeBarberDal freeBarberDal
     ) : IAppointmentNotifyService
     {
         // Overload 1: AppointmentId ile (mevcut randevular için - transaction dışında)
@@ -74,8 +76,9 @@ namespace Business.Concrete
             // DÜZELTME: Randevuyu gönderen kişiyi (actorUserId) recipient listesinden hariç tut
             // AppointmentUnanswered durumunda TÜM ilgili kişilere bildirim gitmeli (actor dahil)
             // Diğer durumlarda gönderen kişi (actor) hariç tutulmalı
+            // ÖNEMLİ: actorUserId null olabilir (örn: background service'ten gelen AppointmentUnanswered)
             var recipients = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue && (type == NotificationType.AppointmentUnanswered || (actorUserId.HasValue && x.Value != actorUserId.Value)))
+                .Where(x => x.HasValue && (type == NotificationType.AppointmentUnanswered || !actorUserId.HasValue || x.Value != actorUserId.Value))
                 .Select(x => x!.Value)
                 .Distinct()
                 .ToList();
@@ -106,6 +109,27 @@ namespace Business.Concrete
 
             var customerInfo = GetUser(appt.CustomerUserId);
             var freeBarberInfo = GetUser(appt.FreeBarberUserId);
+
+            // FreeBarber entity'sini al (image ve diğer bilgiler için)
+            FreeBarber? freeBarberEntity = null;
+            string? freeBarberImageUrl = null;
+            if (appt.FreeBarberUserId.HasValue)
+            {
+                // FreeBarber entity'sini FreeBarberUserId ile bul (FreeBarberUserId = FreeBarber.FreeBarberUserId)
+                freeBarberEntity = await freeBarberDal.Get(x => x.FreeBarberUserId == appt.FreeBarberUserId.Value);
+                if (freeBarberEntity != null)
+                {
+                    // FreeBarber image'ını Image tablosundan al (FreeBarber ID ile)
+                    var freeBarberImage = await imageDal.GetLatestImageAsync(freeBarberEntity.Id, ImageOwnerType.FreeBarber);
+                    freeBarberImageUrl = freeBarberImage?.ImageUrl;
+                    
+                    // Eğer freeBarberInfo varsa, image'ı güncelle
+                    if (freeBarberInfo != null)
+                    {
+                        freeBarberInfo.AvatarUrl = freeBarberImageUrl;
+                    }
+                }
+            }
 
             // Store (ownerId ile bulunuyor)
             // ÖNEMLİ: BarberStoreUserId null ise store bulunamaz
@@ -262,6 +286,35 @@ namespace Business.Concrete
                     }
                 }
 
+                // FAVORİ KONTROLLERİ: Her recipient için favori durumunu kontrol et
+                bool? isCustomerFavorite = null;
+                bool? isStoreFavorite = null;
+                bool? isFreeBarberFavorite = null;
+
+                // Customer favorilerde mi? (Customer UserId ile kontrol et)
+                if (payloadCustomer != null && appt.CustomerUserId.HasValue && role != "customer")
+                {
+                    var customerFavoriteResult = await favoriteService.IsFavoriteAsync(userId, appt.CustomerUserId.Value);
+                    isCustomerFavorite = customerFavoriteResult.Success && customerFavoriteResult.Data;
+                    payloadCustomer.IsInFavorites = isCustomerFavorite;
+                }
+
+                // Store favorilerde mi? (Store ID ile kontrol et)
+                if (payloadStore != null && store != null && role != "store")
+                {
+                    var storeFavoriteResult = await favoriteService.IsFavoriteAsync(userId, store.Id);
+                    isStoreFavorite = storeFavoriteResult.Success && storeFavoriteResult.Data;
+                    payloadStore.IsInFavorites = isStoreFavorite;
+                }
+
+                // FreeBarber favorilerde mi? (FreeBarber ID ile kontrol et, UserId ile değil)
+                if (payloadFreeBarber != null && freeBarberEntity != null && role != "freebarber")
+                {
+                    var freeBarberFavoriteResult = await favoriteService.IsFavoriteAsync(userId, freeBarberEntity.Id);
+                    isFreeBarberFavorite = freeBarberFavoriteResult.Success && freeBarberFavoriteResult.Data;
+                    payloadFreeBarber.IsInFavorites = isFreeBarberFavorite;
+                }
+
                 var payload = new AppointmentNotifyPayloadDto
                 {
                     AppointmentId = appt.Id,
@@ -287,6 +340,11 @@ namespace Business.Concrete
 
                     // Service offerings - Frontend'de hizmet butonlarını göstermek için
                     ServiceOfferings = serviceOfferings.Any() ? serviceOfferings : null,
+
+                    // Favori durumları (backward compatibility için - nested object'lerde de var)
+                    IsCustomerInFavorites = isCustomerFavorite,
+                    IsStoreInFavorites = isStoreFavorite,
+                    IsFreeBarberInFavorites = isFreeBarberFavorite,
                 };
 
                 // role bazlı "kimleri dahil edelim?"
@@ -302,6 +360,10 @@ namespace Business.Concrete
             }
 
             // Tüm recipient'lara badge güncellemesi gönder
+            // ÖNEMLİ: Badge count her notification için zaten NotificationManager.CreateAndPushAsync içinde güncelleniyor
+            // Burada tekrar güncellemek gereksiz olabilir ama tüm recipient'lar için yapılması gerekebilir
+            // Çünkü birden fazla notification aynı anda oluşturulduğunda her birinin badge güncellemesi doğru olmayabilir
+            // En son durumu yansıtmak için tüm recipient'lar için badge güncellemesi yapıyoruz
             foreach (var userId in recipients)
             {
                 try

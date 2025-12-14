@@ -23,6 +23,70 @@ namespace Business.Concrete
         // İç içe transaction scope'lar sorun yaratabilir ve notification'lar commit edilmeyebilir
         public async Task<IDataResult<Guid>> CreateAndPushAsync(Guid userId, NotificationType type, Guid? appointmentId, string title, object payload, string? body = null)
         {
+            // DUPLICATE KONTROLÜ: Aynı userId, appointmentId ve type'a sahip okunmamış notification var mı?
+            // ÖNEMLİ: Bazı notification type'ları için (örn: AppointmentDecisionUpdated) duplicate'a izin verebiliriz
+            // Ama genelde aynı appointmentId ve type için duplicate olmamalı
+            if (appointmentId.HasValue)
+            {
+                // AppointmentUnanswered ve AppointmentDecisionUpdated için duplicate'a izin ver
+                // Çünkü bunlar durum güncellemeleri ve birden fazla gönderilebilir
+                var allowDuplicates = type == NotificationType.AppointmentUnanswered || 
+                                     type == NotificationType.AppointmentDecisionUpdated;
+                
+                if (!allowDuplicates)
+                {
+                    var existing = await notificationDal.Get(x => 
+                        x.UserId == userId && 
+                        x.AppointmentId == appointmentId && 
+                        x.Type == type && 
+                        !x.IsRead);
+                    
+                    if (existing != null)
+                    {
+                        // Duplicate var, mevcut notification'ı güncelle ve döndür
+                        existing.Title = title;
+                        existing.Body = body;
+                        existing.PayloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                            WriteIndented = false
+                        });
+                        existing.CreatedAt = DateTime.UtcNow; // Zamanı güncelle
+                        
+                        await notificationDal.Update(existing);
+                        
+                        var dto = new NotificationDto
+                        {
+                            Id = existing.Id,
+                            Type = existing.Type,
+                            AppointmentId = existing.AppointmentId,
+                            Title = existing.Title,
+                            Body = existing.Body,
+                            PayloadJson = existing.PayloadJson,
+                            CreatedAt = existing.CreatedAt,
+                            IsRead = existing.IsRead
+                        };
+                        
+                        // Güncellenmiş notification'ı SignalR ile push et
+                        await realtime.PushNotificationAsync(userId, dto);
+                        
+                        // Badge güncelle (değişmedi ama kontrol edelim)
+                        try
+                        {
+                            var badges = await badgeService.GetCountsAsync(userId);
+                            if (badges.Success)
+                                await realtime.PushBadgeAsync(userId, badges.Data);
+                        }
+                        catch
+                        {
+                            // Badge güncelleme hatası bildirim gönderimini etkilememeli
+                        }
+                        
+                        return new SuccessDataResult<Guid>(existing.Id);
+                    }
+                }
+            }
+
             var n = new Notification
             {
                 Id = Guid.NewGuid(),
@@ -93,7 +157,8 @@ namespace Business.Concrete
         }
         public async Task<IDataResult<int>> GetUnreadCountAsync(Guid userId)
         {
-            var count = (await notificationDal.GetAll(x => x.UserId == userId && !x.IsRead)).Count;
+            // PERFORMANCE: CountAsync kullan (GetAll().Count yerine)
+            var count = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
             return new SuccessDataResult<int>(count);
         }
         public async Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId)

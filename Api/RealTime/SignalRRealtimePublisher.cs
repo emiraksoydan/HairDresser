@@ -1,4 +1,4 @@
-﻿using Api.Hubs;
+using Api.Hubs;
 using Business.Abstract;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.SignalR;
@@ -54,6 +54,48 @@ namespace Api.RealTime
             catch (Exception)
             {
                 // Log error but don't throw - thread is already in DB
+            }
+        }
+
+        public async Task PushChatThreadUpdatedAsync(Guid userId, ChatThreadListItemDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.threadUpdated", dto);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - thread update can be refetched
+            }
+        }
+
+        public async Task PushChatThreadRemovedAsync(Guid userId, Guid threadId)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.threadRemoved", threadId);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - thread removal can be refetched
+            }
+        }
+
+        public async Task PushChatTypingAsync(Guid userId, Guid threadId, Guid typingUserId, string typingUserName, bool isTyping)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.typing", new
+                {
+                    threadId,
+                    typingUserId,
+                    typingUserName,
+                    isTyping
+                });
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - typing indicator is non-critical
             }
         }
     }

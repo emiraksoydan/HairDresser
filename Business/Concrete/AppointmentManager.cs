@@ -498,21 +498,13 @@ namespace Business.Concrete
                               (appt.CustomerUserId.HasValue && appt.FreeBarberUserId.HasValue) ||
                               (appt.BarberStoreUserId.HasValue && appt.FreeBarberUserId.HasValue);
 
-            if (isDualSystem)
-            {
-                // Store owner'ın notification'ını read yap
-                await notificationService.MarkReadByAppointmentIdAsync(storeOwnerUserId, appt.Id);
-                // Diğer tarafların notification'larını da read yap (eğer varsa)
-                if (appt.CustomerUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.CustomerUserId.Value, appt.Id);
-                if (appt.FreeBarberUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.FreeBarberUserId.Value, appt.Id);
-            }
+            // Bildirimler manuel olarak okunacak, otomatik okundu yapılmıyor
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: storeOwnerUserId);
+                await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -577,21 +569,13 @@ namespace Business.Concrete
                               (appt.CustomerUserId.HasValue && appt.FreeBarberUserId.HasValue) ||
                               (appt.BarberStoreUserId.HasValue && appt.FreeBarberUserId.HasValue);
 
-            if (isDualSystem)
-            {
-                // Free barber'ın notification'ını read yap
-                await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
-                // Diğer tarafların notification'larını da read yap (eğer varsa)
-                if (appt.CustomerUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.CustomerUserId.Value, appt.Id);
-                if (appt.BarberStoreUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.BarberStoreUserId.Value, appt.Id);
-            }
+            // Bildirimler manuel olarak okunacak, otomatik okundu yapılmıyor
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: freeBarberUserId);
+                await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -643,22 +627,9 @@ namespace Business.Concrete
 
             // İptal edildiğinde ilgili tüm taraflara bildirim gönder
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCancelled, actorUserId: userId);
-
-            // İptal edildikten sonra ilgili notification'ları read yap (sadece ikili sistemler için)
-            var isDualSystem = (appt.CustomerUserId.HasValue && appt.BarberStoreUserId.HasValue) ||
-                              (appt.CustomerUserId.HasValue && appt.FreeBarberUserId.HasValue) ||
-                              (appt.BarberStoreUserId.HasValue && appt.FreeBarberUserId.HasValue);
-
-            if (isDualSystem)
-            {
-                // Tüm tarafların notification'larını read yap
-                if (appt.CustomerUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.CustomerUserId.Value, appt.Id);
-                if (appt.BarberStoreUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.BarberStoreUserId.Value, appt.Id);
-                if (appt.FreeBarberUserId.HasValue)
-                    await notificationService.MarkReadByAppointmentIdAsync(appt.FreeBarberUserId.Value, appt.Id);
-            }
+            
+            // Thread güncellemesi (thread kaldırılacak)
+            await UpdateThreadOnAppointmentStatusChangeAsync(appt);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -702,6 +673,9 @@ namespace Business.Concrete
             await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
 
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCompleted, actorUserId: storeOwnerUserId);
+            
+            // Thread güncellemesi (thread kaldırılacak)
+            await UpdateThreadOnAppointmentStatusChangeAsync(appt);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1000,6 +974,38 @@ namespace Business.Concrete
             }
 
             return new SuccessDataResult<bool>(true);
+        }
+
+        // Helper: Randevu durumu değiştiğinde thread güncellemesi yap
+        private async Task UpdateThreadOnAppointmentStatusChangeAsync(Appointment appt)
+        {
+            if (appt.Id == Guid.Empty) return;
+
+            // Thread'i bul
+            var thread = await threadDal.Get(t => t.AppointmentId == appt.Id);
+            if (thread == null) return;
+
+            // Durum artık Pending/Approved değilse thread'i kaldır
+            if (appt.Status != AppointmentStatus.Pending && appt.Status != AppointmentStatus.Approved)
+            {
+                // Katılımcılara thread kaldırıldığını bildir
+                var participants = new[] { thread.CustomerUserId, thread.StoreOwnerUserId, thread.FreeBarberUserId }
+                    .Where(x => x.HasValue)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var userId in participants)
+                {
+                    await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
+                }
+            }
+            else
+            {
+                // Durum hala Pending/Approved ise thread'i güncelle (GetThreadsAsync'te yeniden çekilecek)
+                // Burada direkt güncelleme yapmıyoruz, sadece invalidate ediyoruz
+                // Frontend SignalR event'i ile güncellenecek
+            }
         }
 
         

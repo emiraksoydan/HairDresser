@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +12,7 @@ namespace Entities.Concrete.Dto
         public Guid UserId { get; set; }
         public string? DisplayName { get; set; }
         public string? AvatarUrl { get; set; }
-
         public string RoleHint { get; set; }
+        public bool? IsInFavorites { get; set; } // Bu kullanıcı favorilerde mi?
     }
 }

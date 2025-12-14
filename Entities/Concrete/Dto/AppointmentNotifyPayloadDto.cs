@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
@@ -29,6 +29,11 @@ namespace Entities.Concrete.Dto
 
         // Service offerings - Frontend'de hizmet butonlarını göstermek için
         public List<ServiceOfferingGetDto>? ServiceOfferings { get; set; }
+
+        // Favori durumları (backward compatibility için - nested object'lerde de var)
+        public bool? IsCustomerInFavorites { get; set; }
+        public bool? IsStoreInFavorites { get; set; }
+        public bool? IsFreeBarberInFavorites { get; set; }
 
         public object? Extra { get; set; }              
     }

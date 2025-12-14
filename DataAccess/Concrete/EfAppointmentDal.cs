@@ -296,7 +296,7 @@ namespace DataAccess.Concrete
 
             // Favoriler
             var myFavorites = await _context.Favorites.AsNoTracking()
-                .Where(f => f.FavoritedFromId == currentUserId && allIdsForFav.Contains(f.FavoritedToId))
+                .Where(f => f.FavoritedFromId == currentUserId && allIdsForFav.Contains(f.FavoritedToId) && f.IsActive)
                 .Select(f => f.FavoritedToId)
                 .ToListAsync();
 

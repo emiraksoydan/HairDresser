@@ -1,4 +1,4 @@
-﻿using Core.DataAccess.EntityFramework;
+using Core.DataAccess.EntityFramework;
 using Core.Utilities.Helpers;
 using DataAccess.Abstract;
 using Entities.Concrete.Dto;
@@ -51,7 +51,7 @@ namespace DataAccess.Concrete
 
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
-                .CountAsync(f => f.FavoritedToId == freeBarber.Id);
+                .CountAsync(f => f.FavoritedToId == freeBarber.Id && f.IsActive);
 
 
             var images = await _context.Images
@@ -126,7 +126,7 @@ namespace DataAccess.Concrete
 
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
-                .CountAsync(f => f.FavoritedToId == freeBarber.Id);
+                .CountAsync(f => f.FavoritedToId == freeBarber.Id && f.IsActive);
 
   
             var images = await _context.Images
@@ -208,12 +208,12 @@ namespace DataAccess.Concrete
                 .ToDictionary(x => x.FreeBarberId, x => new { x.AvgRating, x.ReviewCount });
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
-                .Where(f => freeBarberIds.Contains(f.FavoritedToId))
+                .Where(f => freeBarberIds.Contains(f.FavoritedToId) && f.IsActive)
                 .GroupBy(f => f.FavoritedToId)
                 .Select(g => new
                 {
                     FreeBarberId = g.Key,
-                    FavoriteCount = g.Count()
+                    FavoriteCount = g.Count(f => f.IsActive)
                 })
                 .ToListAsync();
 

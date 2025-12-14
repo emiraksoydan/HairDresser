@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +10,14 @@ namespace Entities.Concrete.Entities
     public class ChatThread : IEntity
     {
         public Guid Id { get; set; }
-        public Guid AppointmentId { get; set; }
+        
+        // Randevu thread'i için: AppointmentId dolu, FavoriteFromUserId/FavoriteToUserId null
+        // Favori thread için: AppointmentId null, FavoriteFromUserId/FavoriteToUserId dolu
+        public Guid? AppointmentId { get; set; }
+        
+        // Favori thread için: hangi kullanıcı favoriye ekledi, hangi kullanıcı favoriye eklendi
+        public Guid? FavoriteFromUserId { get; set; }
+        public Guid? FavoriteToUserId { get; set; }
 
         public Guid? CustomerUserId { get; set; }
         public Guid? StoreOwnerUserId { get; set; }

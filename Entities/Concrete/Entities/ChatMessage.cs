@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +11,7 @@ namespace Entities.Concrete.Entities
     {
         public Guid Id { get; set; }
         public Guid ThreadId { get; set; }
-        public Guid AppointmentId { get; set; }
+        public Guid? AppointmentId { get; set; } // Nullable: favori thread'lerde null
 
         public Guid SenderUserId { get; set; }
         public string Text { get; set; } = default!;
