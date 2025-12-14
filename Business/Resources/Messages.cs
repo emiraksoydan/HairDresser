@@ -131,6 +131,23 @@ namespace Business.Resources
         public const string NotificationDefault = "Bildirim";
         public const string NotificationNewAppointmentRequest = "Yeni randevu isteği";
         public const string NotificationNewAppointmentRequestForStore = "Yeni randevu talebi";
+        
+        // Rating Messages
+        public const string RatingCreatedSuccess = "Değerlendirme başarıyla kaydedildi.";
+        public const string RatingUpdatedSuccess = "Değerlendirme başarıyla güncellendi.";
+        public const string RatingDeletedSuccess = "Değerlendirme silindi.";
+        public const string RatingNotFound = "Değerlendirme bulunamadı.";
+        public const string RatingOnlyForCompleted = "Sadece tamamlanmış veya iptal edilmiş randevular için değerlendirme yapılabilir.";
+        public const string CannotRateYourself = "Kendi kendinize değerlendirme yapamazsınız.";
+        public const string InvalidTargetForRating = "Geçersiz hedef. Sadece Store ID, FreeBarber ID veya Customer UserId ile değerlendirme yapılabilir. ManuelBarber'a değerlendirme yapılamaz.";
+        
+        // Favorite Messages
+        public const string FavoriteAddedSuccess = "Favorilere eklendi.";
+        public const string FavoriteUpdatedSuccess = "Favori güncellendi.";
+        public const string FavoriteRemovedSuccess = "Favorilerden çıkarıldı.";
+        public const string FavoriteNotFound = "Favori bulunamadı.";
+        public const string CannotFavoriteYourself = "Kendi kendinizi favorilere ekleyemezsiniz.";
+        public const string TargetUserNotFound = "Hedef kullanıcı bulunamadı.";
     }
 }
 

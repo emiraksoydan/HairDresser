@@ -1,4 +1,4 @@
-﻿using Core.DataAccess.EntityFramework;
+using Core.DataAccess.EntityFramework;
 using Core.Utilities.Configuration;
 using Core.Utilities.Helpers;
 using DataAccess.Abstract;
@@ -172,93 +172,121 @@ namespace DataAccess.Concrete
         public async Task<List<AppointmentGetDto>> GetAllAppointmentByFilter(Guid currentUserId, AppointmentFilter appointmentFilter)
         {
             // ---------------------------------------------------------------------------
-            // 1. ADIM: Temel Sorgu (Kullanıcıya ait kayıtlar)
+            // 1. ADIM: Randevuları Çek
             // ---------------------------------------------------------------------------
             var query = _context.Appointments.AsNoTracking()
                 .Where(x => x.CustomerUserId == currentUserId ||
                             x.BarberStoreUserId == currentUserId ||
                             x.FreeBarberUserId == currentUserId);
 
-            // ---------------------------------------------------------------------------
-            // 2. ADIM: Enum Filtreleme (DÜZELTİLEN KISIM)
-            // ---------------------------------------------------------------------------
+            // Filtreleme
             switch (appointmentFilter)
             {
                 case AppointmentFilter.Active:
-                    // Aktif = Bekleyen (Pending) veya Onaylanan (Approved)
-                    query = query.Where(x => x.Status == AppointmentStatus.Pending ||
-                                             x.Status == AppointmentStatus.Approved);
+                    query = query.Where(x => x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved);
                     break;
-
                 case AppointmentFilter.Completed:
-                    // Tamamlanan = Completed
                     query = query.Where(x => x.Status == AppointmentStatus.Completed);
                     break;
-
                 case AppointmentFilter.Cancelled:
-                    // İptal/Geçmiş = İptal (Cancelled), Red (Rejected) veya Cevapsız (Unanswered)
-                    query = query.Where(x => x.Status == AppointmentStatus.Cancelled ||
-                                             x.Status == AppointmentStatus.Rejected ||
-                                             x.Status == AppointmentStatus.Unanswered);
+                    query = query.Where(x => x.Status == AppointmentStatus.Cancelled || x.Status == AppointmentStatus.Rejected || x.Status == AppointmentStatus.Unanswered);
                     break;
             }
 
             var appointments = await query.ToListAsync();
 
-            if (appointments.Count == 0)
-            {
-                return new List<AppointmentGetDto>();
-            }
+            if (appointments.Count == 0) return new List<AppointmentGetDto>();
 
             // ---------------------------------------------------------------------------
-            // 3. ADIM: ID Toplama (Batch Query Hazırlığı)
+            // 2. ADIM: ID Toplama
             // ---------------------------------------------------------------------------
             var appointmentIds = appointments.Select(x => x.Id).Distinct().ToList();
 
-            var storeOwnerIds = appointments.Where(x => x.BarberStoreUserId.HasValue).Select(x => x.BarberStoreUserId.Value).Distinct().ToList();
+            // User ID'ler
+            var storeUserIds = appointments.Where(x => x.BarberStoreUserId.HasValue).Select(x => x.BarberStoreUserId.Value).Distinct().ToList();
             var freeBarberUserIds = appointments.Where(x => x.FreeBarberUserId.HasValue).Select(x => x.FreeBarberUserId.Value).Distinct().ToList();
             var customerIds = appointments.Where(x => x.CustomerUserId.HasValue).Select(x => x.CustomerUserId.Value).Distinct().ToList();
+
+            // Gerçek ID'ler
             var manuelBarberIds = appointments.Where(x => x.ManuelBarberId.HasValue).Select(x => x.ManuelBarberId.Value).Distinct().ToList();
 
-            // Resim için tüm ID'ler
-            var allIdsForImages = storeOwnerIds
-                .Concat(freeBarberUserIds)
-                .Concat(customerIds)
-                .Concat(manuelBarberIds)
-                .Distinct()
-                .ToList();
-
-            // Favori için ID'ler (Manuel Berber HARİÇ)
-            var allTargetIdsForFav = storeOwnerIds
-                .Concat(freeBarberUserIds)
-                .Concat(customerIds)
-                .Distinct()
-                .ToList();
+            // YENİ: Koltuk ID'leri
+            var chairIds = appointments.Where(x => x.ChairId.HasValue).Select(x => x.ChairId.Value).Distinct().ToList();
 
             // ---------------------------------------------------------------------------
-            // 4. ADIM: Veri Çekme (Toplu Sorgular)
+            // 3. ADIM: Veri Çekme (Batch Queries)
             // ---------------------------------------------------------------------------
 
-            // A) İsimler
+            // A) STORE: StoreId, Name, Pricing, TYPE
             var storesDict = await _context.BarberStores.AsNoTracking()
-                .Where(s => storeOwnerIds.Contains(s.BarberStoreOwnerId))
-                .ToDictionaryAsync(s => s.BarberStoreOwnerId, s => s.StoreName);
+                .Where(s => storeUserIds.Contains(s.BarberStoreOwnerId))
+                .ToDictionaryAsync(s => s.BarberStoreOwnerId, s => new
+                {
+                    RealStoreId = s.Id,
+                    s.StoreName,
+                    s.PricingType,
+                    s.PricingValue,
+                    s.Type // <-- YENİ: Store Type eklendi
+                });
 
+            // B) FREE BARBER
             var freeBarberDict = await _context.FreeBarbers.AsNoTracking()
                 .Where(fb => freeBarberUserIds.Contains(fb.FreeBarberUserId))
-                .ToDictionaryAsync(fb => fb.FreeBarberUserId, fb => fb.FirstName + " " + fb.LastName);
+                .ToDictionaryAsync(fb => fb.FreeBarberUserId, fb => new
+                {
+                    RealFreeBarberId = fb.Id,
+                    FullName = fb.FirstName + " " + fb.LastName
+                });
 
+            // C) MANUEL BARBER
             var manuelBarberDict = await _context.ManuelBarbers.AsNoTracking()
                 .Where(m => manuelBarberIds.Contains(m.Id))
                 .ToDictionaryAsync(m => m.Id, m => m.FullName);
 
+            // D) CUSTOMER
             var customerDict = await _context.Users.AsNoTracking()
                 .Where(u => customerIds.Contains(u.Id))
                 .ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName);
 
-            // B) Resimler
+            // E) YENİ: CHAIR (Koltuk İsimleri)
+            var chairsDict = await _context.BarberChairs.AsNoTracking()
+                .Where(c => chairIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name);
+
+
+            // ---------------------------------------------------------------------------
+            // 4. ADIM: Yan Veri ID'lerini Hazırla (Resim & Favori)
+            // ---------------------------------------------------------------------------
+            var realStoreIds = storesDict.Values.Select(x => x.RealStoreId).ToList();
+            var realFreeBarberIds = freeBarberDict.Values.Select(x => x.RealFreeBarberId).ToList();
+
+            // Resim ID'leri
+            var allIdsForImages = new List<Guid>();
+            allIdsForImages.AddRange(realStoreIds);
+            allIdsForImages.AddRange(realFreeBarberIds);
+            allIdsForImages.AddRange(manuelBarberIds);
+            allIdsForImages.AddRange(customerIds);
+            allIdsForImages = allIdsForImages.Distinct().ToList();
+
+            // Favori ID'leri
+            var allIdsForFav = new List<Guid>();
+            allIdsForFav.AddRange(realStoreIds);
+            allIdsForFav.AddRange(realFreeBarberIds);
+            allIdsForFav.AddRange(customerIds);
+            allIdsForFav = allIdsForFav.Distinct().ToList();
+
+            // ---------------------------------------------------------------------------
+            // 5. ADIM: Yan Verileri Çek
+            // ---------------------------------------------------------------------------
+
+            // Resimler - ImageOwnerType kontrolü ile
             var imagesList = await _context.Images.AsNoTracking()
-                .Where(i => allIdsForImages.Contains(i.ImageOwnerId))
+                .Where(i => 
+                    (i.OwnerType == ImageOwnerType.Store && realStoreIds.Contains(i.ImageOwnerId)) ||
+                    (i.OwnerType == ImageOwnerType.FreeBarber && realFreeBarberIds.Contains(i.ImageOwnerId)) ||
+                    (i.OwnerType == ImageOwnerType.ManuelBarber && manuelBarberIds.Contains(i.ImageOwnerId)) ||
+                    (i.OwnerType == ImageOwnerType.User && customerIds.Contains(i.ImageOwnerId))
+                )
                 .Select(i => new { i.ImageOwnerId, i.ImageUrl })
                 .ToListAsync();
 
@@ -266,15 +294,15 @@ namespace DataAccess.Concrete
                 .GroupBy(x => x.ImageOwnerId)
                 .ToDictionary(g => g.Key, g => g.FirstOrDefault()?.ImageUrl ?? "");
 
-            // C) Favoriler
+            // Favoriler
             var myFavorites = await _context.Favorites.AsNoTracking()
-                .Where(f => f.FavoritedFromId == currentUserId && allTargetIdsForFav.Contains(f.FavoritedToId))
+                .Where(f => f.FavoritedFromId == currentUserId && allIdsForFav.Contains(f.FavoritedToId))
                 .Select(f => f.FavoritedToId)
                 .ToListAsync();
 
             var favSet = new HashSet<Guid>(myFavorites);
 
-            // D) Rating & Yorumlar
+            // Rating - Kullanıcının yaptığı rating'ler
             var myRatings = await _context.Ratings.AsNoTracking()
                 .Where(r => r.RatedFromId == currentUserId && appointmentIds.Contains(r.AppointmentId))
                 .Select(r => new { r.AppointmentId, r.TargetId, r.Score, r.Comment })
@@ -282,8 +310,42 @@ namespace DataAccess.Concrete
 
             var ratingDict = myRatings.ToDictionary(r => (r.AppointmentId, r.TargetId), r => r);
 
+            // Ortalama Rating'ler - Store, FreeBarber, ManuelBarber, Customer için
+            var allTargetIds = new List<Guid>();
+            allTargetIds.AddRange(realStoreIds);
+            allTargetIds.AddRange(realFreeBarberIds);
+            allTargetIds.AddRange(manuelBarberIds);
+            allTargetIds.AddRange(customerIds);
+            allTargetIds = allTargetIds.Distinct().ToList();
+
+            var averageRatings = await _context.Ratings.AsNoTracking()
+                .Where(r => allTargetIds.Contains(r.TargetId))
+                .GroupBy(r => r.TargetId)
+                .Select(g => new { TargetId = g.Key, AverageRating = g.Average(x => (double)x.Score) })
+                .ToListAsync();
+
+            var averageRatingDict = averageRatings.ToDictionary(x => x.TargetId, x => x.AverageRating);
+
+            // Hizmetler (Services) - AppointmentServiceOffering'ler
+            var appointmentServices = await _context.AppointmentServiceOfferings.AsNoTracking()
+                .Where(aso => appointmentIds.Contains(aso.AppointmentId))
+                .Select(aso => new { aso.AppointmentId, aso.ServiceOfferingId, aso.ServiceName, aso.Price })
+                .ToListAsync();
+
+            var servicesDict = appointmentServices
+                .GroupBy(aso => aso.AppointmentId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(s => new AppointmentServiceDto
+                    {
+                        ServiceId = s.ServiceOfferingId,
+                        ServiceName = s.ServiceName,
+                        Price = s.Price
+                    }).ToList()
+                );
+
             // ---------------------------------------------------------------------------
-            // 5. ADIM: Mapping
+            // 6. ADIM: Mapping
             // ---------------------------------------------------------------------------
             var resultList = new List<AppointmentGetDto>();
 
@@ -297,67 +359,121 @@ namespace DataAccess.Concrete
                     StartTime = appt.StartTime,
                     EndTime = appt.EndTime,
                     CreatedAt = appt.CreatedAt,
-                    ChairId = appt.ChairId
+                    ChairId = appt.ChairId,
+                    AppointmentRequester = appt.RequestedBy,
                 };
 
-                // STORE
+                // Hizmetler (Services) ve Toplam Fiyat
+                if (servicesDict.TryGetValue(appt.Id, out var services))
+                {
+                    dto.Services = services;
+                    dto.TotalPrice = services.Sum(s => s.Price);
+                }
+                else
+                {
+                    dto.Services = new List<AppointmentServiceDto>();
+                    dto.TotalPrice = 0;
+                }
+
+                // YENİ: Koltuk Adı Eşleştirme (Düzeltildi: cName -> chairNameVal)
+                if (appt.ChairId.HasValue && chairsDict.TryGetValue(appt.ChairId.Value, out var chairNameVal))
+                {
+                    dto.ChairName = chairNameVal;
+                }
+
+                // --- STORE ---
                 if (appt.BarberStoreUserId.HasValue)
                 {
-                    var sId = appt.BarberStoreUserId.Value;
-                    dto.BarberStoreId = sId;
-                    if (storesDict.TryGetValue(sId, out var sName)) dto.StoreName = sName;
-                    if (imagesDict.TryGetValue(sId, out var sImg)) dto.StoreImage = sImg;
+                    var userId = appt.BarberStoreUserId.Value;
 
-                    dto.IsStoreFavorite = favSet.Contains(sId);
-
-                    if (ratingDict.TryGetValue((appt.Id, sId), out var r))
+                    if (storesDict.TryGetValue(userId, out var sInfo))
                     {
-                        dto.MyRatingForStore = r.Score;
-                        dto.MyCommentForStore = r.Comment;
+                        var realStoreId = sInfo.RealStoreId;
+
+                        dto.BarberStoreId = realStoreId;
+                        dto.StoreName = sInfo.StoreName;
+                        dto.PricingType = sInfo.PricingType;
+                        dto.PricingValue = sInfo.PricingValue;
+                        dto.StoreType = sInfo.Type; // Store Type
+
+                        if (imagesDict.TryGetValue(realStoreId, out var img)) dto.StoreImage = img;
+                        dto.IsStoreFavorite = favSet.Contains(realStoreId);
+
+                        if (ratingDict.TryGetValue((appt.Id, realStoreId), out var r))
+                        {
+                            dto.MyRatingForStore = r.Score;
+                            dto.MyCommentForStore = r.Comment;
+                        }
+
+                        // Store'un ortalama rating'i
+                        if (averageRatingDict.TryGetValue(realStoreId, out var avgRating))
+                        {
+                            dto.StoreAverageRating = avgRating;
+                        }
                     }
                 }
 
-                // FREE BARBER
+                // --- FREE BARBER ---
                 if (appt.FreeBarberUserId.HasValue)
                 {
-                    var fbId = appt.FreeBarberUserId.Value;
-                    dto.FreeBarberId = fbId;
-                    if (freeBarberDict.TryGetValue(fbId, out var fbName)) dto.FreeBarberName = fbName;
-                    if (imagesDict.TryGetValue(fbId, out var fbImg)) dto.FreeBarberImage = fbImg;
+                    var userId = appt.FreeBarberUserId.Value;
 
-                    dto.IsFreeBarberFavorite = favSet.Contains(fbId);
-
-                    if (ratingDict.TryGetValue((appt.Id, fbId), out var r))
+                    if (freeBarberDict.TryGetValue(userId, out var fbInfo))
                     {
-                        dto.MyRatingForFreeBarber = r.Score;
-                        dto.MyCommentForFreeBarber = r.Comment;
+                        var realFbId = fbInfo.RealFreeBarberId;
+
+                        dto.FreeBarberId = realFbId;
+                        dto.FreeBarberName = fbInfo.FullName;
+
+                        if (imagesDict.TryGetValue(realFbId, out var img)) dto.FreeBarberImage = img;
+                        dto.IsFreeBarberFavorite = favSet.Contains(realFbId);
+
+                        if (ratingDict.TryGetValue((appt.Id, realFbId), out var r))
+                        {
+                            dto.MyRatingForFreeBarber = r.Score;
+                            dto.MyCommentForFreeBarber = r.Comment;
+                        }
+
+                        // FreeBarber'ın ortalama rating'i
+                        if (averageRatingDict.TryGetValue(realFbId, out var avgRating))
+                        {
+                            dto.FreeBarberAverageRating = avgRating;
+                        }
                     }
                 }
 
-                // MANUEL BARBER
+                // --- MANUEL BARBER ---
                 if (appt.ManuelBarberId.HasValue)
                 {
                     var mbId = appt.ManuelBarberId.Value;
                     dto.ManuelBarberId = mbId;
-                    if (manuelBarberDict.TryGetValue(mbId, out var mbName)) dto.ManuelBarberName = mbName;
 
-                    // Manuel Barber Resmi (Varsa)
-                    if (imagesDict.TryGetValue(mbId, out var mbImg)) dto.ManuelBarberImage = mbImg;
+                    if (manuelBarberDict.TryGetValue(mbId, out var mbName)) dto.ManuelBarberName = mbName;
+                    if (imagesDict.TryGetValue(mbId, out var img)) dto.ManuelBarberImage = img;
 
                     if (ratingDict.TryGetValue((appt.Id, mbId), out var r))
                     {
                         dto.MyRatingForManuelBarber = r.Score;
                         dto.MyCommentForManuelBarber = r.Comment;
                     }
+
+                    // ManuelBarber'ın ortalama rating'i
+                    if (averageRatingDict.TryGetValue(mbId, out var avgRating))
+                    {
+                        dto.ManuelBarberAverageRating = avgRating;
+                    }
                 }
 
-                // CUSTOMER
+                // --- CUSTOMER ---
                 if (appt.CustomerUserId.HasValue && appt.CustomerUserId != currentUserId)
                 {
                     var cId = appt.CustomerUserId.Value;
                     dto.CustomerUserId = cId;
-                    if (customerDict.TryGetValue(cId, out var cName)) dto.CustomerName = cName;
-                    if (imagesDict.TryGetValue(cId, out var cImg)) dto.CustomerImage = cImg;
+
+                    // Düzeltildi: cName -> customerNameVal
+                    if (customerDict.TryGetValue(cId, out var customerNameVal)) dto.CustomerName = customerNameVal;
+
+                    if (imagesDict.TryGetValue(cId, out var img)) dto.CustomerImage = img;
 
                     dto.IsCustomerFavorite = favSet.Contains(cId);
 
@@ -365,6 +481,12 @@ namespace DataAccess.Concrete
                     {
                         dto.MyRatingForCustomer = r.Score;
                         dto.MyCommentForCustomer = r.Comment;
+                    }
+
+                    // Customer'ın ortalama rating'i
+                    if (averageRatingDict.TryGetValue(cId, out var avgRating))
+                    {
+                        dto.CustomerAverageRating = avgRating;
                     }
                 }
 

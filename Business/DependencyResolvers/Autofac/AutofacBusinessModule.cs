@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Abstract;
 using Business.Concrete;
@@ -43,6 +43,8 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<ChatManager>().As<IChatService>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
+            builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
+            builder.RegisterType<FavoriteManager>().As<IFavoriteService>().InstancePerLifetimeScope();
 
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();
@@ -63,6 +65,10 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfUserDal>().As<IUserDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatThreadDal>().As<IChatThreadDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatMessageDal>().As<IChatMessageDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
 
             // Register IHttpContextAccessor for SecuredOperation
             builder.RegisterType<HttpContextAccessor>().As<IHttpContextAccessor>().SingleInstance();
