@@ -26,6 +26,13 @@ namespace Business.Concrete
         [ValidationAspect(typeof(FreeBarberDtoValidator))]
         public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
         {
+            // Kullanıcının zaten bir FreeBarber paneli var mı kontrol et
+            var existingPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
+            if (existingPanel != null)
+            {
+                return new ErrorResult(Messages.FreeBarberPanelAlreadyExists);
+            }
+
             var entity = freeBarberCreateDto.Adapt<FreeBarber>();
             entity.FreeBarberUserId = currentUserId;
             await freeBarberDal.Add(entity);

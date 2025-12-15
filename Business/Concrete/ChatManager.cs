@@ -312,9 +312,14 @@ namespace Business.Concrete
                     if (!favoriteDict.TryGetValue(threadDto.ThreadId, out var threadEntity))
                         continue;
 
-                    // Favori aktif mi kontrol et
-                    var favorite = await favoriteDal.GetByUsersAsync(threadEntity.FavoriteFromUserId!.Value, threadEntity.FavoriteToUserId!.Value);
-                    if (favorite == null || !favorite.IsActive) continue; // Favori aktif değilse thread'i atla
+                    // Favori aktif mi kontrol et - en az bir tarafın favori olması yeterli
+                    // Her iki yönde de kontrol et: fromUserId -> toUserId ve toUserId -> fromUserId
+                    var favorite1 = await favoriteDal.GetByUsersAsync(threadEntity.FavoriteFromUserId!.Value, threadEntity.FavoriteToUserId!.Value);
+                    var favorite2 = await favoriteDal.GetByUsersAsync(threadEntity.FavoriteToUserId!.Value, threadEntity.FavoriteFromUserId!.Value);
+                    
+                    // En az bir tarafın favori olması yeterli (aktif olmalı)
+                    var isFavoriteActive = (favorite1 != null && favorite1.IsActive) || (favorite2 != null && favorite2.IsActive);
+                    if (!isFavoriteActive) continue; // Hiçbiri aktif değilse thread'i atla
 
                     var otherUserId = threadEntity.FavoriteFromUserId == userId 
                         ? threadEntity.FavoriteToUserId!.Value 
@@ -442,9 +447,13 @@ namespace Business.Concrete
             var isParticipant = (thread.FavoriteFromUserId == senderUserId || thread.FavoriteToUserId == senderUserId);
             if (!isParticipant) return new ErrorDataResult<ChatMessageDto>(Messages.NotAParticipant);
 
-            // Favori aktif mi kontrolü
-            var favorite = await favoriteDal.GetByUsersAsync(thread.FavoriteFromUserId!.Value, thread.FavoriteToUserId!.Value);
-            if (favorite == null || !favorite.IsActive)
+            // Favori aktif mi kontrolü - en az bir tarafın favori olması yeterli
+            var favorite1 = await favoriteDal.GetByUsersAsync(thread.FavoriteFromUserId!.Value, thread.FavoriteToUserId!.Value);
+            var favorite2 = await favoriteDal.GetByUsersAsync(thread.FavoriteToUserId!.Value, thread.FavoriteFromUserId!.Value);
+            
+            // En az bir tarafın favori olması yeterli (aktif olmalı)
+            var isFavoriteActive = (favorite1 != null && favorite1.IsActive) || (favorite2 != null && favorite2.IsActive);
+            if (!isFavoriteActive)
                 return new ErrorDataResult<ChatMessageDto>("Favori aktif değil, mesaj gönderilemez");
 
             var msg = new ChatMessage
@@ -566,9 +575,13 @@ namespace Business.Concrete
                 // Favori thread
                 isParticipant = thread.FavoriteFromUserId == userId || thread.FavoriteToUserId == userId;
                 
-                // Favori aktif mi kontrolü
-                var favorite = await favoriteDal.GetByUsersAsync(thread.FavoriteFromUserId.Value, thread.FavoriteToUserId.Value);
-                if (favorite == null || !favorite.IsActive)
+                // Favori aktif mi kontrolü - en az bir tarafın favori olması yeterli
+                var favorite1 = await favoriteDal.GetByUsersAsync(thread.FavoriteFromUserId.Value, thread.FavoriteToUserId.Value);
+                var favorite2 = await favoriteDal.GetByUsersAsync(thread.FavoriteToUserId.Value, thread.FavoriteFromUserId.Value);
+                
+                // En az bir tarafın favori olması yeterli (aktif olmalı)
+                var isFavoriteActive = (favorite1 != null && favorite1.IsActive) || (favorite2 != null && favorite2.IsActive);
+                if (!isFavoriteActive)
                     return new ErrorDataResult<List<ChatMessageItemDto>>("Favori aktif değil");
             }
 

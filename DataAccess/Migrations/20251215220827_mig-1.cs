@@ -104,7 +104,7 @@ namespace DataAccess.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ThreadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     SenderUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Text = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsSystem = table.Column<bool>(type: "bit", nullable: false),
@@ -120,7 +120,9 @@ namespace DataAccess.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    FavoriteFromUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    FavoriteToUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CustomerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     StoreOwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     FreeBarberUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -269,7 +271,7 @@ namespace DataAccess.Migrations
                     ServiceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                    Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -300,7 +302,7 @@ namespace DataAccess.Migrations
                     AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ServiceOfferingId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ServiceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                    Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -438,7 +440,14 @@ namespace DataAccess.Migrations
                 name: "IX_ChatThreads_AppointmentId",
                 table: "ChatThreads",
                 column: "AppointmentId",
-                unique: true);
+                unique: true,
+                filter: "[AppointmentId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatThreads_FavoriteFromUserId_FavoriteToUserId",
+                table: "ChatThreads",
+                columns: new[] { "FavoriteFromUserId", "FavoriteToUserId" },
+                filter: "[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_FreeBarbers_FreeBarberUserId",

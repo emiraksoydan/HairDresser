@@ -70,17 +70,8 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge güncelle (değişmedi ama kontrol edelim)
-                        try
-                        {
-                            var badges = await badgeService.GetCountsAsync(userId);
-                            if (badges.Success)
-                                await realtime.PushBadgeAsync(userId, badges.Data);
-                        }
-                        catch
-                        {
-                            // Badge güncelleme hatası bildirim gönderimini etkilememeli
-                        }
+                        // Badge güncellemesi transaction commit sonrası yapılacak
+                        // Client tarafında badge invalidate edilecek (SignalR'dan badge.updated event'i gelecek)
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -106,7 +97,7 @@ namespace Business.Concrete
 
             await notificationDal.Add(n);
 
-            var dto = new NotificationDto
+            var notificationDto = new NotificationDto
             {
                 Id = n.Id,
                 Type = n.Type,
@@ -119,19 +110,12 @@ namespace Business.Concrete
             };
 
             // Real-time push - Global exception middleware hataları yakalayacak
-            await realtime.PushNotificationAsync(userId, dto);
+            await realtime.PushNotificationAsync(userId, notificationDto);
 
-            // Badge güncelle ve SignalR ile tetikle
-            try
-            {
-                var badges = await badgeService.GetCountsAsync(userId);
-                if (badges.Success)
-                    await realtime.PushBadgeAsync(userId, badges.Data);
-            }
-            catch
-            {
-                // Badge güncelleme hatası bildirim gönderimini etkilememeli
-            }
+            // ÖNEMLİ: Badge count güncellemesi transaction commit sonrası yapılmalı
+            // Transaction içinde badge count hesaplanırsa, rollback durumunda yanlış badge gönderilmiş olur
+            // Badge güncellemesi AppointmentManager'da transaction commit sonrası yapılacak
+            // Veya client tarafında badge invalidate edilecek (SignalR'dan badge.updated event'i gelecek)
 
             return new SuccessDataResult<Guid>(n.Id);
         }

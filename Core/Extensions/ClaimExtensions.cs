@@ -31,6 +31,12 @@ namespace Core.Extensions
             claims.Add(new Claim(ClaimTypes.NameIdentifier, nameIdentifier));
         }
 
+        public static void AddIdentifier(this ICollection<Claim> claims, string identifier)
+        {
+            // Frontend'deki JwtPayload type'ı ile uyumlu olması için "identifier" claim'ini ekle
+            claims.Add(new Claim("identifier", identifier));
+        }
+
         public static void AddRoles(this ICollection<Claim> claims, string[] roles)
         {
             roles.ToList().ForEach(role => claims.Add(new Claim(ClaimTypes.Role, role)));

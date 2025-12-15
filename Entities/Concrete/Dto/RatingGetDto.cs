@@ -1,3 +1,4 @@
+using Entities.Concrete.Enums;
 using System;
 
 namespace Entities.Concrete.Dto
@@ -14,5 +15,7 @@ namespace Entities.Concrete.Dto
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public Guid AppointmentId { get; set; }
+        public UserType? RatedFromUserType { get; set; }
+        public BarberType? RatedFromBarberType { get; set; }
     }
 }

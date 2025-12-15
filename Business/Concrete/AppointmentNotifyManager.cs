@@ -359,24 +359,10 @@ namespace Business.Concrete
                 );
             }
 
-            // Tüm recipient'lara badge güncellemesi gönder
-            // ÖNEMLİ: Badge count her notification için zaten NotificationManager.CreateAndPushAsync içinde güncelleniyor
-            // Burada tekrar güncellemek gereksiz olabilir ama tüm recipient'lar için yapılması gerekebilir
-            // Çünkü birden fazla notification aynı anda oluşturulduğunda her birinin badge güncellemesi doğru olmayabilir
-            // En son durumu yansıtmak için tüm recipient'lar için badge güncellemesi yapıyoruz
-            foreach (var userId in recipients)
-            {
-                try
-                {
-                    var badges = await badgeService.GetCountsAsync(userId);
-                    if (badges.Success)
-                        await realtime.PushBadgeAsync(userId, badges.Data);
-                }
-                catch
-                {
-                    // Badge güncelleme hatası bildirim gönderimini etkilememeli
-                }
-            }
+            // ÖNEMLİ: Badge count güncellemesi transaction commit sonrası yapılmalı
+            // Transaction içinde badge count hesaplanırsa, rollback durumunda yanlış badge gönderilmiş olur
+            // Badge güncellemesi client tarafında yapılacak (SignalR'dan badge.updated event'i gelecek)
+            // Veya transaction commit sonrası bir event mekanizması ile yapılabilir
 
             return new SuccessResult();
         }

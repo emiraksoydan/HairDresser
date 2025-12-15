@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20251214154126_mig-1")]
+    [Migration("20251215220827_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -120,6 +120,7 @@ namespace DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ServiceName")
@@ -238,7 +239,7 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AppointmentId")
+                    b.Property<Guid?>("AppointmentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -270,7 +271,7 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AppointmentId")
+                    b.Property<Guid?>("AppointmentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -280,6 +281,12 @@ namespace DataAccess.Migrations
                         .HasColumnType("int");
 
                     b.Property<Guid?>("CustomerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("FavoriteFromUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("FavoriteToUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("FreeBarberUnreadCount")
@@ -306,7 +313,11 @@ namespace DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AppointmentId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[AppointmentId] IS NOT NULL");
+
+                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId")
+                        .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
                     b.ToTable("ChatThreads");
                 });
@@ -603,6 +614,7 @@ namespace DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ServiceName")

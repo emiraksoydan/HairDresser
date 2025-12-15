@@ -39,19 +39,21 @@ namespace DataAccess.Concrete
             if (freeBarber is null)
                 return new FreeBarberMinePanelDto();
 
+            // Rating - Artık TargetId User ID
             var avgRating = await _context.Ratings
             .AsNoTracking()
-            .Where(r => r.TargetId == freeBarber.Id)
+            .Where(r => r.TargetId == freeBarber.FreeBarberUserId)
             .Select(r => (double?)r.Score)
             .AverageAsync() ?? 0.0;
 
             var reviewCount = await _context.Ratings
                 .AsNoTracking()
-                .CountAsync(r => r.TargetId == freeBarber.Id);
+                .CountAsync(r => r.TargetId == freeBarber.FreeBarberUserId);
 
+            // Favorite count (sadece aktif favoriler) - Artık User ID'ler arasında
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
-                .CountAsync(f => f.FavoritedToId == freeBarber.Id && f.IsActive);
+                .CountAsync(f => f.FavoritedToId == freeBarber.FreeBarberUserId && f.IsActive);
 
 
             var images = await _context.Images
@@ -114,19 +116,21 @@ namespace DataAccess.Concrete
             if (freeBarber is null)
                 return new FreeBarberMinePanelDto();
 
+            // Rating - Artık TargetId User ID
             var avgRating = await _context.Ratings
             .AsNoTracking()
-            .Where(r => r.TargetId == freeBarber.Id)
+            .Where(r => r.TargetId == freeBarber.FreeBarberUserId)
             .Select(r => (double?)r.Score)
             .AverageAsync() ?? 0.0;
 
             var reviewCount = await _context.Ratings
                 .AsNoTracking()
-                .CountAsync(r => r.TargetId == freeBarber.Id);
+                .CountAsync(r => r.TargetId == freeBarber.FreeBarberUserId);
 
+            // Favorite count (sadece aktif favoriler) - Artık User ID'ler arasında
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
-                .CountAsync(f => f.FavoritedToId == freeBarber.Id && f.IsActive);
+                .CountAsync(f => f.FavoritedToId == freeBarber.FreeBarberUserId && f.IsActive);
 
   
             var images = await _context.Images
@@ -191,13 +195,15 @@ namespace DataAccess.Concrete
             if (!freeBarbers.Any())
                 return new List<FreeBarberGetDto>();
             var freeBarberIds = freeBarbers.Select(s => s.Id).ToList();
+            // Rating - TargetId = FreeBarber User ID (FreeBarber'ın rating'i)
+            var freeBarberOwnerIds = freeBarbers.Select(s => s.FreeBarberUserId).Distinct().ToList();
             var ratingStats = await _context.Ratings
                 .AsNoTracking()
-                .Where(r => freeBarberIds.Contains(r.TargetId))
+                .Where(r => freeBarberOwnerIds.Contains(r.TargetId))
                 .GroupBy(r => r.TargetId)
                 .Select(g => new
                 {
-                    FreeBarberId = g.Key,
+                    OwnerUserId = g.Key,
                     AvgRating = g.Average(x => (double)x.Score),
                     ReviewCount = g.Count()
 
@@ -205,20 +211,22 @@ namespace DataAccess.Concrete
                 .ToListAsync();
 
             var ratingDict = ratingStats
-                .ToDictionary(x => x.FreeBarberId, x => new { x.AvgRating, x.ReviewCount });
+                .ToDictionary(x => x.OwnerUserId, x => new { x.AvgRating, x.ReviewCount });
+            
+            // Favorite count (sadece aktif favoriler) - FavoritedToId = FreeBarber User ID (FreeBarber'ın favori sayısı)
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
-                .Where(f => freeBarberIds.Contains(f.FavoritedToId) && f.IsActive)
+                .Where(f => freeBarberOwnerIds.Contains(f.FavoritedToId) && f.IsActive)
                 .GroupBy(f => f.FavoritedToId)
                 .Select(g => new
                 {
-                    FreeBarberId = g.Key,
+                    OwnerUserId = g.Key,
                     FavoriteCount = g.Count(f => f.IsActive)
                 })
                 .ToListAsync();
 
             var favoriteDict = favoriteStats
-                .ToDictionary(x => x.FreeBarberId, x => x.FavoriteCount);
+                .ToDictionary(x => x.OwnerUserId, x => x.FavoriteCount);
             var offeringGroups = await _context.ServiceOfferings
                 .AsNoTracking()
                 .Where(o => freeBarberIds.Contains(o.OwnerId))
@@ -262,8 +270,8 @@ namespace DataAccess.Concrete
                     var distance = Geo.DistanceKm(lat, lon, s.Latitude, s.Longitude);
                     if (distance > radiusKm) return null;
 
-                    ratingDict.TryGetValue(s.Id, out var ratingInfo);
-                    favoriteDict.TryGetValue(s.Id, out var favCount);
+                    ratingDict.TryGetValue(s.FreeBarberUserId, out var ratingInfo); // Artık owner User ID'ye göre
+                    favoriteDict.TryGetValue(s.FreeBarberUserId, out var favCount); // Artık owner User ID'ye göre
                     offeringDict.TryGetValue(s.Id, out var offerings);
                     imageDict.TryGetValue(s.Id, out var images);
 

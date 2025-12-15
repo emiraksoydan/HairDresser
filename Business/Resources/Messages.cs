@@ -57,6 +57,7 @@ namespace Business.Resources
         public const string StoreFreeBarberDistanceExceeded = "Dükkan ile serbest berber arası 1 km dışında. Bu eşleşmeyle randevu açılamaz.";
         public const string FreeBarberUserIdRequired = "FreeBarberUserId is required";
         public const string FreeBarberUpdateUnauthorized = "Bu serbest berberi güncelleme yetkiniz yok";
+        public const string FreeBarberPanelAlreadyExists = "Zaten bir serbest berber paneliniz bulunmaktadır. Her kullanıcının sadece bir paneli olabilir.";
 
         // Customer Messages
         public const string CustomerHasActiveAppointment = "Müşterinin aktif (Pending/Approved) randevusu var.";

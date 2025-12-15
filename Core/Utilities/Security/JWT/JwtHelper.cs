@@ -60,7 +60,9 @@ namespace Core.Utilities.Security.JWT
         private IEnumerable<Claim> SetClaims(User user, List<OperationClaim> operationClaims)
         {
             var claims = new List<Claim>();
-            claims.AddNameIdentifier(user.Id.ToString());
+            var userIdString = user.Id.ToString();
+            claims.AddNameIdentifier(userIdString); // ClaimTypes.NameIdentifier -> JWT'de "sub" olarak görünür
+            claims.AddIdentifier(userIdString); // Frontend'deki JwtPayload type'ı ile uyumlu olması için
             claims.AddName($"{user.FirstName}");
             claims.AddLastName($"{user.LastName}");
             claims.AddRoles(operationClaims?.Select(c => c.Name).ToArray() ?? []);

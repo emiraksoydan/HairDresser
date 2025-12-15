@@ -21,6 +21,7 @@ namespace Business.Concrete
         private readonly IBarberStoreDal _barberStoreDal;
         private readonly IFreeBarberDal _freeBarberDal;
         private readonly IManuelBarberDal _manuelBarberDal;
+        private readonly IImageDal _imageDal;
 
         public RatingManager(
             IRatingDal ratingDal,
@@ -28,7 +29,8 @@ namespace Business.Concrete
             IUserDal userDal,
             IBarberStoreDal barberStoreDal,
             IFreeBarberDal freeBarberDal,
-            IManuelBarberDal manuelBarberDal)
+            IManuelBarberDal manuelBarberDal,
+            IImageDal imageDal)
         {
             _ratingDal = ratingDal;
             _appointmentDal = appointmentDal;
@@ -36,6 +38,7 @@ namespace Business.Concrete
             _barberStoreDal = barberStoreDal;
             _freeBarberDal = freeBarberDal;
             _manuelBarberDal = manuelBarberDal;
+            _imageDal = imageDal;
         }
 
         public async Task<IDataResult<RatingGetDto>> CreateRatingAsync(Guid userId, CreateRatingDto dto)
@@ -54,23 +57,116 @@ namespace Business.Concrete
                 appointment.FreeBarberUserId != userId)
                 return new ErrorDataResult<RatingGetDto>(Messages.Unauthorized);
 
-            // TargetId: Store ID, FreeBarber ID veya Customer UserId olabilir (ManuelBarber hariç)
-            var isValidTarget = await ValidateTargetIdForRatingAsync(dto.TargetId, appointment);
-            if (!isValidTarget)
+            // TargetId: Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir
+            // TargetId belirleme:
+            // Store için: Store ID (her dükkanın kendi rating'i)
+            // FreeBarber için: FreeBarber User ID (FreeBarber'ın rating'i)
+            // Customer için: Customer User ID (Customer'ın rating'i)
+            // ManuelBarber için: Store Owner User ID
+            var store = await _barberStoreDal.Get(x => x.Id == dto.TargetId);
+            var freeBarber = await _freeBarberDal.Get(x => x.Id == dto.TargetId);
+            var manuelBarber = await _manuelBarberDal.Get(x => x.Id == dto.TargetId);
+            var customerUser = await _userDal.Get(x => x.Id == dto.TargetId);
+            
+            Guid targetIdForRating = Guid.Empty; // Rating TargetId
+            Guid targetUserIdForValidation = Guid.Empty; // Appointment validation için User ID
+            
+            if (store != null)
+            {
+                targetIdForRating = store.Id; // Store ID
+                targetUserIdForValidation = store.BarberStoreOwnerId; // Validation için owner User ID
+            }
+            else if (freeBarber != null)
+            {
+                targetIdForRating = freeBarber.FreeBarberUserId; // FreeBarber User ID
+                targetUserIdForValidation = freeBarber.FreeBarberUserId;
+            }
+            else if (customerUser != null)
+            {
+                targetIdForRating = customerUser.Id; // Customer User ID
+                targetUserIdForValidation = customerUser.Id;
+            }
+            else if (manuelBarber != null)
+            {
+                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
+                if (manuelBarberStore != null)
+                {
+                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
+                    targetUserIdForValidation = manuelBarberStore.BarberStoreOwnerId;
+                }
+            }
+            
+            if (targetIdForRating == Guid.Empty)
+                return new ErrorDataResult<RatingGetDto>(Messages.InvalidTargetForRating);
+            
+            // Appointment kontrolü - targetUserIdForValidation appointment'a katılımcı olmalı
+            if (appointment.CustomerUserId != targetUserIdForValidation && 
+                appointment.BarberStoreUserId != targetUserIdForValidation && 
+                appointment.FreeBarberUserId != targetUserIdForValidation)
                 return new ErrorDataResult<RatingGetDto>(Messages.InvalidTargetForRating);
 
-            // Mevcut rating'i kontrol et - eğer varsa bir daha eklenemez/güncellenemez
-            var existingRating = await _ratingDal.GetByAppointmentAndTargetAsync(dto.AppointmentId, dto.TargetId, userId);
+            // Mevcut rating'i kontrol et
+            // Store için: TargetId = Store ID
+            // FreeBarber/Customer için: TargetId = User ID
+            var existingRating = await _ratingDal.Get(x => x.AppointmentId == dto.AppointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (existingRating != null)
                 return new ErrorDataResult<RatingGetDto>("Bu randevu için bu hedefe zaten değerlendirme yaptınız. Değerlendirme güncellenemez.");
 
+            // RatedFromId artık her zaman userId
+            // RatedFrom bilgilerini kullanıcı tipine göre belirle
+            UserType? ratedFromUserType = null;
+            BarberType? ratedFromBarberType = null;
+            string? ratedFromName = null;
+            string? ratedFromImage = null;
+
+            var currentUser = await _userDal.Get(x => x.Id == userId);
+            if (currentUser != null)
+            {
+                ratedFromUserType = currentUser.UserType;
+                ratedFromName = $"{currentUser.FirstName} {currentUser.LastName}";
+                
+                // Image URL'ini al
+                if (currentUser.ImageId.HasValue)
+                {
+                    var image = await _imageDal.GetLatestImageAsync(currentUser.ImageId.Value, ImageOwnerType.User);
+                    ratedFromImage = image?.ImageUrl;
+                }
+                
+                if (currentUser.UserType == UserType.FreeBarber)
+                {
+                    var freeBarberFrom = await _freeBarberDal.Get(x => x.FreeBarberUserId == userId);
+                    if (freeBarberFrom != null)
+                    {
+                        ratedFromName = $"{freeBarberFrom.FirstName} {freeBarberFrom.LastName}";
+                        ratedFromBarberType = freeBarberFrom.Type;
+                        // Image URL'ini al - FreeBarber ID ile
+                        var image = await _imageDal.GetLatestImageAsync(freeBarberFrom.Id, ImageOwnerType.FreeBarber);
+                        ratedFromImage = image?.ImageUrl;
+                    }
+                }
+                else if (currentUser.UserType == UserType.BarberStore)
+                {
+                    var storeFrom = await _barberStoreDal.Get(x => x.BarberStoreOwnerId == userId);
+                    if (storeFrom != null)
+                    {
+                        ratedFromName = storeFrom.StoreName;
+                        ratedFromBarberType = storeFrom.Type;
+                        // Image URL'ini al - Store ID ile
+                        var image = await _imageDal.GetLatestImageAsync(storeFrom.Id, ImageOwnerType.Store);
+                        ratedFromImage = image?.ImageUrl;
+                    }
+                }
+            }
+
             // Yeni rating oluştur
+            // Store için: TargetId = Store ID
+            // FreeBarber/Customer için: TargetId = User ID
             var rating = new Rating
             {
                 Id = Guid.NewGuid(),
                 AppointmentId = dto.AppointmentId,
-                TargetId = dto.TargetId,
-                RatedFromId = userId,
+                TargetId = targetIdForRating, // Store ID veya User ID
+                RatedFromId = userId, // Her zaman User ID
                 Score = dto.Score,
                 Comment = dto.Comment,
                 CreatedAt = DateTime.UtcNow,
@@ -79,14 +175,15 @@ namespace Business.Concrete
             await _ratingDal.Add(rating);
 
             // DTO'ya map et
-            var ratedFromUser = await _userDal.Get(x => x.Id == userId);
             var dtoResult = new RatingGetDto
             {
                 Id = rating.Id,
                 TargetId = rating.TargetId,
                 RatedFromId = rating.RatedFromId,
-                RatedFromName = ratedFromUser != null ? $"{ratedFromUser.FirstName} {ratedFromUser.LastName}" : null,
-                RatedFromImage = ratedFromUser?.ImageId != null ? ratedFromUser.ImageId.ToString() : null,
+                RatedFromName = ratedFromName,
+                RatedFromImage = ratedFromImage,
+                RatedFromUserType = ratedFromUserType,
+                RatedFromBarberType = ratedFromBarberType,
                 Score = rating.Score,
                 Comment = rating.Comment,
                 CreatedAt = rating.CreatedAt,
@@ -136,29 +233,177 @@ namespace Business.Concrete
 
         public async Task<IDataResult<List<RatingGetDto>>> GetRatingsByTargetAsync(Guid targetId)
         {
-            var ratings = await _ratingDal.GetAll(x => x.TargetId == targetId);
+            // targetId Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir
+            // TargetId belirleme:
+            // Store için: Store ID (her dükkanın kendi rating'i)
+            // FreeBarber için: FreeBarber User ID (FreeBarber'ın rating'i)
+            // Customer için: Customer User ID (Customer'ın rating'i)
+            // ManuelBarber için: Store Owner User ID
+            var store = await _barberStoreDal.Get(x => x.Id == targetId);
+            var freeBarber = await _freeBarberDal.Get(x => x.Id == targetId);
+            var manuelBarber = await _manuelBarberDal.Get(x => x.Id == targetId);
+            var customerUser = await _userDal.Get(x => x.Id == targetId);
             
-            var userIds = ratings.Select(r => r.RatedFromId).Distinct().ToList();
-            var users = await _userDal.GetAll(x => userIds.Contains(x.Id));
-
+            Guid targetIdForRating = Guid.Empty;
+            
+            if (store != null)
+                targetIdForRating = store.Id; // Store ID
+            else if (freeBarber != null)
+                targetIdForRating = freeBarber.FreeBarberUserId; // FreeBarber User ID
+            else if (customerUser != null)
+                targetIdForRating = customerUser.Id; // Customer User ID
+            else if (manuelBarber != null)
+            {
+                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
+                if (manuelBarberStore != null)
+                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
+            }
+            
+            if (targetIdForRating == Guid.Empty)
+                return new SuccessDataResult<List<RatingGetDto>>(new List<RatingGetDto>());
+            
+            // Rating'leri getir
+            // Store için: TargetId = Store ID
+            // FreeBarber/Customer için: TargetId = User ID
+            var ratings = await _ratingDal.GetAll(x => x.TargetId == targetIdForRating);
+            
+            // Eğer rating yoksa boş liste döndür
+            if (ratings == null || !ratings.Any())
+            {
+                return new SuccessDataResult<List<RatingGetDto>>(new List<RatingGetDto>());
+            }
+            
+            // RatedFromId artık her zaman User ID
+            var ratedFromUserIds = ratings.Select(r => r.RatedFromId).Distinct().ToList();
+            var users = await _userDal.GetAll(x => ratedFromUserIds.Contains(x.Id));
             var userDict = users.ToDictionary(u => u.Id, u => u);
 
+            // FreeBarber ve Store bilgilerini de al (UserType'a göre)
+            var freeBarberUsers = users.Where(u => u.UserType == UserType.FreeBarber).Select(u => u.Id).ToList();
+            var storeUsers = users.Where(u => u.UserType == UserType.BarberStore).Select(u => u.Id).ToList();
+            
+            var freeBarbers = await _freeBarberDal.GetAll(x => freeBarberUsers.Contains(x.FreeBarberUserId));
+            var stores = await _barberStoreDal.GetAll(x => storeUsers.Contains(x.BarberStoreOwnerId));
+            
+            var freeBarberDict = freeBarbers.ToDictionary(fb => fb.FreeBarberUserId, fb => fb);
+            var storeDict = stores.ToDictionary(s => s.BarberStoreOwnerId, s => s);
+
+            // Image'leri çek
+            // Customer için: User.ImageId -> Image.Id (ImageOwnerId = User ID, OwnerType = User olabilir ama genelde direkt Image.Id kullanılır)
+            // Store için: ImageOwnerId = Store ID, OwnerType = Store
+            // FreeBarber için: ImageOwnerId = FreeBarber ID, OwnerType = FreeBarber
+            var storeIds = stores.Select(s => s.Id).ToList();
+            var freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            var customerImageIds = users.Where(u => u.UserType == UserType.Customer && u.ImageId.HasValue).Select(u => u.ImageId!.Value).ToList();
+            
+            // Customer image'leri (User.ImageId -> Image.Id)
+            var customerImages = customerImageIds.Any()
+                ? await _imageDal.GetAll(x => customerImageIds.Contains(x.Id))
+                : new List<Image>();
+            var customerImageDict = customerImages.ToDictionary(img => img.Id, img => img.ImageUrl);
+            
+            // Store image'leri (ImageOwnerId = Store ID, OwnerType = Store) - En son eklenen image'i al
+            var storeImages = storeIds.Any()
+                ? await _imageDal.GetAll(x => storeIds.Contains(x.ImageOwnerId) && x.OwnerType == ImageOwnerType.Store)
+                : new List<Image>();
+            var storeImageDict = storeImages.GroupBy(i => i.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).First().ImageUrl);
+            
+            // FreeBarber image'leri (ImageOwnerId = FreeBarber ID, OwnerType = FreeBarber) - En son eklenen image'i al
+            var freeBarberImages = freeBarberIds.Any()
+                ? await _imageDal.GetAll(x => freeBarberIds.Contains(x.ImageOwnerId) && x.OwnerType == ImageOwnerType.FreeBarber)
+                : new List<Image>();
+            var freeBarberImageDict = freeBarberImages.GroupBy(i => i.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).First().ImageUrl);
+
+            // TargetId frontend'e döndürülürken:
+            // Store için: Store ID
+            // FreeBarber için: FreeBarber ID (ama rating'te TargetId = FreeBarber User ID)
+            // Customer için: Customer User ID
+            // ManuelBarber için: ManuelBarber ID (ama rating'te TargetId = Store Owner User ID)
+            Guid? targetIdForFrontend = null;
+            if (store != null)
+                targetIdForFrontend = store.Id; // Store ID
+            else if (freeBarber != null)
+                targetIdForFrontend = freeBarber.Id; // FreeBarber ID (frontend için)
+            else if (customerUser != null)
+                targetIdForFrontend = customerUser.Id; // Customer User ID
+            else if (manuelBarber != null)
+                targetIdForFrontend = manuelBarber.Id; // ManuelBarber ID (frontend için)
+            
             var dtos = ratings.Select(r =>
             {
-                var user = userDict.GetValueOrDefault(r.RatedFromId);
-                return new RatingGetDto
+                RatingGetDto dto = new RatingGetDto
                 {
                     Id = r.Id,
-                    TargetId = r.TargetId,
-                    RatedFromId = r.RatedFromId,
-                    RatedFromName = user != null ? $"{user.FirstName} {user.LastName}" : null,
-                    RatedFromImage = user?.ImageId != null ? user.ImageId.ToString() : null,
+                    TargetId = targetIdForFrontend ?? targetId, // Frontend'e Store/FreeBarber/Customer/ManuelBarber ID döndür
+                    RatedFromId = r.RatedFromId, // Her zaman User ID
                     Score = r.Score,
                     Comment = r.Comment,
                     CreatedAt = r.CreatedAt,
                     UpdatedAt = r.UpdatedAt,
                     AppointmentId = r.AppointmentId
                 };
+
+                // RatedFromId artık her zaman User ID, User tablosundan bilgileri al
+                if (userDict.TryGetValue(r.RatedFromId, out var user))
+                {
+                    dto.RatedFromUserType = user.UserType;
+                    
+                    if (user.UserType == UserType.Customer)
+                    {
+                        dto.RatedFromName = $"{user.FirstName} {user.LastName}";
+                        if (user.ImageId.HasValue && customerImageDict.TryGetValue(user.ImageId.Value, out var imageUrl))
+                        {
+                            dto.RatedFromImage = imageUrl;
+                        }
+                        dto.RatedFromBarberType = null;
+                    }
+                    else if (user.UserType == UserType.FreeBarber)
+                    {
+                        if (freeBarberDict.TryGetValue(r.RatedFromId, out var freeBarber))
+                        {
+                            dto.RatedFromName = $"{freeBarber.FirstName} {freeBarber.LastName}"; // FreeBarber'ın kendi ismi
+                            dto.RatedFromBarberType = freeBarber.Type;
+                            // FreeBarber image'ini FreeBarber ID'ye göre al (ImageOwnerId = FreeBarber ID)
+                            if (freeBarberImageDict.TryGetValue(freeBarber.Id, out var imageUrl))
+                            {
+                                dto.RatedFromImage = imageUrl;
+                            }
+                        }
+                        else
+                        {
+                            dto.RatedFromName = $"{user.FirstName} {user.LastName}";
+                            if (user.ImageId.HasValue && customerImageDict.TryGetValue(user.ImageId.Value, out var imageUrl))
+                            {
+                                dto.RatedFromImage = imageUrl;
+                            }
+                        }
+                    }
+                    else if (user.UserType == UserType.BarberStore)
+                    {
+                        if (storeDict.TryGetValue(r.RatedFromId, out var store))
+                        {
+                            dto.RatedFromName = store.StoreName; // Store'un kendi ismi
+                            dto.RatedFromBarberType = store.Type;
+                            // Store image'ini Store ID'ye göre al (ImageOwnerId = Store ID)
+                            if (storeImageDict.TryGetValue(store.Id, out var imageUrl))
+                            {
+                                dto.RatedFromImage = imageUrl;
+                            }
+                        }
+                        else
+                        {
+                            dto.RatedFromName = $"{user.FirstName} {user.LastName}";
+                            if (user.ImageId.HasValue && customerImageDict.TryGetValue(user.ImageId.Value, out var imageUrl))
+                            {
+                                dto.RatedFromImage = imageUrl;
+                            }
+                        }
+                    }
+                }
+
+                return dto;
             }).ToList();
 
             return new SuccessDataResult<List<RatingGetDto>>(dtos);
@@ -166,16 +411,49 @@ namespace Business.Concrete
 
         public async Task<IDataResult<RatingGetDto>> GetMyRatingForAppointmentAsync(Guid userId, Guid appointmentId, Guid targetId)
         {
-            var rating = await _ratingDal.GetByAppointmentAndTargetAsync(appointmentId, targetId, userId);
+            // targetId Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir
+            // TargetId belirleme:
+            // Store için: Store ID (her dükkanın kendi rating'i)
+            // FreeBarber için: FreeBarber User ID (FreeBarber'ın rating'i)
+            // Customer için: Customer User ID (Customer'ın rating'i)
+            // ManuelBarber için: Store Owner User ID
+            var store = await _barberStoreDal.Get(x => x.Id == targetId);
+            var freeBarber = await _freeBarberDal.Get(x => x.Id == targetId);
+            var manuelBarber = await _manuelBarberDal.Get(x => x.Id == targetId);
+            var customerUser = await _userDal.Get(x => x.Id == targetId);
+            
+            Guid targetIdForRating = Guid.Empty;
+            
+            if (store != null)
+                targetIdForRating = store.Id; // Store ID
+            else if (freeBarber != null)
+                targetIdForRating = freeBarber.FreeBarberUserId; // FreeBarber User ID
+            else if (customerUser != null)
+                targetIdForRating = customerUser.Id; // Customer User ID
+            else if (manuelBarber != null)
+            {
+                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
+                if (manuelBarberStore != null)
+                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
+            }
+            
+            if (targetIdForRating == Guid.Empty)
+                return new ErrorDataResult<RatingGetDto>(null, "Hedef bulunamadı.");
+            
+            // Rating'i getir
+            // Store için: TargetId = Store ID
+            // FreeBarber/Customer için: TargetId = User ID
+            var rating = await _ratingDal.Get(x => x.AppointmentId == appointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (rating == null)
                 return new ErrorDataResult<RatingGetDto>(null, "Değerlendirme bulunamadı.");
 
+            // RatedFromId artık her zaman User ID
             var ratedFromUser = await _userDal.Get(x => x.Id == userId);
             var dto = new RatingGetDto
             {
                 Id = rating.Id,
-                TargetId = rating.TargetId,
-                RatedFromId = rating.RatedFromId,
+                TargetId = rating.TargetId, // Artık User ID, ama frontend'e Store/FreeBarber ID döndürmek için targetId'yi kullan
+                RatedFromId = rating.RatedFromId, // Artık her zaman User ID
                 RatedFromName = ratedFromUser != null ? $"{ratedFromUser.FirstName} {ratedFromUser.LastName}" : null,
                 RatedFromImage = ratedFromUser?.ImageId != null ? ratedFromUser.ImageId.ToString() : null,
                 Score = rating.Score,

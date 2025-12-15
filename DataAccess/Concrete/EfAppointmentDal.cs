@@ -183,7 +183,8 @@ namespace DataAccess.Concrete
             switch (appointmentFilter)
             {
                 case AppointmentFilter.Active:
-                    query = query.Where(x => x.Status == AppointmentStatus.Pending || x.Status == AppointmentStatus.Approved);
+                    // Sadece Approved durumundaki randevular aktif tab'da görünmeli
+                    query = query.Where(x => x.Status == AppointmentStatus.Approved);
                     break;
                 case AppointmentFilter.Completed:
                     query = query.Where(x => x.Status == AppointmentStatus.Completed);
@@ -235,6 +236,7 @@ namespace DataAccess.Concrete
                 .ToDictionaryAsync(fb => fb.FreeBarberUserId, fb => new
                 {
                     RealFreeBarberId = fb.Id,
+                    FreeBarberUserId = fb.FreeBarberUserId, // Favori kontrolü için User ID
                     FullName = fb.FirstName + " " + fb.LastName
                 });
 
@@ -269,9 +271,14 @@ namespace DataAccess.Concrete
             allIdsForImages = allIdsForImages.Distinct().ToList();
 
             // Favori ID'leri
+            // Store için: Store ID
+            // FreeBarber için: FreeBarber User ID (FavoritedToId = FreeBarberUserId)
+            // Customer için: Customer User ID
             var allIdsForFav = new List<Guid>();
             allIdsForFav.AddRange(realStoreIds);
-            allIdsForFav.AddRange(realFreeBarberIds);
+            // FreeBarber için User ID'leri ekle (FavoritedToId = FreeBarberUserId)
+            var freeBarberUserIdsForFav = freeBarberDict.Values.Select(x => x.FreeBarberUserId).ToList();
+            allIdsForFav.AddRange(freeBarberUserIdsForFav);
             allIdsForFav.AddRange(customerIds);
             allIdsForFav = allIdsForFav.Distinct().ToList();
 
@@ -311,9 +318,13 @@ namespace DataAccess.Concrete
             var ratingDict = myRatings.ToDictionary(r => (r.AppointmentId, r.TargetId), r => r);
 
             // Ortalama Rating'ler - Store, FreeBarber, ManuelBarber, Customer için
+            // Store için: Store ID
+            // FreeBarber için: FreeBarber User ID (TargetId = FreeBarberUserId)
+            // Customer için: Customer User ID
             var allTargetIds = new List<Guid>();
             allTargetIds.AddRange(realStoreIds);
-            allTargetIds.AddRange(realFreeBarberIds);
+            // FreeBarber için User ID'leri ekle (TargetId = FreeBarberUserId)
+            allTargetIds.AddRange(freeBarberUserIdsForFav);
             allTargetIds.AddRange(manuelBarberIds);
             allTargetIds.AddRange(customerIds);
             allTargetIds = allTargetIds.Distinct().ToList();
@@ -426,16 +437,18 @@ namespace DataAccess.Concrete
                         dto.FreeBarberName = fbInfo.FullName;
 
                         if (imagesDict.TryGetValue(realFbId, out var img)) dto.FreeBarberImage = img;
-                        dto.IsFreeBarberFavorite = favSet.Contains(realFbId);
+                        // Favori kontrolü: FavoritedToId = FreeBarber User ID
+                        dto.IsFreeBarberFavorite = favSet.Contains(fbInfo.FreeBarberUserId);
 
-                        if (ratingDict.TryGetValue((appt.Id, realFbId), out var r))
+                        // Rating kontrolü: TargetId = FreeBarber User ID
+                        if (ratingDict.TryGetValue((appt.Id, fbInfo.FreeBarberUserId), out var r))
                         {
                             dto.MyRatingForFreeBarber = r.Score;
                             dto.MyCommentForFreeBarber = r.Comment;
                         }
 
-                        // FreeBarber'ın ortalama rating'i
-                        if (averageRatingDict.TryGetValue(realFbId, out var avgRating))
+                        // FreeBarber'ın ortalama rating'i: TargetId = FreeBarber User ID
+                        if (averageRatingDict.TryGetValue(fbInfo.FreeBarberUserId, out var avgRating))
                         {
                             dto.FreeBarberAverageRating = avgRating;
                         }

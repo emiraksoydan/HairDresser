@@ -26,6 +26,7 @@ namespace Business.Concrete
         IAppointmentNotifyService notifySvc,
         INotificationService notificationService,
         IRealTimePublisher realtime,
+        IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings
     ) : IAppointmentService
     {
@@ -504,6 +505,21 @@ namespace Business.Concrete
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: storeOwnerUserId);
+                
+                // Rejected durumunda chat mesajı gönder
+                try
+                {
+                    var rejectionMessage = "Randevu talebiniz reddedildi.";
+                    if (appt.CustomerUserId.HasValue)
+                    {
+                        await chatService.SendMessageAsync(storeOwnerUserId, appt.Id, rejectionMessage);
+                    }
+                }
+                catch
+                {
+                    // Chat mesajı gönderilemezse devam et, kritik değil
+                }
+                
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 return new SuccessDataResult<bool>(true);
             }
@@ -526,6 +542,20 @@ namespace Business.Concrete
             // hala pending (örn: freebarber bekleniyor)
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentDecisionUpdated, actorUserId: storeOwnerUserId,
                 extra: new { storeDecision = appt.StoreDecision, freeBarberDecision = appt.FreeBarberDecision });
+            
+            // Decision güncellendiğinde chat mesajı gönder
+            try
+            {
+                var decisionMessage = approve ? "Randevu talebiniz kabul edildi. Diğer tarafın onayı bekleniyor." : "Randevu talebiniz reddedildi.";
+                if (appt.CustomerUserId.HasValue)
+                {
+                    await chatService.SendMessageAsync(storeOwnerUserId, appt.Id, decisionMessage);
+                }
+            }
+            catch
+            {
+                // Chat mesajı gönderilemezse devam et, kritik değil
+            }
 
             return new SuccessDataResult<bool>(true);
         }
@@ -575,6 +605,25 @@ namespace Business.Concrete
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: freeBarberUserId);
+                
+                // Rejected durumunda chat mesajı gönder
+                try
+                {
+                    var rejectionMessage = "Randevu talebiniz reddedildi.";
+                    if (appt.CustomerUserId.HasValue)
+                    {
+                        await chatService.SendMessageAsync(freeBarberUserId, appt.Id, rejectionMessage);
+                    }
+                    else if (appt.BarberStoreUserId.HasValue)
+                    {
+                        await chatService.SendMessageAsync(freeBarberUserId, appt.Id, rejectionMessage);
+                    }
+                }
+                catch
+                {
+                    // Chat mesajı gönderilemezse devam et, kritik değil
+                }
+                
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 return new SuccessDataResult<bool>(true);
             }
@@ -588,12 +637,49 @@ namespace Business.Concrete
                     await SetFreeBarberAvailabilityAsync(fb, false);
                 }
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentApproved, actorUserId: freeBarberUserId);
+                
+                // Decision sonrası chat mesajı gönder
+                try
+                {
+                    var decisionMessage = approve ? "Randevu talebiniz kabul edildi." : "Randevu talebiniz reddedildi.";
+                    if (appt.CustomerUserId.HasValue)
+                    {
+                        await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
+                    }
+                    else if (appt.BarberStoreUserId.HasValue)
+                    {
+                        await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
+                    }
+                }
+                catch
+                {
+                    // Chat mesajı gönderilemezse devam et, kritik değil
+                }
+                
                 return new SuccessDataResult<bool>(true);
             }
 
             // hala pending (örn: store bekleniyor)
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentDecisionUpdated, actorUserId: freeBarberUserId,
                 extra: new { storeDecision = appt.StoreDecision, freeBarberDecision = appt.FreeBarberDecision });
+            
+            // Decision güncellendiğinde chat mesajı gönder
+            try
+            {
+                var decisionMessage = approve ? "Randevu talebiniz kabul edildi. Diğer tarafın onayı bekleniyor." : "Randevu talebiniz reddedildi.";
+                if (appt.CustomerUserId.HasValue)
+                {
+                    await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
+                }
+                else if (appt.BarberStoreUserId.HasValue)
+                {
+                    await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
+                }
+            }
+            catch
+            {
+                // Chat mesajı gönderilemezse devam et, kritik değil
+            }
 
             return new SuccessDataResult<bool>(true);
         }
@@ -627,6 +713,17 @@ namespace Business.Concrete
 
             // İptal edildiğinde ilgili tüm taraflara bildirim gönder
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCancelled, actorUserId: userId);
+            
+            // İptal durumunda chat mesajı gönder
+            try
+            {
+                var cancelMessage = "Randevu iptal edildi.";
+                await chatService.SendMessageAsync(userId, appt.Id, cancelMessage);
+            }
+            catch
+            {
+                // Chat mesajı gönderilemezse devam et, kritik değil
+            }
             
             // Thread güncellemesi (thread kaldırılacak)
             await UpdateThreadOnAppointmentStatusChangeAsync(appt);
@@ -673,6 +770,17 @@ namespace Business.Concrete
             await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
 
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCompleted, actorUserId: storeOwnerUserId);
+            
+            // Tamamlanma durumunda chat mesajı gönder
+            try
+            {
+                var completeMessage = "Randevu tamamlandı.";
+                await chatService.SendMessageAsync(storeOwnerUserId, appt.Id, completeMessage);
+            }
+            catch
+            {
+                // Chat mesajı gönderilemezse devam et, kritik değil
+            }
             
             // Thread güncellemesi (thread kaldırılacak)
             await UpdateThreadOnAppointmentStatusChangeAsync(appt);

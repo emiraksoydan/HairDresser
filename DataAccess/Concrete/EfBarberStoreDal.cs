@@ -32,13 +32,14 @@ namespace DataAccess.Concrete
                     s.AddressDescription,
                     s.PricingValue,
                     s.PricingType,
+                    s.BarberStoreOwnerId, // Owner User ID'yi de al
                 })
                 .FirstOrDefaultAsync();
 
             if (store == null)
                 return new BarberStoreMineDto();
 
-            // 2) Rating + review count (tek store)
+            // 2) Rating + review count - TargetId = Store ID (her dükkanın kendi rating'i)
             var ratingInfo = await _context.Ratings
                 .AsNoTracking()
                 .Where(r => r.TargetId == store.Id)
@@ -50,7 +51,7 @@ namespace DataAccess.Concrete
                 })
                 .FirstOrDefaultAsync();
 
-            // 3) Favorite count (sadece aktif favoriler)
+            // 3) Favorite count (sadece aktif favoriler) - FavoritedToId = Store ID (her dükkanın kendi favori sayısı)
             var favoriteCount = await _context.Favorites
                 .AsNoTracking()
                 .CountAsync(f => f.FavoritedToId == store.Id && f.IsActive);
@@ -233,6 +234,7 @@ namespace DataAccess.Concrete
                     s.Latitude,
                     s.Longitude,
                     s.AddressDescription,
+                    s.BarberStoreOwnerId, // Owner User ID'yi de al
                 })
                 .ToListAsync();
 
@@ -241,7 +243,7 @@ namespace DataAccess.Concrete
 
             var storeIds = stores.Select(s => s.Id).ToList();
 
-            // 2) Rating & ReviewCount
+            // 2) Rating & ReviewCount - TargetId = Store ID (her dükkanın kendi rating'i)
             var ratingStats = await _context.Ratings
                 .AsNoTracking()
                 .Where(r => storeIds.Contains(r.TargetId))
@@ -260,7 +262,7 @@ namespace DataAccess.Concrete
                 x.ReviewCount
             });
 
-            // 3) Favoriler
+            // 3) Favoriler - FavoritedToId = Store ID (her dükkanın kendi favori sayısı)
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
                 .Where(f => storeIds.Contains(f.FavoritedToId) && f.IsActive)
@@ -268,7 +270,7 @@ namespace DataAccess.Concrete
                 .Select(g => new
                 {
                     StoreId = g.Key,
-                    FavoriteCount = g.Count(f => f.IsActive)
+                    FavoriteCount = g.Count()
                 })
                 .ToListAsync();
 
@@ -326,15 +328,15 @@ namespace DataAccess.Concrete
 
             var imageDict = imageGroups.ToDictionary(x => x.OwnerId, x => x.Images);
 
-            // 7) Hepsini BarberStoreMineDto’ya projekte et
+            // 7) Hepsini BarberStoreMineDto'ya projekte et
             var result = stores
                 .Select(s =>
                 {
-                    ratingDict.TryGetValue(s.Id, out var ratingInfo);
-                    favoriteDict.TryGetValue(s.Id, out var favCount);
+                    ratingDict.TryGetValue(s.Id, out var ratingInfo); // Her store'un kendi rating'i
+                    favoriteDict.TryGetValue(s.Id, out var favCount); // Her store'un kendi favori sayısı
                     offeringDict.TryGetValue(s.Id, out var offerings);
                     hoursDict.TryGetValue(s.Id, out var hours);
-                    imageDict.TryGetValue(s.Id, out var images);
+                    imageDict.TryGetValue(s.Id, out var images); // Her store'un kendi fotoğrafları
 
                     var avgRating = ratingInfo?.AvgRating ?? 0;
                     var reviewCount = ratingInfo?.ReviewCount ?? 0;
@@ -347,12 +349,12 @@ namespace DataAccess.Concrete
                     return new BarberStoreMineDto
                     {
                         Id = s.Id,
-                        StoreName = s.StoreName,
-                        ImageList = images ?? new List<ImageGetDto>(),
+                        StoreName = s.StoreName, // Her store'un kendi ismi
+                        ImageList = images ?? new List<ImageGetDto>(), // Her store'un kendi fotoğrafları
                         Type = s.Type,
-                        Rating = Math.Round(avgRating, 2),
-                        FavoriteCount = favoriteCount,
-                        ReviewCount = reviewCount,
+                        Rating = Math.Round(avgRating, 2), // Her store'un kendi rating'i
+                        FavoriteCount = favoriteCount, // Her store'un kendi favori sayısı
+                        ReviewCount = reviewCount, // Her store'un kendi review sayısı
                         IsOpenNow = isOpenNow,
                         ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
                         Latitude = s.Latitude,
@@ -382,13 +384,15 @@ namespace DataAccess.Concrete
                     s.PricingType,
                     s.PricingValue,
                     s.Type,
-                    s.AddressDescription
+                    s.AddressDescription,
+                    s.BarberStoreOwnerId // Owner User ID'yi de al
                 })
                 .ToListAsync();
 
             if (!stores.Any())
                 return new List<BarberStoreGetDto>();
             var storeIds = stores.Select(s => s.Id).ToList();
+            // Rating - TargetId = Store ID (her dükkanın kendi rating'i)
             var ratingStats = await _context.Ratings
                 .AsNoTracking()
                 .Where(r => storeIds.Contains(r.TargetId))
@@ -403,6 +407,8 @@ namespace DataAccess.Concrete
 
             var ratingDict = ratingStats
                 .ToDictionary(x => x.StoreId, x => new { x.AvgRating, x.ReviewCount });
+            
+            // Favorite - FavoritedToId = Store ID (her dükkanın kendi favori sayısı)
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
                 .Where(f => storeIds.Contains(f.FavoritedToId) && f.IsActive)
@@ -470,8 +476,8 @@ namespace DataAccess.Concrete
                     var distance = Geo.DistanceKm(lat, lon, s.Latitude, s.Longitude);
                     if (distance > radiusKm) return null;
 
-                    ratingDict.TryGetValue(s.Id, out var ratingInfo);
-                    favoriteDict.TryGetValue(s.Id, out var favCount);
+                    ratingDict.TryGetValue(s.Id, out var ratingInfo); // Her store'un kendi rating'i
+                    favoriteDict.TryGetValue(s.Id, out var favCount); // Her store'un kendi favori sayısı
                     offeringDict.TryGetValue(s.Id, out var offerings);
                     hoursDict.TryGetValue(s.Id, out var hours);
                     imageDict.TryGetValue(s.Id, out var images);
