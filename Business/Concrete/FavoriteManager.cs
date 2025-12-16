@@ -67,8 +67,8 @@ namespace Business.Concrete
                     return new ErrorDataResult<bool>(Messages.AppointmentNotFound);
 
                 // Randevu sayfasından geliyorsa, sadece Completed veya Cancelled olmalı
-                if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled)
-                    return new ErrorDataResult<bool>("Randevu sayfasından favorileme için randevunun tamamlanmış veya iptal edilmiş olması gerekir.");
+                if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled && appointment.Status != AppointmentStatus.Rejected && appointment.Status != AppointmentStatus.Unanswered)
+                    return new ErrorDataResult<bool>("Randevu sayfasından favorileme için randevunuzun sonuçlanması gerekir.");
             }
 
             // FavoritedToId belirleme:
