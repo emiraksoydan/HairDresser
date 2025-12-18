@@ -285,8 +285,13 @@ namespace Business.Concrete
             var freeBarbers = await _freeBarberDal.GetAll(x => freeBarberUsers.Contains(x.FreeBarberUserId));
             var stores = await _barberStoreDal.GetAll(x => storeUsers.Contains(x.BarberStoreOwnerId));
             
-            var freeBarberDict = freeBarbers.ToDictionary(fb => fb.FreeBarberUserId, fb => fb);
-            var storeDict = stores.ToDictionary(s => s.BarberStoreOwnerId, s => s);
+            // GroupBy kullanarak duplicate key'leri handle et
+            var freeBarberDict = freeBarbers
+                .GroupBy(fb => fb.FreeBarberUserId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(fb => fb.CreatedAt).First());
+            var storeDict = stores
+                .GroupBy(s => s.BarberStoreOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.CreatedAt).First());
 
             // Image'leri çek
             // Customer için: User.ImageId -> Image.Id (ImageOwnerId = User ID, OwnerType = User olabilir ama genelde direkt Image.Id kullanılır)

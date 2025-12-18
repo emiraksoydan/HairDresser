@@ -219,25 +219,56 @@ namespace DataAccess.Concrete
             // ---------------------------------------------------------------------------
 
             // A) STORE: StoreId, Name, Pricing, TYPE
-            var storesDict = await _context.BarberStores.AsNoTracking()
+            // FIX: GroupBy kullanarak duplicate key hatasını önle (aynı ownerId'ye sahip birden fazla store olabilir)
+            // EF Core'da GroupBy().Select(g => g.First()) projection hatası veriyor, bu yüzden memory'de GroupBy yapıyoruz
+            var allStores = await _context.BarberStores.AsNoTracking()
                 .Where(s => storeUserIds.Contains(s.BarberStoreOwnerId))
-                .ToDictionaryAsync(s => s.BarberStoreOwnerId, s => new
+                .Select(s => new
                 {
+                    s.BarberStoreOwnerId,
                     RealStoreId = s.Id,
                     s.StoreName,
                     s.PricingType,
                     s.PricingValue,
-                    s.Type // <-- YENİ: Store Type eklendi
-                });
+                    s.Type
+                })
+                .ToListAsync();
+            
+            // Memory'de GroupBy yap (aynı ownerId'ye sahip birden fazla store varsa ilkini al)
+            var storesList = allStores
+                .GroupBy(s => s.BarberStoreOwnerId)
+                .Select(g => g.First())
+                .ToList();
+            
+            var storesDict = storesList.ToDictionary(s => s.BarberStoreOwnerId, s => new
+            {
+                s.RealStoreId,
+                s.StoreName,
+                s.PricingType,
+                s.PricingValue,
+                s.Type
+            });
 
             // B) FREE BARBER
-            var freeBarberDict = await _context.FreeBarbers.AsNoTracking()
+            // Önce list olarak çek, sonra GroupBy ile duplicate key'leri handle et
+            var freeBarbersList = await _context.FreeBarbers.AsNoTracking()
                 .Where(fb => freeBarberUserIds.Contains(fb.FreeBarberUserId))
-                .ToDictionaryAsync(fb => fb.FreeBarberUserId, fb => new
+                .Select(fb => new
                 {
                     RealFreeBarberId = fb.Id,
                     FreeBarberUserId = fb.FreeBarberUserId, // Favori kontrolü için User ID
-                    FullName = fb.FirstName + " " + fb.LastName
+                    FullName = fb.FirstName + " " + fb.LastName,
+                    CreatedAt = fb.CreatedAt
+                })
+                .ToListAsync();
+            
+            var freeBarberDict = freeBarbersList
+                .GroupBy(fb => fb.FreeBarberUserId)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    g.First().RealFreeBarberId,
+                    g.First().FreeBarberUserId,
+                    g.First().FullName
                 });
 
             // C) MANUEL BARBER

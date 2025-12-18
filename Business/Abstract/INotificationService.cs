@@ -1,4 +1,4 @@
-﻿using Core.Utilities.Results;
+using Core.Utilities.Results;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
@@ -25,6 +25,11 @@ namespace Business.Abstract
         Task<IDataResult<bool>> MarkReadAsync(Guid userId, Guid notificationId);
 
         Task<IDataResult<bool>> MarkReadByAppointmentIdAsync(Guid userId, Guid appointmentId);
+
+        /// <summary>
+        /// Updates notification payloads for an appointment (status, decisions) and pushes via SignalR
+        /// </summary>
+        Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(Guid appointmentId, AppointmentStatus status, DecisionStatus? storeDecision = null, DecisionStatus? freeBarberDecision = null);
 
     }
 }

@@ -98,5 +98,17 @@ namespace Api.RealTime
                 // Log error but don't throw - typing indicator is non-critical
             }
         }
+
+        public async Task PushAppointmentUpdatedAsync(Guid userId, Entities.Concrete.Dto.AppointmentGetDto appointment)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("appointment.updated", appointment);
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - appointment update can be refetched
+            }
+        }
     }
 }

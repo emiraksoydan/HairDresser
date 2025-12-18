@@ -16,6 +16,6 @@ namespace Business.Abstract
         Task PushChatThreadUpdatedAsync(Guid userId, ChatThreadListItemDto dto);
         Task PushChatThreadRemovedAsync(Guid userId, Guid threadId);
         Task PushChatTypingAsync(Guid userId, Guid threadId, Guid typingUserId, string typingUserName, bool isTyping);
-
+        Task PushAppointmentUpdatedAsync(Guid userId, Entities.Concrete.Dto.AppointmentGetDto appointment);
     }
 }

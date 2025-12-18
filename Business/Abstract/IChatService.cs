@@ -34,6 +34,8 @@ namespace Business.Abstract
         
         // Favori thread oluştur veya güncelle
         Task<IDataResult<Guid>> EnsureFavoriteThreadAsync(Guid fromUserId, Guid toUserId);
+        Task PushAppointmentThreadCreatedAsync(Guid appointmentId);
+        Task PushAppointmentThreadUpdatedAsync(Guid appointmentId);
         
         // Typing indicator gönder
         Task<IDataResult<bool>> NotifyTypingAsync(Guid userId, Guid threadId, bool isTyping);

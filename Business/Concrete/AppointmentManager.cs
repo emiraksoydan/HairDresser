@@ -192,34 +192,14 @@ namespace Business.Concrete
             catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
             {
                 // Unique constraint violation (aynı chair/date/start/end kombinasyonu)
-                // Son kontrol: overlap tekrar kontrol et
-                var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
-                if (!finalOverlap.Success)
-                    return new ErrorDataResult<Guid>(finalOverlap.Message);
-                
-                // Eğer hala overlap yoksa, başka bir unique constraint ihlali olabilir
+                // Overlap kontrolü zaten EnsureChairNoOverlapAsync'te yapıldı
+                // Bu exception genellikle race condition durumunda oluşur
+                // (iki kullanıcı aynı anda aynı slot'u seçtiğinde)
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
             // offerings snapshot - AddRange ile toplu ekleme
-            if (req.ServiceOfferingIds != null && req.ServiceOfferingIds.Count > 0)
-            {
-                var offs = await offeringDal.GetServiceOfferingsByIdsAsync(req.ServiceOfferingIds);
-                var appointmentServiceOfferings = offs.Select(o => new AppointmentServiceOffering
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentId = appt.Id,
-                    ServiceOfferingId = o.Id,
-                    ServiceName = o.ServiceName,
-                    Price = o.Price
-                }).ToList();
-                
-                // AddRange ile toplu ekleme - performans için daha iyi
-                if (appointmentServiceOfferings.Any())
-                {
-                    await apptOfferingDal.AddRange(appointmentServiceOfferings);
-                }
-            }
+            await CreateAppointmentServiceOfferingsAsync(appt.Id, req.ServiceOfferingIds);
 
             // FREEBARBER LOCK
             if (fbEntity is not null)
@@ -311,34 +291,13 @@ namespace Business.Concrete
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
             {
-                if (req.ChairId.HasValue)
-                {
-                    var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
-                    if (!finalOverlap.Success)
-                        return new ErrorDataResult<Guid>(finalOverlap.Message);
-                }
+                // Unique constraint violation - overlap kontrolü zaten yapıldı
+                // Bu exception genellikle race condition durumunda oluşur
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
             // offerings snapshot - AddRange ile toplu ekleme
-            if (req.ServiceOfferingIds != null && req.ServiceOfferingIds.Count > 0)
-            {
-                var offs = await offeringDal.GetServiceOfferingsByIdsAsync(req.ServiceOfferingIds);
-                var appointmentServiceOfferings = offs.Select(o => new AppointmentServiceOffering
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentId = appt.Id,
-                    ServiceOfferingId = o.Id,
-                    ServiceName = o.ServiceName,
-                    Price = o.Price
-                }).ToList();
-                
-                // AddRange ile toplu ekleme - performans için daha iyi
-                if (appointmentServiceOfferings.Any())
-                {
-                    await apptOfferingDal.AddRange(appointmentServiceOfferings);
-                }
-            }
+            await CreateAppointmentServiceOfferingsAsync(appt.Id, req.ServiceOfferingIds);
 
             // lock free barber
             var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
@@ -415,35 +374,13 @@ namespace Business.Concrete
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
             {
-                if (req.ChairId.HasValue)
-                {
-                    var finalOverlap = await EnsureChairNoOverlapAsync(req.ChairId.Value, req.AppointmentDate, start, end);
-                    if (!finalOverlap.Success)
-                        return new ErrorDataResult<Guid>(finalOverlap.Message);
-                }
+                // Unique constraint violation - overlap kontrolü zaten yapıldı
+                // Bu exception genellikle race condition durumunda oluşur
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
             // offerings snapshot - AddRange ile toplu ekleme
-            List<Entities.Concrete.Dto.ServiceOfferingGetDto>? serviceOfferingsForNotification = null;
-            if (req.ServiceOfferingIds != null && req.ServiceOfferingIds.Count > 0)
-            {
-                var offs = await offeringDal.GetServiceOfferingsByIdsAsync(req.ServiceOfferingIds);
-                var appointmentServiceOfferings = offs.Select(o => new AppointmentServiceOffering
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentId = appt.Id,
-                    ServiceOfferingId = o.Id,
-                    ServiceName = o.ServiceName,
-                    Price = o.Price
-                }).ToList();
-                
-                // AddRange ile toplu ekleme - performans için daha iyi
-                if (appointmentServiceOfferings.Any())
-                {
-                    await apptOfferingDal.AddRange(appointmentServiceOfferings);
-                }
-            }
+            await CreateAppointmentServiceOfferingsAsync(appt.Id, req.ServiceOfferingIds);
 
             // lock free barber
             var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
@@ -494,12 +431,31 @@ namespace Business.Concrete
 
             await appointmentDal.Update(appt);
 
-            // Decision verildikten sonra ilgili notification'ları read yap (sadece ikili sistemler için)
-            var isDualSystem = (appt.CustomerUserId.HasValue && appt.BarberStoreUserId.HasValue) ||
-                              (appt.CustomerUserId.HasValue && appt.FreeBarberUserId.HasValue) ||
-                              (appt.BarberStoreUserId.HasValue && appt.FreeBarberUserId.HasValue);
+            // Decision verildikten sonra notification payload'larını güncelle (status, decisions)
+            // Bu sayede frontend'de butonlar doğru şekilde gizlenir
+            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
+                appt.Id, 
+                appt.Status, 
+                appt.StoreDecision, 
+                appt.FreeBarberDecision
+            );
 
-            // Bildirimler manuel olarak okunacak, otomatik okundu yapılmıyor
+            // Decision verildikten sonra ilgili notification'ları read yap
+            // Decision button'ları gizlemek için notification'ları okundu yapıyoruz
+            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            // Actor (karar veren kişi - storeOwnerUserId) hariç diğer kullanıcıların notification'larını read yap
+            foreach (var userId in participantUserIds)
+            {
+                if (userId != storeOwnerUserId)
+                {
+                    await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                }
+            }
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
@@ -521,6 +477,10 @@ namespace Business.Concrete
                 }
                 
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
+                
+                // İlgili kullanıcılara appointment güncellemesini bildir
+                await NotifyAppointmentUpdateToParticipantsAsync(appt);
+                
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -536,12 +496,19 @@ namespace Business.Concrete
                     }
                 }
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentApproved, actorUserId: storeOwnerUserId);
+                
+                // İlgili kullanıcılara appointment güncellemesini bildir
+                await NotifyAppointmentUpdateToParticipantsAsync(appt);
+                
                 return new SuccessDataResult<bool>(true);
             }
 
             // hala pending (örn: freebarber bekleniyor)
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentDecisionUpdated, actorUserId: storeOwnerUserId,
                 extra: new { storeDecision = appt.StoreDecision, freeBarberDecision = appt.FreeBarberDecision });
+            
+            // Decision güncellendiğinde ilgili kullanıcılara appointment güncellemesini bildir
+            await NotifyAppointmentUpdateToParticipantsAsync(appt);
             
             // Decision güncellendiğinde chat mesajı gönder
             try
@@ -594,18 +561,37 @@ namespace Business.Concrete
 
             await appointmentDal.Update(appt);
 
-            // Decision verildikten sonra ilgili notification'ları read yap (sadece ikili sistemler için)
-            var isDualSystem = (appt.CustomerUserId.HasValue && appt.BarberStoreUserId.HasValue) ||
-                              (appt.CustomerUserId.HasValue && appt.FreeBarberUserId.HasValue) ||
-                              (appt.BarberStoreUserId.HasValue && appt.FreeBarberUserId.HasValue);
+            // Decision verildikten sonra notification payload'larını güncelle (status, decisions)
+            // Bu sayede frontend'de butonlar doğru şekilde gizlenir
+            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
+                appt.Id, 
+                appt.Status, 
+                appt.StoreDecision, 
+                appt.FreeBarberDecision
+            );
 
-            // Bildirimler manuel olarak okunacak, otomatik okundu yapılmıyor
+            // Decision verildikten sonra ilgili notification'ları read yap
+            // Decision button'ları gizlemek için notification'ları okundu yapıyoruz
+            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            // Actor (karar veren kişi - freeBarberUserId) hariç diğer kullanıcıların notification'larını read yap
+            foreach (var userId in participantUserIds)
+            {
+                if (userId != freeBarberUserId)
+                {
+                    await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                }
+            }
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: freeBarberUserId);
-                
+
                 // Rejected durumunda chat mesajı gönder
                 try
                 {
@@ -623,8 +609,12 @@ namespace Business.Concrete
                 {
                     // Chat mesajı gönderilemezse devam et, kritik değil
                 }
-                
+
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
+                
+                // İlgili kullanıcılara appointment güncellemesini bildir
+                await NotifyAppointmentUpdateToParticipantsAsync(appt);
+                
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -680,6 +670,9 @@ namespace Business.Concrete
             {
                 // Chat mesajı gönderilemezse devam et, kritik değil
             }
+            
+            // Decision güncellendiğinde ilgili kullanıcılara appointment güncellemesini bildir
+            await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -727,6 +720,9 @@ namespace Business.Concrete
             
             // Thread güncellemesi (thread kaldırılacak)
             await UpdateThreadOnAppointmentStatusChangeAsync(appt);
+            
+            // İlgili kullanıcılara appointment güncellemesini bildir
+            await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -784,6 +780,9 @@ namespace Business.Concrete
             
             // Thread güncellemesi (thread kaldırılacak)
             await UpdateThreadOnAppointmentStatusChangeAsync(appt);
+            
+            // İlgili kullanıcılara appointment güncellemesini bildir
+            await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -792,6 +791,11 @@ namespace Business.Concrete
 
         private async Task<IResult> EnforceActiveRules(Guid? customerId, Guid? freeBarberId, Guid? storeOwnerId, AppointmentRequester requestedBy)
         {
+            // NOTE: Race condition riski var - EnforceActiveRules ile Add() arasında
+            // Database seviyesinde unique constraint'ler (IX_Appointments) bu durumu önler
+            // Transaction isolation level Serializable kullanılabilir ama performans etkisi olabilir
+            // Şu an için database constraint'ler yeterli koruma sağlıyor
+            
             if (customerId.HasValue)
             {
                 var has = await appointmentDal.AnyAsync(x => x.CustomerUserId == customerId && Active.Contains(x.Status));
@@ -818,6 +822,32 @@ namespace Business.Concrete
             }
 
             return new SuccessResult();
+        }
+
+        /// <summary>
+        /// Creates appointment service offerings snapshot from service offering IDs.
+        /// Extracted to reduce code duplication across create appointment methods.
+        /// </summary>
+        private async Task CreateAppointmentServiceOfferingsAsync(Guid appointmentId, List<Guid>? serviceOfferingIds)
+        {
+            if (serviceOfferingIds == null || serviceOfferingIds.Count == 0)
+                return;
+
+            var offs = await offeringDal.GetServiceOfferingsByIdsAsync(serviceOfferingIds);
+            var appointmentServiceOfferings = offs.Select(o => new AppointmentServiceOffering
+            {
+                Id = Guid.NewGuid(),
+                AppointmentId = appointmentId,
+                ServiceOfferingId = o.Id,
+                ServiceName = o.ServiceName,
+                Price = o.Price
+            }).ToList();
+
+            // AddRange ile toplu ekleme - performans için daha iyi
+            if (appointmentServiceOfferings.Any())
+            {
+                await apptOfferingDal.AddRange(appointmentServiceOfferings);
+            }
         }
 
         private async Task<IResult> EnsureChairNoOverlapAsync(Guid chairId, DateOnly date, TimeSpan start, TimeSpan end)
@@ -960,28 +990,8 @@ namespace Business.Concrete
             await threadDal.Add(thread);
 
             // Katılımcılara chat.threadCreated push
-            var recipients = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToList();
-
-            // Store name (title için)
-            var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
-
-            foreach (var u in recipients)
-            {
-                var title = BuildThreadTitleForUser(u, appt, store?.StoreName);
-
-                var dto = new ChatThreadListItemDto
-                {
-                    AppointmentId = appt.Id,
-                    Status = appt.Status,
-                    Title = title,
-                    LastMessagePreview = null,
-                    LastMessageAt = null,
-                    UnreadCount = 0
-                };
-
-                await realtime.PushChatThreadCreatedAsync(u, dto);
-            }
+            // GetThreadsAsync mantığını kullanarak thread detaylarını doldur
+            await chatService.PushAppointmentThreadCreatedAsync(appt.Id);
         }
 
         private static string BuildThreadTitleForUser(Guid userId, Appointment appt, string? storeName)
@@ -1110,9 +1120,86 @@ namespace Business.Concrete
             }
             else
             {
-                // Durum hala Pending/Approved ise thread'i güncelle (GetThreadsAsync'te yeniden çekilecek)
-                // Burada direkt güncelleme yapmıyoruz, sadece invalidate ediyoruz
-                // Frontend SignalR event'i ile güncellenecek
+                // Durum hala Pending/Approved ise thread'i güncelle (status değişmiş olabilir)
+                // PushAppointmentThreadUpdatedAsync ile thread güncellemesini gönder
+                // Bu metod tüm katılımcılara thread update push eder
+                await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
+            }
+        }
+
+        private async Task NotifyAppointmentUpdateToParticipantsAsync(Appointment appt)
+        {
+            // İlgili kullanıcıları bul
+            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            if (participantUserIds.Count == 0) return;
+
+            // Her kullanıcı için güncellenmiş appointment'ı al ve SignalR ile gönder
+            // Performans için: Önce appointment'ın hangi filter'a uyduğunu belirle
+            AppointmentFilter? targetFilter = null;
+            if (appt.Status == AppointmentStatus.Approved || appt.Status == AppointmentStatus.Pending)
+                targetFilter = AppointmentFilter.Active;
+            else if (appt.Status == AppointmentStatus.Completed)
+                targetFilter = AppointmentFilter.Completed;
+            else if (appt.Status == AppointmentStatus.Cancelled || 
+                     appt.Status == AppointmentStatus.Rejected || 
+                     appt.Status == AppointmentStatus.Unanswered)
+                targetFilter = AppointmentFilter.Cancelled;
+
+            foreach (var userId in participantUserIds)
+            {
+                try
+                {
+                    // Eğer target filter belirlenebildiyse sadece onu kontrol et
+                    if (targetFilter.HasValue)
+                    {
+                        var appointments = await appointmentDal.GetAllAppointmentByFilter(userId, targetFilter.Value);
+                        var updatedAppt = appointments.FirstOrDefault(a => a.Id == appt.Id);
+                        
+                        if (updatedAppt != null)
+                        {
+                            await realtime.PushAppointmentUpdatedAsync(userId, updatedAppt);
+                            
+                            // Badge count güncellemesi - appointment güncellemesi sonrası
+                            var badgeSvc = (IBadgeService)realtime.GetType().GetProperty("BadgeService")?.GetValue(realtime);
+                            if (badgeSvc == null)
+                            {
+                                // BadgeService'i dependency injection'dan al
+                                // Burada AppointmentManager'da IBadgeService inject edilmeli
+                                // Şimdilik NotificationManager üzerinden badge güncellemesi yapılacak
+                            }
+                            continue;
+                        }
+                    }
+                    
+                    // Eğer target filter'da bulunamadıysa veya belirlenemediyse tüm filter'ları kontrol et
+                    var allFilters = new[] { AppointmentFilter.Active, AppointmentFilter.Completed, AppointmentFilter.Cancelled };
+                    bool found = false;
+                    
+                    foreach (var filter in allFilters)
+                    {
+                        if (targetFilter.HasValue && filter == targetFilter.Value)
+                            continue; // Zaten kontrol ettik
+                            
+                        var appointments = await appointmentDal.GetAllAppointmentByFilter(userId, filter);
+                        var updatedAppt = appointments.FirstOrDefault(a => a.Id == appt.Id);
+                        
+                        if (updatedAppt != null)
+                        {
+                            await realtime.PushAppointmentUpdatedAsync(userId, updatedAppt);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Hata durumunda devam et, kritik değil
+                }
             }
         }
 

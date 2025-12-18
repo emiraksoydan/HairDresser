@@ -70,8 +70,17 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge güncellemesi transaction commit sonrası yapılacak
-                        // Client tarafında badge invalidate edilecek (SignalR'dan badge.updated event'i gelecek)
+                        // Badge count güncellemesi (recipient için)
+                        try
+                        {
+                            var badges = await badgeService.GetCountsAsync(userId);
+                            if (badges.Success)
+                                await realtime.PushBadgeAsync(userId, badges.Data);
+                        }
+                        catch
+                        {
+                            // Badge güncellemesi başarısız olursa devam et, kritik değil
+                        }
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -112,10 +121,18 @@ namespace Business.Concrete
             // Real-time push - Global exception middleware hataları yakalayacak
             await realtime.PushNotificationAsync(userId, notificationDto);
 
-            // ÖNEMLİ: Badge count güncellemesi transaction commit sonrası yapılmalı
-            // Transaction içinde badge count hesaplanırsa, rollback durumunda yanlış badge gönderilmiş olur
-            // Badge güncellemesi AppointmentManager'da transaction commit sonrası yapılacak
-            // Veya client tarafında badge invalidate edilecek (SignalR'dan badge.updated event'i gelecek)
+            // Badge count güncellemesi (recipient için - actor'a gönderilmiyor)
+            // Transaction commit sonrası badge count doğru hesaplanacak
+            try
+            {
+                var badges = await badgeService.GetCountsAsync(userId);
+                if (badges.Success)
+                    await realtime.PushBadgeAsync(userId, badges.Data);
+            }
+            catch
+            {
+                // Badge güncellemesi başarısız olursa devam et, kritik değil
+            }
 
             return new SuccessDataResult<Guid>(n.Id);
         }
@@ -184,6 +201,120 @@ namespace Business.Concrete
             var badges = await badgeService.GetCountsAsync(userId);
             if (badges.Success)
                 await realtime.PushBadgeAsync(userId, badges.Data);
+
+            return new SuccessDataResult<bool>(true);
+        }
+
+        public async Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(Guid appointmentId, AppointmentStatus status, DecisionStatus? storeDecision = null, DecisionStatus? freeBarberDecision = null)
+        {
+            // Appointment'a ait tüm notification'ları bul (okunmuş/okunmamış fark etmez)
+            var notifications = await notificationDal.GetAll(x => x.AppointmentId == appointmentId);
+            
+            if (notifications == null || !notifications.Any())
+                return new SuccessDataResult<bool>(true);
+
+            var updatedNotifications = new List<NotificationDto>();
+
+            foreach (var n in notifications)
+            {
+                // Payload'ı parse et
+                if (string.IsNullOrEmpty(n.PayloadJson) || n.PayloadJson.Trim() == "{}")
+                    continue;
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(n.PayloadJson);
+                    var root = doc.RootElement;
+                    
+                    // Yeni bir dictionary oluştur
+                    var payloadDict = new Dictionary<string, object?>();
+                    
+                    // Mevcut tüm property'leri kopyala (object ve array'leri de dahil)
+                    foreach (var prop in root.EnumerateObject())
+                    {
+                        // Status ve decision'ları atla, bunları aşağıda güncelleyeceğiz
+                        if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
+                            prop.Name.Equals("storeDecision", StringComparison.OrdinalIgnoreCase) ||
+                            prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+                        
+                        payloadDict[prop.Name] = prop.Value.ValueKind switch
+                        {
+                            System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
+                            System.Text.Json.JsonValueKind.Number => prop.Value.TryGetInt32(out var intVal) ? (object)intVal : prop.Value.GetDecimal(),
+                            System.Text.Json.JsonValueKind.True => true,
+                            System.Text.Json.JsonValueKind.False => false,
+                            System.Text.Json.JsonValueKind.Null => null,
+                            System.Text.Json.JsonValueKind.Object => JsonSerializer.Deserialize<object>(prop.Value.GetRawText()),
+                            System.Text.Json.JsonValueKind.Array => JsonSerializer.Deserialize<object[]>(prop.Value.GetRawText()),
+                            _ => prop.Value.GetRawText()
+                        };
+                    }
+                    
+                    // Status ve decision'ları güncelle
+                    // ÖNEMLİ: Frontend'de enum değerleri number (int) olarak bekleniyor, string değil
+                    payloadDict["status"] = (int)status;
+                    if (storeDecision.HasValue)
+                        payloadDict["storeDecision"] = (int)storeDecision.Value;
+                    if (freeBarberDecision.HasValue)
+                        payloadDict["freeBarberDecision"] = (int)freeBarberDecision.Value;
+                    
+                    // Geri JSON string'e çevir
+                    var options = new JsonSerializerOptions 
+                    { 
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = false 
+                    };
+                    n.PayloadJson = JsonSerializer.Serialize(payloadDict, options);
+                    // UpdatedAt property'si Notification entity'sinde yok, sadece CreatedAt ve ReadAt var
+                    // Bu yüzden UpdatedAt ataması yapmıyoruz
+                    
+                    await notificationDal.Update(n);
+                    
+                    // SignalR ile push et
+                    var dto = new NotificationDto
+                    {
+                        Id = n.Id,
+                        Type = n.Type,
+                        AppointmentId = n.AppointmentId,
+                        Title = n.Title,
+                        Body = n.Body,
+                        PayloadJson = n.PayloadJson,
+                        CreatedAt = n.CreatedAt,
+                        IsRead = n.IsRead
+                    };
+                    
+                    updatedNotifications.Add(dto);
+                }
+                catch
+                {
+                    // Payload parse edilemezse devam et
+                    continue;
+                }
+            }
+
+            // Tüm kullanıcılara güncellenmiş notification'ları push et
+            var userIds = notifications.Select(n => n.UserId).Distinct().ToList();
+            foreach (var userId in userIds)
+            {
+                var userNotifications = updatedNotifications.Where(n => 
+                    notifications.Any(orig => orig.Id == n.Id && orig.UserId == userId)
+                ).ToList();
+                
+                foreach (var dto in userNotifications)
+                {
+                    try
+                    {
+                        await realtime.PushNotificationAsync(userId, dto);
+                    }
+                    catch
+                    {
+                        // SignalR push başarısız olursa devam et
+                    }
+                }
+            }
 
             return new SuccessDataResult<bool>(true);
         }

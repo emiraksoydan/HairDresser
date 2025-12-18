@@ -307,10 +307,13 @@ namespace Business.Concrete
                     payloadStore.IsInFavorites = isStoreFavorite;
                 }
 
-                // FreeBarber favorilerde mi? (FreeBarber ID ile kontrol et, UserId ile değil)
+                // FreeBarber favorilerde mi? 
+                // ÖNEMLİ: IsFavoriteAsync FreeBarber ID'yi de kabul eder ve FreeBarber User ID'ye çevirir
+                // Frontend'de freeBarber.userId (User ID) kullanıldığı için tutarlılık için FreeBarber User ID kullanıyoruz
                 if (payloadFreeBarber != null && freeBarberEntity != null && role != "freebarber")
                 {
-                    var freeBarberFavoriteResult = await favoriteService.IsFavoriteAsync(userId, freeBarberEntity.Id);
+                    // FreeBarber User ID ile kontrol et (frontend ile uyumlu - freeBarber.userId)
+                    var freeBarberFavoriteResult = await favoriteService.IsFavoriteAsync(userId, freeBarberEntity.FreeBarberUserId);
                     isFreeBarberFavorite = freeBarberFavoriteResult.Success && freeBarberFavoriteResult.Data;
                     payloadFreeBarber.IsInFavorites = isFreeBarberFavorite;
                 }
@@ -359,10 +362,10 @@ namespace Business.Concrete
                 );
             }
 
-            // ÖNEMLİ: Badge count güncellemesi transaction commit sonrası yapılmalı
-            // Transaction içinde badge count hesaplanırsa, rollback durumunda yanlış badge gönderilmiş olur
-            // Badge güncellemesi client tarafında yapılacak (SignalR'dan badge.updated event'i gelecek)
-            // Veya transaction commit sonrası bir event mekanizması ile yapılabilir
+            // ÖNEMLİ: Badge count güncellemesi - tüm recipient'lara push et
+            // Transaction commit sonrası badge count doğru hesaplanacak
+            // NotificationManager.CreateAndPushAsync içinde zaten badge push ediliyor
+            // Burada ekstra badge push etmeye gerek yok, çünkü her notification için badge push ediliyor
 
             return new SuccessResult();
         }

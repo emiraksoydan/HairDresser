@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.Resources;
+using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Helpers;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
@@ -24,6 +25,8 @@ namespace Business.Concrete
         private readonly IAppointmentDal _appointmentDal;
         private readonly IManuelBarberDal _manuelBarberDal;
         private readonly IChatService _chatService;
+        private readonly IChatThreadDal _threadDal;
+        private readonly IRealTimePublisher _realtime;
         private readonly DatabaseContext _context;
 
         public FavoriteManager(
@@ -34,6 +37,8 @@ namespace Business.Concrete
             IAppointmentDal appointmentDal,
             IManuelBarberDal manuelBarberDal,
             IChatService chatService,
+            IChatThreadDal threadDal,
+            IRealTimePublisher realtime,
             DatabaseContext context)
         {
             _favoriteDal = favoriteDal;
@@ -43,9 +48,12 @@ namespace Business.Concrete
             _appointmentDal = appointmentDal;
             _manuelBarberDal = manuelBarberDal;
             _chatService = chatService;
+            _threadDal = threadDal;
+            _realtime = realtime;
             _context = context;
         }
 
+        [TransactionScopeAspect]
         public async Task<IDataResult<bool>> ToggleFavoriteAsync(Guid userId, ToggleFavoriteDto dto)
         {
             // TargetId: Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir
@@ -126,12 +134,62 @@ namespace Business.Concrete
                 
                 // Favori aktif edildiyse thread oluştur veya güncelle (thread'ler User ID'ler arasında)
                 // Ancak kendi kendine favori ise thread oluşturma
+                // ÖNEMLİ: Transaction commit edilmeden önce EnsureFavoriteThreadAsync çağrılıyor,
+                // bu yüzden favori henüz DB'de görünmeyebilir. EnsureFavoriteThreadAsync içinde
+                // Store ID kontrolü yapılıyor, bu yüzden sorun olmamalı.
                 if (existingFavorite.IsActive && !isSelfFavorite && targetUserIdForThread != Guid.Empty)
                 {
+                    // Transaction commit et (favori DB'de görünür olsun)
+                    await _context.SaveChangesAsync();
+                    
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
+                    // Bu metod her iki kullanıcıya da thread update push eder
                     await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
                 }
-                // Favori pasif edildiyse thread görünmez olacak (GetThreadsAsync'te aktif favori kontrolü var)
+                // Favori pasif edildiyse thread görünürlüğünü kontrol et
+                else if (!existingFavorite.IsActive && !isSelfFavorite && targetUserIdForThread != Guid.Empty)
+                {
+                    // Karşı taraftan favori aktif mi kontrol et
+                    // ÖNEMLİ: favoritedToId Store ID olabilir, ama targetUserIdForThread Store Owner User ID
+                    // Store için: Store sahibi userId'yi favoriye ekledi mi? (Store Owner User ID -> userId)
+                    // FreeBarber/Customer için: targetUserIdForThread -> userId (User ID -> User ID)
+                    Favorite? reverseFavorite = null;
+                    if (store != null)
+                    {
+                        // Store sahibi userId'yi favoriye ekledi mi kontrol et
+                        // Reverse favori: Store Owner User ID -> userId (User ID -> User ID)
+                        reverseFavorite = await _favoriteDal.GetByUsersAsync(targetUserIdForThread, userId);
+                    }
+                    else
+                    {
+                        // FreeBarber/Customer için User ID ile kontrol et
+                        reverseFavorite = await _favoriteDal.GetByUsersAsync(targetUserIdForThread, userId);
+                    }
+                    
+                    var isReverseFavoriteActive = reverseFavorite != null && reverseFavorite.IsActive;
+                    
+                    // Eğer karşı taraftan da favori yoksa veya pasifse, thread'i kaldır
+                    if (!isReverseFavoriteActive)
+                    {
+                        var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread);
+                        if (thread != null)
+                        {
+                            // Her iki tarafa da threadRemoved gönder
+                            await _realtime.PushChatThreadRemovedAsync(userId, thread.Id);
+                            await _realtime.PushChatThreadRemovedAsync(targetUserIdForThread, thread.Id);
+                        }
+                    }
+                    else
+                    {
+                        // Karşı taraftan favori aktif, thread görünür kalmalı
+                        // Transaction commit et (favori durumu DB'de görünür olsun)
+                        await _context.SaveChangesAsync();
+                        
+                        // Thread'i güncelle (EnsureFavoriteThreadAsync thread güncellemesini yapar)
+                        // Bu metod her iki kullanıcıya da thread update push eder
+                        await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
+                    }
+                }
                 
                 var message = existingFavorite.IsActive 
                     ? Messages.FavoriteAddedSuccess 
@@ -157,8 +215,16 @@ namespace Business.Concrete
                 
                 // Favori eklendiğinde thread oluştur (eğer yoksa) - thread'ler User ID'ler arasında
                 // Ancak kendi kendine favori ise thread oluşturma
+                // ÖNEMLİ: Transaction commit edilmeden önce EnsureFavoriteThreadAsync çağrılıyor,
+                // bu yüzden favori henüz DB'de görünmeyebilir. EnsureFavoriteThreadAsync içinde
+                // Store ID kontrolü yapılıyor, bu yüzden sorun olmamalı.
                 if (!isSelfFavorite && targetUserIdForThread != Guid.Empty)
                 {
+                    // Transaction commit et (favori DB'de görünür olsun)
+                    await _context.SaveChangesAsync();
+                    
+                    // Thread oluştur veya güncelle (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
+                    // Bu metod her iki kullanıcıya da thread update push eder
                     await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
                 }
                 
@@ -421,25 +487,25 @@ namespace Business.Concrete
                 {
                     Id = f.Id,
                     FavoritedFromId = f.FavoritedFromId,
-                    FavoritedToId = f.FavoritedToId, // Artık User ID
+                    FavoritedToId = f.FavoritedToId, // Store ID (Store için), User ID (FreeBarber/Customer için), Store Owner User ID (ManuelBarber için)
                     CreatedAt = f.CreatedAt
                 };
 
-                // Store bilgisi - Artık User ID'ye göre kontrol et
+                // Store bilgisi - FavoritedToId = Store ID (Store için)
                 if (storeDetails.TryGetValue(f.FavoritedToId, out var storeDetail))
                 {
                     dto.TargetType = FavoriteTargetType.Store;
                     dto.TargetName = storeDetail.StoreName;
                     dto.Store = storeDetail;
                 }
-                // FreeBarber bilgisi - Artık User ID'ye göre kontrol et
+                // FreeBarber bilgisi - FavoritedToId = FreeBarber User ID
                 else if (freeBarberDetails.TryGetValue(f.FavoritedToId, out var freeBarberDetail))
                 {
                     dto.TargetType = FavoriteTargetType.FreeBarber;
                     dto.TargetName = freeBarberDetail.FullName;
                     dto.FreeBarber = freeBarberDetail;
                 }
-                // ManuelBarber bilgisi - Artık User ID'ye göre kontrol et
+                // ManuelBarber bilgisi - FavoritedToId = Store Owner User ID (ManuelBarber için)
                 else if (manuelBarberDict.TryGetValue(f.FavoritedToId, out var manuelBarber))
                 {
                     dto.TargetType = FavoriteTargetType.ManuelBarber;
@@ -475,31 +541,35 @@ namespace Business.Concrete
         public async Task<IDataResult<bool>> RemoveFavoriteAsync(Guid userId, Guid targetId)
         {
             // targetId Store ID, FreeBarber ID, Customer User ID veya ManuelBarber ID olabilir
-            // Önce targetId'nin UserId'sini bul
+            // FavoritedToId belirleme: ToggleFavoriteAsync ile aynı mantık
+            // Store için: FavoritedToId = Store ID
+            // FreeBarber için: FavoritedToId = FreeBarber User ID
+            // Customer için: FavoritedToId = Customer User ID
+            // ManuelBarber için: FavoritedToId = Store Owner User ID
             var store = await _barberStoreDal.Get(x => x.Id == targetId);
             var freeBarber = await _freeBarberDal.Get(x => x.Id == targetId);
             var manuelBarber = await _manuelBarberDal.Get(x => x.Id == targetId);
             var customerUser = await _userDal.Get(x => x.Id == targetId);
             
-            Guid targetUserId = Guid.Empty;
+            Guid favoritedToId = Guid.Empty;
             if (store != null)
-                targetUserId = store.BarberStoreOwnerId;
+                favoritedToId = store.Id; // Store ID
             else if (freeBarber != null)
-                targetUserId = freeBarber.FreeBarberUserId;
+                favoritedToId = freeBarber.FreeBarberUserId; // FreeBarber User ID
             else if (customerUser != null)
-                targetUserId = customerUser.Id;
+                favoritedToId = customerUser.Id; // Customer User ID
             else if (manuelBarber != null)
             {
                 var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
                 if (manuelBarberStore != null)
-                    targetUserId = manuelBarberStore.BarberStoreOwnerId;
+                    favoritedToId = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
             }
             
-            if (targetUserId == Guid.Empty)
+            if (favoritedToId == Guid.Empty)
                 return new ErrorDataResult<bool>("Favori bulunamadı.");
             
-            // Artık her zaman User ID'ler arasında kontrol et
-            var favorite = await _favoriteDal.GetByUsersAsync(userId, targetUserId);
+            // FavoritedToId'ye göre kontrol et (Store ID veya User ID)
+            var favorite = await _favoriteDal.Get(x => x.FavoritedFromId == userId && x.FavoritedToId == favoritedToId);
             if (favorite == null)
                 return new ErrorDataResult<bool>("Favori bulunamadı.");
 

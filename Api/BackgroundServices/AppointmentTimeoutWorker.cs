@@ -76,6 +76,7 @@ namespace Api.BackgroundServices
                                  && n.Type == NotificationType.AppointmentCreated)
                         .ToListAsync(stoppingToken);
 
+                    // Mevcut notification'ları güncelle
                     foreach (var notif in existingNotifications)
                     {
                         notif.Type = NotificationType.AppointmentUnanswered;
@@ -151,12 +152,21 @@ namespace Api.BackgroundServices
                         }
                     }
 
-                    // ÖNEMLİ: Yeni AppointmentUnanswered notification göndermeye gerek yok
-                    // Çünkü eski AppointmentCreated notification'ları zaten AppointmentUnanswered'e çevrildi
-                    // ve SignalR ile push edildi. Yeni notification göndermek duplicate'a yol açar.
-                    // Eğer hiç notification yoksa (nadir durum), o zaman gönderilebilir ama 
-                    // genelde her participant için AppointmentCreated notification'ı zaten var.
-                    // Bu yüzden yeni notification göndermiyoruz.
+                    // ÖNEMLİ: Eğer hiç notification yoksa (nadir durum), yeni AppointmentUnanswered notification gönder
+                    // Çünkü mevcut notification'ları güncelledik ama eğer hiç notification yoksa,
+                    // ilgili kişilere bildirim gitmemiş olabilir. Bu durumda NotifyAsync ile yeni notification'lar gönder.
+                    if (existingNotifications.Count == 0)
+                    {
+                        try
+                        {
+                            _logger.LogInformation("AppointmentTimeoutWorker: No existing notifications found for appointment {AppointmentId}, sending new AppointmentUnanswered notifications", appt.Id);
+                            await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", appt.Id);
+                        }
+                    }
                 }
 
                 if (expired.Count > 0)
