@@ -54,7 +54,7 @@ namespace Business.Concrete
         }
 
         [TransactionScopeAspect]
-        public async Task<IDataResult<bool>> ToggleFavoriteAsync(Guid userId, ToggleFavoriteDto dto)
+        public async Task<IDataResult<ToggleFavoriteResponseDto>> ToggleFavoriteAsync(Guid userId, ToggleFavoriteDto dto)
         {
             // TargetId: Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir
             // Önce Store ID kontrolü
@@ -65,18 +65,18 @@ namespace Business.Concrete
             
             // Eğer hiçbiri değilse hata
             if (store == null && freeBarber == null && manuelBarber == null && customerUser == null)
-                return new ErrorDataResult<bool>(Messages.TargetUserNotFound);
+                return new ErrorDataResult<ToggleFavoriteResponseDto>(Messages.TargetUserNotFound);
 
             // Eğer appointmentId varsa (randevu sayfasından geliyorsa), appointment kontrolü yap
             if (dto.AppointmentId.HasValue)
             {
                 var appointment = await _appointmentDal.Get(x => x.Id == dto.AppointmentId.Value);
                 if (appointment == null)
-                    return new ErrorDataResult<bool>(Messages.AppointmentNotFound);
+                    return new ErrorDataResult<ToggleFavoriteResponseDto>(Messages.AppointmentNotFound);
 
                 // Randevu sayfasından geliyorsa, sadece Completed veya Cancelled olmalı
                 if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled && appointment.Status != AppointmentStatus.Rejected && appointment.Status != AppointmentStatus.Unanswered)
-                    return new ErrorDataResult<bool>("Randevu sayfasından favorileme için randevunuzun sonuçlanması gerekir.");
+                    return new ErrorDataResult<ToggleFavoriteResponseDto>("Randevu sayfasından favorileme için randevunuzun sonuçlanması gerekir.");
             }
 
             // FavoritedToId belirleme:
@@ -114,7 +114,7 @@ namespace Business.Concrete
             }
 
             if (favoritedToId == Guid.Empty)
-                return new ErrorDataResult<bool>(Messages.TargetUserNotFound);
+                return new ErrorDataResult<ToggleFavoriteResponseDto>(Messages.TargetUserNotFound);
             
             // Kendi kendine favori eklenebilir (Store sahibi kendi dükkanını, FreeBarber kendi panelini favoriye ekleyebilir)
             // Ancak thread oluşturulmaz (kendi kendine mesajlaşma mantıklı değil)
@@ -143,7 +143,7 @@ namespace Business.Concrete
                     await _context.SaveChangesAsync();
                     
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
-                    // Bu metod her iki kullanıcıya da thread update push eder
+                    // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
                     await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
                 }
                 // Favori pasif edildiyse thread görünürlüğünü kontrol et
@@ -156,9 +156,19 @@ namespace Business.Concrete
                     Favorite? reverseFavorite = null;
                     if (store != null)
                     {
-                        // Store sahibi userId'yi favoriye ekledi mi kontrol et
-                        // Reverse favori: Store Owner User ID -> userId (User ID -> User ID)
+                        // Store için: Store sahibi (targetUserIdForThread) userId'yi favoriye ekledi mi?
+                        // Önce User ID -> User ID kontrolü yap
                         reverseFavorite = await _favoriteDal.GetByUsersAsync(targetUserIdForThread, userId);
+                        
+                        // Eğer bulunamazsa, Store ID -> userId kontrolü yap (store sahibi kendi store'unu favoriye eklemiş olabilir)
+                        if (reverseFavorite == null || !reverseFavorite.IsActive)
+                        {
+                            var storeFavorite = await _favoriteDal.Get(x => x.FavoritedFromId == targetUserIdForThread && x.FavoritedToId == favoritedToId && x.IsActive);
+                            if (storeFavorite != null)
+                            {
+                                reverseFavorite = storeFavorite;
+                            }
+                        }
                     }
                     else
                     {
@@ -191,11 +201,38 @@ namespace Business.Concrete
                     }
                 }
                 
+                // FavoriteCount hesapla (aktif favoriler)
+                int favoriteCount = 0;
+                if (store != null)
+                {
+                    // Store için: FavoritedToId = Store ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                else if (freeBarber != null || customerUser != null)
+                {
+                    // FreeBarber/Customer için: FavoritedToId = User ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                else if (manuelBarber != null)
+                {
+                    // ManuelBarber için: favoritedToId = Store Owner User ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                
                 var message = existingFavorite.IsActive 
                     ? Messages.FavoriteAddedSuccess 
                     : Messages.FavoriteRemovedSuccess;
+                
+                var response = new ToggleFavoriteResponseDto
+                {
+                    IsFavorite = existingFavorite.IsActive,
+                    FavoriteCount = favoriteCount
+                };
                     
-                return new SuccessDataResult<bool>(existingFavorite.IsActive, message);
+                return new SuccessDataResult<ToggleFavoriteResponseDto>(response, message);
             }
             else
             {
@@ -223,12 +260,39 @@ namespace Business.Concrete
                     // Transaction commit et (favori DB'de görünür olsun)
                     await _context.SaveChangesAsync();
                     
-                    // Thread oluştur veya güncelle (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
-                    // Bu metod her iki kullanıcıya da thread update push eder
+                    // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
+                    // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
                     await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
                 }
                 
-                return new SuccessDataResult<bool>(true, Messages.FavoriteAddedSuccess);
+                // FavoriteCount hesapla (aktif favoriler)
+                int favoriteCount = 0;
+                if (store != null)
+                {
+                    // Store için: FavoritedToId = Store ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                else if (freeBarber != null || customerUser != null)
+                {
+                    // FreeBarber/Customer için: FavoritedToId = User ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                else if (manuelBarber != null)
+                {
+                    // ManuelBarber için: favoritedToId = Store Owner User ID
+                    favoriteCount = await _context.Favorites
+                        .CountAsync(f => f.FavoritedToId == favoritedToId && f.IsActive);
+                }
+                
+                var response = new ToggleFavoriteResponseDto
+                {
+                    IsFavorite = true,
+                    FavoriteCount = favoriteCount
+                };
+                
+                return new SuccessDataResult<ToggleFavoriteResponseDto>(response, Messages.FavoriteAddedSuccess);
             }
         }
 

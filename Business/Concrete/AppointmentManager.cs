@@ -1099,31 +1099,43 @@ namespace Business.Concrete
         {
             if (appt.Id == Guid.Empty) return;
 
-            // Thread'i bul
+            // Thread'i bul (henüz oluşturulmamış olabilir - mesaj gönderilmemişse)
             var thread = await threadDal.Get(t => t.AppointmentId == appt.Id);
-            if (thread == null) return;
+            
+            // Katılımcıları belirle (appointment'tan al, thread'den değil - thread null olabilir)
+            var participants = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
 
             // Durum artık Pending/Approved değilse thread'i kaldır
             if (appt.Status != AppointmentStatus.Pending && appt.Status != AppointmentStatus.Approved)
             {
-                // Katılımcılara thread kaldırıldığını bildir
-                var participants = new[] { thread.CustomerUserId, thread.StoreOwnerUserId, thread.FreeBarberUserId }
-                    .Where(x => x.HasValue)
-                    .Select(x => x!.Value)
-                    .Distinct()
-                    .ToList();
-
-                foreach (var userId in participants)
+                // Thread varsa kaldır
+                if (thread != null)
                 {
-                    await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
+                    // Tüm katılımcılara thread kaldırıldığını bildir
+                    foreach (var userId in participants)
+                    {
+                        await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
+                    }
                 }
+                // Thread yoksa (henüz oluşturulmamış) hiçbir şey yapmaya gerek yok
+                // Çünkü SendMessageAsync'te zaten status kontrolü var ve Pending/Approved değilse mesaj gönderilmez
             }
             else
             {
                 // Durum hala Pending/Approved ise thread'i güncelle (status değişmiş olabilir)
-                // PushAppointmentThreadUpdatedAsync ile thread güncellemesini gönder
-                // Bu metod tüm katılımcılara thread update push eder
-                await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
+                // Thread varsa güncelle
+                if (thread != null)
+                {
+                    // PushAppointmentThreadUpdatedAsync ile thread güncellemesini gönder
+                    // Bu metod tüm katılımcılara thread update push eder
+                    await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
+                }
+                // Thread yoksa henüz oluşturulmamış demektir (mesaj gönderilmemiş)
+                // Thread oluşturulduğunda (ilk mesaj gönderildiğinde) zaten doğru durumda olacak
             }
         }
 
