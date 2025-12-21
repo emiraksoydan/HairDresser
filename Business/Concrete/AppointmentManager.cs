@@ -27,7 +27,8 @@ namespace Business.Concrete
         INotificationService notificationService,
         IRealTimePublisher realtime,
         IChatService chatService,
-        IOptions<AppointmentSettings> appointmentSettings
+        IOptions<AppointmentSettings> appointmentSettings,
+        IBadgeUpdateService badgeUpdateService
     ) : IAppointmentService
     {
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
@@ -214,6 +215,9 @@ namespace Business.Concrete
             // notify: created (appointment entity'sini direkt geçiyoruz - transaction içinde olduğu için)
             var result = await notifySvc.NotifyWithAppointmentAsync(appt, NotificationType.AppointmentCreated, actorUserId: customerUserId);
 
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
 
@@ -308,6 +312,9 @@ namespace Business.Concrete
             // notify: created (appointment entity'sini direkt geçiyoruz - transaction içinde olduğu için)
             await notifySvc.NotifyWithAppointmentAsync(appt, NotificationType.AppointmentCreated, actorUserId: freeBarberUserId);
 
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
 
@@ -390,6 +397,9 @@ namespace Business.Concrete
 
             // notify: created (appointment entity'sini direkt geçiyoruz - transaction içinde olduğu için)
             await notifySvc.NotifyWithAppointmentAsync(appt, NotificationType.AppointmentCreated, actorUserId: storeOwnerUserId);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -526,6 +536,9 @@ namespace Business.Concrete
             {
                 // Chat mesajı gönderilemezse devam et, kritik değil
             }
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -680,6 +693,9 @@ namespace Business.Concrete
             // Decision güncellendiğinde ilgili kullanıcılara appointment güncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<bool>(true);
         }
 
@@ -729,6 +745,9 @@ namespace Business.Concrete
             
             // İlgili kullanıcılara appointment güncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -789,6 +808,9 @@ namespace Business.Concrete
             
             // İlgili kullanıcılara appointment güncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -957,22 +979,15 @@ namespace Business.Concrete
             }
         }
 
-        private async Task<IResult> SetFreeBarberAvailabilityAsync(Guid freeBarberUserId, bool isAvailable)
-        {
-            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
-            if (fb is null) return new ErrorResult(Messages.FreeBarberNotFound);
-
-            fb.IsAvailable = isAvailable;
-            fb.UpdatedAt = DateTime.UtcNow;
-
-            await freeBarberDal.Update(fb);
-            return new SuccessResult();
-        }
-
         private async Task ReleaseFreeBarberIfNeededAsync(Guid? freeBarberUserId)
         {
             if (!freeBarberUserId.HasValue) return;
-            await SetFreeBarberAvailabilityAsync(freeBarberUserId.Value, true);
+            
+            // FreeBarber entity'sini al ve overload metodunu kullan (daha verimli)
+            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId.Value);
+            if (fb is null) return;
+            
+            await SetFreeBarberAvailabilityAsync(fb, true);
         }
 
         //  thread create + push

@@ -16,7 +16,8 @@ namespace Business.Concrete
 {
     public class NotificationManager(INotificationDal notificationDal,
         IBadgeService badgeService,
-        IRealTimePublisher realtime) : INotificationService
+        IRealTimePublisher realtime,
+        IBadgeUpdateService badgeUpdateService) : INotificationService
     {
         // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
         // (AppointmentManager içindeki TransactionScopeAspect içinde)
@@ -66,17 +67,8 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge count güncellemesi (recipient için)
-                        try
-                        {
-                            var badges = await badgeService.GetCountsAsync(userId);
-                            if (badges.Success)
-                                await realtime.PushBadgeAsync(userId, badges.Data);
-                        }
-                        catch
-                        {
-                            // Badge güncellemesi başarısız olursa devam et, kritik değil
-                        }
+                        // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existingAny.Id);
                     }
@@ -125,17 +117,8 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge count güncellemesi (recipient için)
-                        try
-                        {
-                            var badges = await badgeService.GetCountsAsync(userId);
-                            if (badges.Success)
-                                await realtime.PushBadgeAsync(userId, badges.Data);
-                        }
-                        catch
-                        {
-                            // Badge güncellemesi başarısız olursa devam et, kritik değil
-                        }
+                        // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -176,18 +159,9 @@ namespace Business.Concrete
             // Real-time push - Global exception middleware hataları yakalayacak
             await realtime.PushNotificationAsync(userId, notificationDto);
 
-            // Badge count güncellemesi (recipient için - actor'a gönderilmiyor)
-            // Transaction commit sonrası badge count doğru hesaplanacak
-            try
-            {
-                var badges = await badgeService.GetCountsAsync(userId);
-                if (badges.Success)
-                    await realtime.PushBadgeAsync(userId, badges.Data);
-            }
-            catch
-            {
-                // Badge güncellemesi başarısız olursa devam et, kritik değil
-            }
+            // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
+            // Bu sayede notification DB'ye yazıldıktan sonra badge count doğru hesaplanacak
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<Guid>(n.Id);
         }
@@ -227,10 +201,8 @@ namespace Business.Concrete
 
             await notificationDal.Update(n);
 
-            // Badge güncelle ve SignalR ile tetikle
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-                await realtime.PushBadgeAsync(userId, badges.Data);
+            // Badge update'i schedule et (transaction commit sonrası çalışacak)
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -252,10 +224,8 @@ namespace Business.Concrete
             
             await notificationDal.UpdateRange(notifications);
 
-            // Badge güncelle ve SignalR ile tetikle
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-                await realtime.PushBadgeAsync(userId, badges.Data);
+            // Badge update'i schedule et (transaction commit sonrası çalışacak)
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }

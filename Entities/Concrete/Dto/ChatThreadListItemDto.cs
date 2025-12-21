@@ -27,6 +27,9 @@ namespace Entities.Concrete.Dto
 
         public int UnreadCount { get; set; }
         
+        // Mevcut kullanıcının profil resmi (mesaj balonlarında göstermek için)
+        public string? CurrentUserImageUrl { get; set; }
+        
         // Thread'deki diğer kullanıcıların bilgileri (mesajlaştığı kişiler)
         public List<ChatThreadParticipantDto> Participants { get; set; } = new List<ChatThreadParticipantDto>();
     }

@@ -174,6 +174,44 @@ namespace Business.Concrete
 
             var result = new List<ChatThreadListItemDto>();
 
+            // Mevcut kullanıcının UserType'ını al
+            var currentUser = await userDal.Get(u => u.Id == userId);
+            if (currentUser == null)
+                return new ErrorDataResult<List<ChatThreadListItemDto>>("Kullanıcı bulunamadı");
+            var currentUserType = currentUser.UserType;
+            
+            // Mevcut kullanıcının profil resmini al
+            string? currentUserImageUrl = null;
+            if (currentUserType == UserType.Customer)
+            {
+                // Customer için User image
+                if (currentUser.ImageId.HasValue)
+                {
+                    var userImg = await imageDal.GetLatestImageAsync(currentUser.Id, ImageOwnerType.User);
+                    currentUserImageUrl = userImg?.ImageUrl;
+                }
+            }
+            else if (currentUserType == UserType.BarberStore)
+            {
+                // BarberStore için Store image
+                var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == userId);
+                if (userStore != null)
+                {
+                    var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
+                    currentUserImageUrl = storeImg?.ImageUrl;
+                }
+            }
+            else if (currentUserType == UserType.FreeBarber)
+            {
+                // FreeBarber için FreeBarber image
+                var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == userId);
+                if (userFreeBarber != null)
+                {
+                    var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
+                    currentUserImageUrl = freeBarberImg?.ImageUrl;
+                }
+            }
+
             // Randevu thread'leri için işlem
             if (appointmentThreads.Any())
             {
@@ -266,63 +304,84 @@ namespace Business.Concrete
                     // Status'u appointment'tan güncelle (threadDto.Status zaten appointment'tan geliyor ama güncel olması için)
                     threadDto.Status = appt.Status;
 
-                    // Participants listesini doldur
+                    // Participants listesini doldur - ÖNEMLİ: Sadece kendi userId'miz hariç diğer participant'ları göster
                     threadDto.Participants = new List<ChatThreadParticipantDto>();
 
-                    // Customer
-                    if (appt.CustomerUserId.HasValue && appt.CustomerUserId != userId)
+                    // Customer - sadece kendimiz değilsek ekle
+                    if (appt.CustomerUserId.HasValue && appt.CustomerUserId.Value != userId)
                     {
                         if (userDict.TryGetValue(appt.CustomerUserId.Value, out var customer))
                         {
-                            var imageUrl = customer.ImageId.HasValue && userImageDict.TryGetValue(customer.ImageId.Value, out var img) ? img.ImageUrl : null;
-                            threadDto.Participants.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (threadEntity.CustomerUserId == appt.CustomerUserId.Value)
                             {
-                                UserId = customer.Id,
-                                DisplayName = $"{customer.FirstName} {customer.LastName}",
-                                ImageUrl = imageUrl,
-                                UserType = customer.UserType,
-                                BarberType = null
-                            });
-                        }
-                    }
-
-                    // Store
-                    if (appt.BarberStoreUserId.HasValue && appt.BarberStoreUserId != userId && store != null)
-                    {
-                        var imageUrl = storeImageDict.TryGetValue(store.Id, out var imgUrl) ? imgUrl : null;
-                        if (userDict.TryGetValue(store.BarberStoreOwnerId, out var storeOwner))
-                        {
-                            threadDto.Participants.Add(new ChatThreadParticipantDto
-                            {
-                                UserId = storeOwner.Id,
-                                DisplayName = store.StoreName,
-                                ImageUrl = imageUrl,
-                                UserType = UserType.BarberStore,
-                                BarberType = store.Type
-                            });
-                        }
-                    }
-
-                    // FreeBarber
-                    if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId != userId)
-                    {
-                        var freeBarber = freeBarbers.FirstOrDefault(fb => fb.FreeBarberUserId == appt.FreeBarberUserId.Value);
-                        if (freeBarber != null)
-                        {
-                            var imageUrl = freeBarberImageDict.TryGetValue(freeBarber.Id, out var imgUrl) ? imgUrl : null;
-                            if (userDict.TryGetValue(freeBarber.FreeBarberUserId, out var fbUser))
-                            {
+                                var imageUrl = customer.ImageId.HasValue && userImageDict.TryGetValue(customer.ImageId.Value, out var img) ? img.ImageUrl : null;
                                 threadDto.Participants.Add(new ChatThreadParticipantDto
                                 {
-                                    UserId = fbUser.Id,
-                                    DisplayName = $"{freeBarber.FirstName} {freeBarber.LastName}",
+                                    UserId = customer.Id,
+                                    DisplayName = $"{customer.FirstName} {customer.LastName}",
                                     ImageUrl = imageUrl,
-                                    UserType = UserType.FreeBarber,
-                                    BarberType = freeBarber.Type
+                                    UserType = customer.UserType,
+                                    BarberType = null
                                 });
                             }
                         }
                     }
+
+                    // Store - sadece kendimiz değilsek ekle
+                    if (appt.BarberStoreUserId.HasValue && store != null)
+                    {
+                        // Store sahibi userId'si ile karşılaştır
+                        if (store.BarberStoreOwnerId != userId)
+                        {
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (threadEntity.StoreOwnerUserId == store.BarberStoreOwnerId || 
+                                (threadEntity.StoreOwnerUserId.HasValue && threadEntity.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
+                            {
+                                var imageUrl = storeImageDict.TryGetValue(store.Id, out var imgUrl) ? imgUrl : null;
+                                if (userDict.TryGetValue(store.BarberStoreOwnerId, out var storeOwner))
+                                {
+                                    threadDto.Participants.Add(new ChatThreadParticipantDto
+                                    {
+                                        UserId = storeOwner.Id,
+                                        DisplayName = store.StoreName,
+                                        ImageUrl = imageUrl,
+                                        UserType = UserType.BarberStore,
+                                        BarberType = store.Type
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // FreeBarber - sadece kendimiz değilsek ekle
+                    if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId.Value != userId)
+                    {
+                        var freeBarber = freeBarbers.FirstOrDefault(fb => fb.FreeBarberUserId == appt.FreeBarberUserId.Value);
+                        if (freeBarber != null)
+                        {
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (threadEntity.FreeBarberUserId == freeBarber.FreeBarberUserId || 
+                                (threadEntity.FreeBarberUserId.HasValue && threadEntity.FreeBarberUserId.Value == freeBarber.FreeBarberUserId))
+                            {
+                                var imageUrl = freeBarberImageDict.TryGetValue(freeBarber.Id, out var imgUrl) ? imgUrl : null;
+                                if (userDict.TryGetValue(freeBarber.FreeBarberUserId, out var fbUser))
+                                {
+                                    threadDto.Participants.Add(new ChatThreadParticipantDto
+                                    {
+                                        UserId = fbUser.Id,
+                                        DisplayName = $"{freeBarber.FirstName} {freeBarber.LastName}",
+                                        ImageUrl = imageUrl,
+                                        UserType = UserType.FreeBarber,
+                                        BarberType = freeBarber.Type
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    // Mevcut kullanıcının profil resmini ekle
+                    threadDto.CurrentUserImageUrl = currentUserImageUrl;
 
                     result.Add(threadDto);
                 }
@@ -392,6 +451,7 @@ namespace Business.Concrete
                     string? imageUrl = null;
                     BarberType? barberType = null;
                     Guid participantUserId = Guid.Empty;
+                    UserType participantUserType;
 
                     // Store bazlı thread'ler için Store bilgisini göster
                     if (threadEntity.StoreId.HasValue)
@@ -399,11 +459,56 @@ namespace Business.Concrete
                         var store = await barberStoreDal.Get(x => x.Id == threadEntity.StoreId.Value);
                         if (store != null)
                         {
-                            displayName = store.StoreName;
-                            barberType = store.Type;
-                            var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
-                            imageUrl = img?.ImageUrl;
-                            participantUserId = store.BarberStoreOwnerId;
+                            // ÖNEMLİ: Store sahibi kendisi ise, participant olarak diğer kullanıcıyı göster
+                            if (store.BarberStoreOwnerId == userId)
+                            {
+                                // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
+                                var otherUserId = threadEntity.FavoriteFromUserId == userId 
+                                    ? threadEntity.FavoriteToUserId!.Value 
+                                    : threadEntity.FavoriteFromUserId!.Value;
+                                
+                                var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                                if (otherUser == null) continue;
+                                
+                                participantUserId = otherUser.Id;
+                                participantUserType = otherUser.UserType;
+                                
+                                if (otherUser.UserType == UserType.Customer)
+                                {
+                                    displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                                    if (otherUser.ImageId.HasValue)
+                                    {
+                                        var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                    barberType = null;
+                                }
+                                else if (otherUser.UserType == UserType.FreeBarber)
+                                {
+                                    var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                                    if (freeBarber != null)
+                                    {
+                                        displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                                        barberType = freeBarber.Type;
+                                        var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                }
+                                else
+                                {
+                                    continue; // Beklenmeyen durum
+                                }
+                            }
+                            else
+                            {
+                                // Store sahibi başka biri - Store bilgisini göster
+                                displayName = store.StoreName;
+                                barberType = store.Type;
+                                var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                                imageUrl = img?.ImageUrl;
+                                participantUserId = store.BarberStoreOwnerId;
+                                participantUserType = UserType.BarberStore;
+                            }
                         }
                         else
                         {
@@ -422,6 +527,7 @@ namespace Business.Concrete
                         if (otherUser == null) continue;
 
                         participantUserId = otherUser.Id;
+                        participantUserType = otherUser.UserType;
 
                         if (otherUser.UserType == UserType.Customer)
                         {
@@ -431,6 +537,7 @@ namespace Business.Concrete
                                 var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
                                 imageUrl = img?.ImageUrl;
                             }
+                            barberType = null;
                         }
                         else if (otherUser.UserType == UserType.BarberStore)
                         {
@@ -454,13 +561,21 @@ namespace Business.Concrete
                                 imageUrl = img?.ImageUrl;
                             }
                         }
+                        else
+                        {
+                            continue; // Beklenmeyen durum
+                        }
                     }
 
                     threadDto.Title = displayName;
                     
                     // Participant bilgilerini ayarla
-                    var participantUser = await userDal.Get(u => u.Id == participantUserId);
-                    if (participantUser == null) continue;
+                    // ÖNEMLİ: participantUserId kendi userId'miz değil, diğer kullanıcının userId'si olmalı
+                    if (participantUserId == userId || participantUserId == Guid.Empty)
+                    {
+                        // Kendi bilgilerimiz participant olarak eklenmiş veya geçersiz - bu yanlış, atla
+                        continue;
+                    }
                     
                     threadDto.Participants = new List<ChatThreadParticipantDto>
                     {
@@ -469,10 +584,13 @@ namespace Business.Concrete
                             UserId = participantUserId,
                             DisplayName = displayName,
                             ImageUrl = imageUrl,
-                            UserType = threadEntity.StoreId.HasValue ? UserType.BarberStore : participantUser.UserType,
+                            UserType = participantUserType,
                             BarberType = barberType
                         }
                     };
+
+                    // Mevcut kullanıcının profil resmini ekle
+                    threadDto.CurrentUserImageUrl = currentUserImageUrl;
 
                     activeFavoriteThreads.Add(threadDto);
                 }
@@ -874,47 +992,125 @@ namespace Business.Concrete
             {
                 try
                 {
-                    // Favori thread detaylarını oluştur
-                    var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                        ? thread.FavoriteToUserId!.Value 
-                        : thread.FavoriteFromUserId!.Value;
-
-                    var otherUser = await userDal.Get(u => u.Id == otherUserId);
-                    if (otherUser == null) continue;
-
                     string displayName = "";
                     string? imageUrl = null;
                     BarberType? barberType = null;
+                    Guid participantUserId = Guid.Empty;
+                    UserType participantUserType;
 
-                    if (otherUser.UserType == UserType.Customer)
+                    // Store bazlı thread'ler için Store bilgisini göster
+                    if (storeId.HasValue)
                     {
-                        displayName = $"{otherUser.FirstName} {otherUser.LastName}";
-                        if (otherUser.ImageId.HasValue)
-                        {
-                            var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
-                            imageUrl = img?.ImageUrl;
-                        }
-                    }
-                    else if (otherUser.UserType == UserType.BarberStore)
-                    {
-                        var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                        var store = await barberStoreDal.Get(x => x.Id == storeId.Value);
                         if (store != null)
                         {
-                            displayName = store.StoreName;
-                            barberType = store.Type;
-                            var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
-                            imageUrl = img?.ImageUrl;
+                            // ÖNEMLİ: Store sahibi kendisi ise, participant olarak diğer kullanıcıyı göster
+                            if (store.BarberStoreOwnerId == recipientUserId)
+                            {
+                                // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
+                                var otherUserId = thread.FavoriteFromUserId == recipientUserId 
+                                    ? thread.FavoriteToUserId!.Value 
+                                    : thread.FavoriteFromUserId!.Value;
+                                
+                                var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                                if (otherUser == null) continue;
+                                
+                                participantUserId = otherUser.Id;
+                                
+                                if (otherUser.UserType == UserType.Customer)
+                                {
+                                    displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                                    if (otherUser.ImageId.HasValue)
+                                    {
+                                        var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                    barberType = null;
+                                    participantUserType = UserType.Customer;
+                                }
+                                else if (otherUser.UserType == UserType.FreeBarber)
+                                {
+                                    var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                                    if (freeBarber != null)
+                                    {
+                                        displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                                        barberType = freeBarber.Type;
+                                        var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                    participantUserType = UserType.FreeBarber;
+                                }
+                                else
+                                {
+                                    continue; // Beklenmeyen durum
+                                }
+                            }
+                            else
+                            {
+                                // Store sahibi başka biri - Store bilgisini göster
+                                displayName = store.StoreName;
+                                barberType = store.Type;
+                                var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                                imageUrl = img?.ImageUrl;
+                                participantUserId = store.BarberStoreOwnerId;
+                                participantUserType = UserType.BarberStore;
+                            }
+                        }
+                        else
+                        {
+                            continue; // Store bulunamadı, thread'i atla
                         }
                     }
-                    else if (otherUser.UserType == UserType.FreeBarber)
+                    else
                     {
-                        var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
-                        if (freeBarber != null)
+                        // Store bazlı değil, User ID bazlı thread
+                        var otherUserId = thread.FavoriteFromUserId == recipientUserId 
+                            ? thread.FavoriteToUserId!.Value 
+                            : thread.FavoriteFromUserId!.Value;
+
+                        var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                        if (otherUser == null) continue;
+
+                        participantUserId = otherUser.Id;
+
+                        if (otherUser.UserType == UserType.Customer)
                         {
-                            displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
-                            barberType = freeBarber.Type;
-                            var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
-                            imageUrl = img?.ImageUrl;
+                            displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                            if (otherUser.ImageId.HasValue)
+                            {
+                                var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            barberType = null;
+                            participantUserType = UserType.Customer;
+                        }
+                        else if (otherUser.UserType == UserType.BarberStore)
+                        {
+                            var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                            if (store != null)
+                            {
+                                displayName = store.StoreName;
+                                barberType = store.Type;
+                                var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            participantUserType = UserType.BarberStore;
+                        }
+                        else if (otherUser.UserType == UserType.FreeBarber)
+                        {
+                            var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                            if (freeBarber != null)
+                            {
+                                displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                                barberType = freeBarber.Type;
+                                var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            participantUserType = UserType.FreeBarber;
+                        }
+                        else
+                        {
+                            continue; // Beklenmeyen durum
                         }
                     }
 
@@ -927,6 +1123,36 @@ namespace Business.Concrete
                     else if (thread.FreeBarberUserId == recipientUserId)
                         unreadCount = thread.FreeBarberUnreadCount;
 
+                    // Mevcut kullanıcının (recipientUserId) profil resmini al
+                    string? currentUserImageUrlForRecipient = null;
+                    var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
+                    if (recipientUser != null)
+                    {
+                        if (recipientUser.UserType == UserType.Customer)
+                        {
+                            var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
+                            currentUserImageUrlForRecipient = userImg?.ImageUrl;
+                        }
+                        else if (recipientUser.UserType == UserType.BarberStore)
+                        {
+                            var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
+                            if (userStore != null)
+                            {
+                                var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
+                                currentUserImageUrlForRecipient = storeImg?.ImageUrl;
+                            }
+                        }
+                        else if (recipientUser.UserType == UserType.FreeBarber)
+                        {
+                            var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
+                            if (userFreeBarber != null)
+                            {
+                                var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
+                                currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
+                            }
+                        }
+                    }
+
                     var threadDto = new ChatThreadListItemDto
                     {
                         ThreadId = thread.Id,
@@ -937,14 +1163,15 @@ namespace Business.Concrete
                         LastMessagePreview = thread.LastMessagePreview,
                         LastMessageAt = thread.LastMessageAt,
                         UnreadCount = unreadCount,
+                        CurrentUserImageUrl = currentUserImageUrlForRecipient,
                         Participants = new List<ChatThreadParticipantDto>
                         {
                             new ChatThreadParticipantDto
                             {
-                                UserId = otherUser.Id,
+                                UserId = participantUserId,
                                 DisplayName = displayName,
                                 ImageUrl = imageUrl,
-                                UserType = otherUser.UserType,
+                                UserType = participantUserType,
                                 BarberType = barberType
                             }
                         }
@@ -985,6 +1212,10 @@ namespace Business.Concrete
                 .Distinct()
                 .ToList();
 
+            // Tüm katılımcıların UserType'larını al (participant bilgilerini doğru göstermek için)
+            var participantUsers = await userDal.GetAll(u => participants.Contains(u.Id));
+            var participantUserTypeDict = participantUsers.ToDictionary(u => u.Id, u => u.UserType);
+
             // Store bilgisi
             BarberStore? store = null;
             if (appt.BarberStoreUserId.HasValue)
@@ -1048,57 +1279,72 @@ namespace Business.Concrete
                 {
                     var title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
 
-                    // Participants listesini oluştur
+                    // Participants listesini oluştur - ÖNEMLİ: Sadece kendi userId'miz hariç diğer participant'ları göster
                     var participantsList = new List<ChatThreadParticipantDto>();
 
-                    // Customer participant
+                    // Customer participant - sadece kendimiz değilsek ekle
                     if (appt.CustomerUserId.HasValue && appt.CustomerUserId.Value != userId)
                     {
                         if (userDict.TryGetValue(appt.CustomerUserId.Value, out var customerUser))
                         {
-                            userImageDict.TryGetValue(customerUser.Id, out var customerImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.CustomerUserId == appt.CustomerUserId.Value)
                             {
-                                UserId = customerUser.Id,
-                                DisplayName = $"{customerUser.FirstName} {customerUser.LastName}",
-                                ImageUrl = customerImageUrl,
-                                UserType = customerUser.UserType,
-                                BarberType = null
-                            });
+                                userImageDict.TryGetValue(customerUser.Id, out var customerImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = customerUser.Id,
+                                    DisplayName = $"{customerUser.FirstName} {customerUser.LastName}",
+                                    ImageUrl = customerImageUrl,
+                                    UserType = customerUser.UserType,
+                                    BarberType = null
+                                });
+                            }
                         }
                     }
 
-                    // Store participant
-                    if (appt.BarberStoreUserId.HasValue && appt.BarberStoreUserId.Value != userId)
+                    // Store participant - sadece kendimiz değilsek ekle
+                    if (appt.BarberStoreUserId.HasValue && store != null)
                     {
-                        if (storeDict.TryGetValue(appt.BarberStoreUserId.Value, out var storeEntity))
+                        // Store sahibi userId'si ile karşılaştır - ÖNEMLİ: Kendi store bilgilerimizi değil, karşı tarafın bilgilerini göster
+                        if (store.BarberStoreOwnerId != userId)
                         {
-                            storeImageDict.TryGetValue(storeEntity.Id, out var storeImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.StoreOwnerUserId == store.BarberStoreOwnerId || 
+                                (thread.StoreOwnerUserId.HasValue && thread.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
                             {
-                                UserId = appt.BarberStoreUserId.Value,
-                                DisplayName = storeEntity.StoreName,
-                                ImageUrl = storeImageUrl,
-                                UserType = UserType.BarberStore,
-                                BarberType = storeEntity.Type
-                            });
+                                storeImageDict.TryGetValue(store.Id, out var storeImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = store.BarberStoreOwnerId,
+                                    DisplayName = store.StoreName,
+                                    ImageUrl = storeImageUrl,
+                                    UserType = UserType.BarberStore,
+                                    BarberType = store.Type
+                                });
+                            }
                         }
                     }
 
-                    // FreeBarber participant
+                    // FreeBarber participant - sadece kendimiz değilsek ekle
                     if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId.Value != userId)
                     {
                         if (freeBarberDict.TryGetValue(appt.FreeBarberUserId.Value, out var freeBarberEntity))
                         {
-                            freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.FreeBarberUserId == freeBarberEntity.FreeBarberUserId || 
+                                (thread.FreeBarberUserId.HasValue && thread.FreeBarberUserId.Value == freeBarberEntity.FreeBarberUserId))
                             {
-                                UserId = appt.FreeBarberUserId.Value,
-                                DisplayName = $"{freeBarberEntity.FirstName} {freeBarberEntity.LastName}",
-                                ImageUrl = freeBarberImageUrl,
-                                UserType = UserType.FreeBarber,
-                                BarberType = freeBarberEntity.Type
-                            });
+                                freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = appt.FreeBarberUserId.Value,
+                                    DisplayName = $"{freeBarberEntity.FirstName} {freeBarberEntity.LastName}",
+                                    ImageUrl = freeBarberImageUrl,
+                                    UserType = UserType.FreeBarber,
+                                    BarberType = freeBarberEntity.Type
+                                });
+                            }
                         }
                     }
 
@@ -1111,6 +1357,30 @@ namespace Business.Concrete
                     else if (thread.FreeBarberUserId == userId)
                         unreadCount = thread.FreeBarberUnreadCount;
 
+                    // Mevcut kullanıcının (userId) profil resmini al
+                    string? currentUserImageUrlForThisUser = null;
+                    if (userDict.TryGetValue(userId, out var currentUserEntity))
+                    {
+                        if (currentUserEntity.UserType == UserType.Customer)
+                        {
+                            userImageDict.TryGetValue(currentUserEntity.Id, out currentUserImageUrlForThisUser);
+                        }
+                        else if (currentUserEntity.UserType == UserType.BarberStore)
+                        {
+                            if (storeDict.TryGetValue(userId, out var userStore))
+                            {
+                                storeImageDict.TryGetValue(userStore.Id, out currentUserImageUrlForThisUser);
+                            }
+                        }
+                        else if (currentUserEntity.UserType == UserType.FreeBarber)
+                        {
+                            if (freeBarberDict.TryGetValue(userId, out var userFreeBarber))
+                            {
+                                freeBarberImageDict.TryGetValue(userFreeBarber.Id, out currentUserImageUrlForThisUser);
+                            }
+                        }
+                    }
+
                     var threadDto = new ChatThreadListItemDto
                     {
                         ThreadId = thread.Id,
@@ -1121,6 +1391,7 @@ namespace Business.Concrete
                         LastMessagePreview = thread.LastMessagePreview,
                         LastMessageAt = thread.LastMessageAt,
                         UnreadCount = unreadCount,
+                        CurrentUserImageUrl = currentUserImageUrlForThisUser,
                         Participants = participantsList
                     };
 
@@ -1155,6 +1426,10 @@ namespace Business.Concrete
                 .Distinct()
                 .ToList();
 
+            // Tüm katılımcıların UserType'larını al (participant bilgilerini doğru göstermek için)
+            var participantUsers = await userDal.GetAll(u => participants.Contains(u.Id));
+            var participantUserTypeDict = participantUsers.ToDictionary(u => u.Id, u => u.UserType);
+
             // Store bilgisi
             BarberStore? store = null;
             if (appt.BarberStoreUserId.HasValue)
@@ -1218,57 +1493,72 @@ namespace Business.Concrete
                 {
                     var title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
 
-                    // Participants listesini oluştur
+                    // Participants listesini oluştur - ÖNEMLİ: Sadece kendi userId'miz hariç diğer participant'ları göster
                     var participantsList = new List<ChatThreadParticipantDto>();
 
-                    // Customer participant
+                    // Customer participant - sadece kendimiz değilsek ekle
                     if (appt.CustomerUserId.HasValue && appt.CustomerUserId.Value != userId)
                     {
                         if (userDict.TryGetValue(appt.CustomerUserId.Value, out var customerUser))
                         {
-                            userImageDict.TryGetValue(customerUser.Id, out var customerImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.CustomerUserId == appt.CustomerUserId.Value)
                             {
-                                UserId = customerUser.Id,
-                                DisplayName = $"{customerUser.FirstName} {customerUser.LastName}",
-                                ImageUrl = customerImageUrl,
-                                UserType = customerUser.UserType,
-                                BarberType = null
-                            });
+                                userImageDict.TryGetValue(customerUser.Id, out var customerImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = customerUser.Id,
+                                    DisplayName = $"{customerUser.FirstName} {customerUser.LastName}",
+                                    ImageUrl = customerImageUrl,
+                                    UserType = customerUser.UserType,
+                                    BarberType = null
+                                });
+                            }
                         }
                     }
 
-                    // Store participant
-                    if (appt.BarberStoreUserId.HasValue && appt.BarberStoreUserId.Value != userId)
+                    // Store participant - sadece kendimiz değilsek ekle
+                    if (appt.BarberStoreUserId.HasValue && store != null)
                     {
-                        if (storeDict.TryGetValue(appt.BarberStoreUserId.Value, out var storeEntity))
+                        // Store sahibi userId'si ile karşılaştır - ÖNEMLİ: Kendi store bilgilerimizi değil, karşı tarafın bilgilerini göster
+                        if (store.BarberStoreOwnerId != userId)
                         {
-                            storeImageDict.TryGetValue(storeEntity.Id, out var storeImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.StoreOwnerUserId == store.BarberStoreOwnerId || 
+                                (thread.StoreOwnerUserId.HasValue && thread.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
                             {
-                                UserId = appt.BarberStoreUserId.Value,
-                                DisplayName = storeEntity.StoreName,
-                                ImageUrl = storeImageUrl,
-                                UserType = UserType.BarberStore,
-                                BarberType = storeEntity.Type
-                            });
+                                storeImageDict.TryGetValue(store.Id, out var storeImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = store.BarberStoreOwnerId,
+                                    DisplayName = store.StoreName,
+                                    ImageUrl = storeImageUrl,
+                                    UserType = UserType.BarberStore,
+                                    BarberType = store.Type
+                                });
+                            }
                         }
                     }
 
-                    // FreeBarber participant
+                    // FreeBarber participant - sadece kendimiz değilsek ekle
                     if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId.Value != userId)
                     {
                         if (freeBarberDict.TryGetValue(appt.FreeBarberUserId.Value, out var freeBarberEntity))
                         {
-                            freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
-                            participantsList.Add(new ChatThreadParticipantDto
+                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
+                            if (thread.FreeBarberUserId == freeBarberEntity.FreeBarberUserId || 
+                                (thread.FreeBarberUserId.HasValue && thread.FreeBarberUserId.Value == freeBarberEntity.FreeBarberUserId))
                             {
-                                UserId = appt.FreeBarberUserId.Value,
-                                DisplayName = $"{freeBarberEntity.FirstName} {freeBarberEntity.LastName}",
-                                ImageUrl = freeBarberImageUrl,
-                                UserType = UserType.FreeBarber,
-                                BarberType = freeBarberEntity.Type
-                            });
+                                freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
+                                participantsList.Add(new ChatThreadParticipantDto
+                                {
+                                    UserId = appt.FreeBarberUserId.Value,
+                                    DisplayName = $"{freeBarberEntity.FirstName} {freeBarberEntity.LastName}",
+                                    ImageUrl = freeBarberImageUrl,
+                                    UserType = UserType.FreeBarber,
+                                    BarberType = freeBarberEntity.Type
+                                });
+                            }
                         }
                     }
 
@@ -1281,6 +1571,30 @@ namespace Business.Concrete
                     else if (thread.FreeBarberUserId == userId)
                         unreadCount = thread.FreeBarberUnreadCount;
 
+                    // Mevcut kullanıcının (userId) profil resmini al
+                    string? currentUserImageUrlForThisUser = null;
+                    if (userDict.TryGetValue(userId, out var currentUserEntity))
+                    {
+                        if (currentUserEntity.UserType == UserType.Customer)
+                        {
+                            userImageDict.TryGetValue(currentUserEntity.Id, out currentUserImageUrlForThisUser);
+                        }
+                        else if (currentUserEntity.UserType == UserType.BarberStore)
+                        {
+                            if (storeDict.TryGetValue(userId, out var userStore))
+                            {
+                                storeImageDict.TryGetValue(userStore.Id, out currentUserImageUrlForThisUser);
+                            }
+                        }
+                        else if (currentUserEntity.UserType == UserType.FreeBarber)
+                        {
+                            if (freeBarberDict.TryGetValue(userId, out var userFreeBarber))
+                            {
+                                freeBarberImageDict.TryGetValue(userFreeBarber.Id, out currentUserImageUrlForThisUser);
+                            }
+                        }
+                    }
+
                     var threadDto = new ChatThreadListItemDto
                     {
                         ThreadId = thread.Id,
@@ -1291,6 +1605,7 @@ namespace Business.Concrete
                         LastMessagePreview = thread.LastMessagePreview,
                         LastMessageAt = thread.LastMessageAt,
                         UnreadCount = unreadCount,
+                        CurrentUserImageUrl = currentUserImageUrlForThisUser,
                         Participants = participantsList
                     };
 
@@ -1365,47 +1680,125 @@ namespace Business.Concrete
             {
                 try
                 {
-                    // Favori thread detaylarını oluştur
-                    var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                        ? thread.FavoriteToUserId!.Value 
-                        : thread.FavoriteFromUserId!.Value;
-
-                    var otherUser = await userDal.Get(u => u.Id == otherUserId);
-                    if (otherUser == null) continue;
-
                     string displayName = "";
                     string? imageUrl = null;
                     BarberType? barberType = null;
+                    Guid participantUserId = Guid.Empty;
+                    UserType participantUserType;
 
-                    if (otherUser.UserType == UserType.Customer)
+                    // Store bazlı thread'ler için Store bilgisini göster
+                    if (thread.StoreId.HasValue)
                     {
-                        displayName = $"{otherUser.FirstName} {otherUser.LastName}";
-                        if (otherUser.ImageId.HasValue)
-                        {
-                            var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
-                            imageUrl = img?.ImageUrl;
-                        }
-                    }
-                    else if (otherUser.UserType == UserType.BarberStore)
-                    {
-                        var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                        var store = await barberStoreDal.Get(x => x.Id == thread.StoreId.Value);
                         if (store != null)
                         {
-                            displayName = store.StoreName;
-                            barberType = store.Type;
-                            var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
-                            imageUrl = img?.ImageUrl;
+                            // ÖNEMLİ: Store sahibi kendisi ise, participant olarak diğer kullanıcıyı göster
+                            if (store.BarberStoreOwnerId == recipientUserId)
+                            {
+                                // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
+                                var otherUserId = thread.FavoriteFromUserId == recipientUserId 
+                                    ? thread.FavoriteToUserId!.Value 
+                                    : thread.FavoriteFromUserId!.Value;
+                                
+                                var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                                if (otherUser == null) continue;
+                                
+                                participantUserId = otherUser.Id;
+                                
+                                if (otherUser.UserType == UserType.Customer)
+                                {
+                                    displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                                    if (otherUser.ImageId.HasValue)
+                                    {
+                                        var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                    barberType = null;
+                                    participantUserType = UserType.Customer;
+                                }
+                                else if (otherUser.UserType == UserType.FreeBarber)
+                                {
+                                    var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                                    if (freeBarber != null)
+                                    {
+                                        displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                                        barberType = freeBarber.Type;
+                                        var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                                        imageUrl = img?.ImageUrl;
+                                    }
+                                    participantUserType = UserType.FreeBarber;
+                                }
+                                else
+                                {
+                                    continue; // Beklenmeyen durum
+                                }
+                            }
+                            else
+                            {
+                                // Store sahibi başka biri - Store bilgisini göster
+                                displayName = store.StoreName;
+                                barberType = store.Type;
+                                var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                                imageUrl = img?.ImageUrl;
+                                participantUserId = store.BarberStoreOwnerId;
+                                participantUserType = UserType.BarberStore;
+                            }
+                        }
+                        else
+                        {
+                            continue; // Store bulunamadı, thread'i atla
                         }
                     }
-                    else if (otherUser.UserType == UserType.FreeBarber)
+                    else
                     {
-                        var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
-                        if (freeBarber != null)
+                        // Store bazlı değil, User ID bazlı thread
+                        var otherUserId = thread.FavoriteFromUserId == recipientUserId 
+                            ? thread.FavoriteToUserId!.Value 
+                            : thread.FavoriteFromUserId!.Value;
+
+                        var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                        if (otherUser == null) continue;
+
+                        participantUserId = otherUser.Id;
+
+                        if (otherUser.UserType == UserType.Customer)
                         {
-                            displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
-                            barberType = freeBarber.Type;
-                            var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
-                            imageUrl = img?.ImageUrl;
+                            displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                            if (otherUser.ImageId.HasValue)
+                            {
+                                var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            barberType = null;
+                            participantUserType = UserType.Customer;
+                        }
+                        else if (otherUser.UserType == UserType.BarberStore)
+                        {
+                            var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                            if (store != null)
+                            {
+                                displayName = store.StoreName;
+                                barberType = store.Type;
+                                var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            participantUserType = UserType.BarberStore;
+                        }
+                        else if (otherUser.UserType == UserType.FreeBarber)
+                        {
+                            var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                            if (freeBarber != null)
+                            {
+                                displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                                barberType = freeBarber.Type;
+                                var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                                imageUrl = img?.ImageUrl;
+                            }
+                            participantUserType = UserType.FreeBarber;
+                        }
+                        else
+                        {
+                            continue; // Beklenmeyen durum
                         }
                     }
 
@@ -1418,6 +1811,36 @@ namespace Business.Concrete
                     else if (thread.FreeBarberUserId == recipientUserId)
                         unreadCount = thread.FreeBarberUnreadCount;
 
+                    // Mevcut kullanıcının (recipientUserId) profil resmini al
+                    string? currentUserImageUrlForRecipient = null;
+                    var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
+                    if (recipientUser != null)
+                    {
+                        if (recipientUser.UserType == UserType.Customer)
+                        {
+                            var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
+                            currentUserImageUrlForRecipient = userImg?.ImageUrl;
+                        }
+                        else if (recipientUser.UserType == UserType.BarberStore)
+                        {
+                            var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
+                            if (userStore != null)
+                            {
+                                var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
+                                currentUserImageUrlForRecipient = storeImg?.ImageUrl;
+                            }
+                        }
+                        else if (recipientUser.UserType == UserType.FreeBarber)
+                        {
+                            var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
+                            if (userFreeBarber != null)
+                            {
+                                var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
+                                currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
+                            }
+                        }
+                    }
+
                     var threadDto = new ChatThreadListItemDto
                     {
                         ThreadId = thread.Id,
@@ -1428,14 +1851,15 @@ namespace Business.Concrete
                         LastMessagePreview = thread.LastMessagePreview,
                         LastMessageAt = thread.LastMessageAt,
                         UnreadCount = unreadCount,
+                        CurrentUserImageUrl = currentUserImageUrlForRecipient,
                         Participants = new List<ChatThreadParticipantDto>
                         {
                             new ChatThreadParticipantDto
                             {
-                                UserId = otherUser.Id,
+                                UserId = participantUserId,
                                 DisplayName = displayName,
                                 ImageUrl = imageUrl,
-                                UserType = otherUser.UserType,
+                                UserType = participantUserType,
                                 BarberType = barberType
                             }
                         }

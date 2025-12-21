@@ -40,6 +40,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<ImageManager>().As<IImageService>().InstancePerLifetimeScope();
             builder.RegisterType<NotificationManager>().As<INotificationService>().InstancePerLifetimeScope();
             builder.RegisterType<BadgeManager>().As<IBadgeService>().InstancePerLifetimeScope();
+            builder.RegisterType<BadgeUpdateService>().As<IBadgeUpdateService>().InstancePerLifetimeScope();
             builder.RegisterType<ChatManager>().As<IChatService>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
