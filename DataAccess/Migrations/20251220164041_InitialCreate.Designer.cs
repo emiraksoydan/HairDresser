@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20251217231242_mig-1")]
-    partial class mig1
+    [Migration("20251220164041_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -301,6 +301,9 @@ namespace DataAccess.Migrations
                     b.Property<string>("LastMessagePreview")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("StoreOwnerUserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -316,7 +319,8 @@ namespace DataAccess.Migrations
                         .IsUnique()
                         .HasFilter("[AppointmentId] IS NOT NULL");
 
-                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId")
+                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId", "StoreId")
+                        .IsUnique()
                         .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
                     b.ToTable("ChatThreads");

@@ -33,7 +33,8 @@ namespace Business.Abstract
         Task<IDataResult<int>> GetUnreadTotalAsync(Guid userId);
         
         // Favori thread oluştur veya güncelle
-        Task<IDataResult<Guid>> EnsureFavoriteThreadAsync(Guid fromUserId, Guid toUserId);
+        // storeId: Store bazlı favori thread'leri için StoreId (nullable - diğer favori thread'leri için null)
+        Task<IDataResult<Guid>> EnsureFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null);
         Task PushAppointmentThreadCreatedAsync(Guid appointmentId);
         Task PushAppointmentThreadUpdatedAsync(Guid appointmentId);
         Task PushFavoriteThreadUpdatedAsync(Guid fromUserId, Guid toUserId, Guid threadId);

@@ -43,12 +43,12 @@ namespace Business.Concrete
 
         public async Task<IDataResult<RatingGetDto>> CreateRatingAsync(Guid userId, CreateRatingDto dto)
         {
-            // Appointment kontrolü - sadece Completed veya Cancelled appointment'ler için rating yapılabilir
+            // Appointment kontrolü - sadece Completed, Cancelled veya Unanswered appointment'ler için rating yapılabilir
             var appointment = await _appointmentDal.Get(x => x.Id == dto.AppointmentId);
             if (appointment == null)
                 return new ErrorDataResult<RatingGetDto>(Messages.AppointmentNotFound);
 
-            if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled)
+            if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled && appointment.Status != AppointmentStatus.Unanswered)
                 return new ErrorDataResult<RatingGetDto>(Messages.RatingOnlyForCompleted);
 
             // Kullanıcının bu randevuya katılımcı olup olmadığını kontrol et
@@ -88,11 +88,17 @@ namespace Business.Concrete
             }
             else if (manuelBarber != null)
             {
-                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
-                if (manuelBarberStore != null)
+                // ManuelBarber için: TargetId = ManuelBarber ID (randevuda kim varsa ona rating yapılabilir)
+                // ManuelBarber'ın appointment'a ait olduğunu kontrol et
+                if (appointment.ManuelBarberId == manuelBarber.Id)
                 {
-                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
-                    targetUserIdForValidation = manuelBarberStore.BarberStoreOwnerId;
+                    targetIdForRating = manuelBarber.Id; // ManuelBarber ID
+                    // ManuelBarber'ın store'unu bul ve owner User ID'yi al (validation için)
+                    var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
+                    if (manuelBarberStore != null)
+                    {
+                        targetUserIdForValidation = manuelBarberStore.BarberStoreOwnerId;
+                    }
                 }
             }
             
@@ -100,14 +106,22 @@ namespace Business.Concrete
                 return new ErrorDataResult<RatingGetDto>(Messages.InvalidTargetForRating);
             
             // Appointment kontrolü - targetUserIdForValidation appointment'a katılımcı olmalı
+            // ManuelBarber durumunda: ManuelBarber'ın store'u appointment'a katılımcı olmalı
             if (appointment.CustomerUserId != targetUserIdForValidation && 
                 appointment.BarberStoreUserId != targetUserIdForValidation && 
                 appointment.FreeBarberUserId != targetUserIdForValidation)
-                return new ErrorDataResult<RatingGetDto>(Messages.InvalidTargetForRating);
+            {
+                // ManuelBarber durumunda: ManuelBarber'ın appointment'a ait olduğunu kontrol et
+                if (manuelBarber == null || appointment.ManuelBarberId != manuelBarber.Id)
+                {
+                    return new ErrorDataResult<RatingGetDto>(Messages.InvalidTargetForRating);
+                }
+            }
 
             // Mevcut rating'i kontrol et
             // Store için: TargetId = Store ID
             // FreeBarber/Customer için: TargetId = User ID
+            // ManuelBarber için: TargetId = ManuelBarber ID
             var existingRating = await _ratingDal.Get(x => x.AppointmentId == dto.AppointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (existingRating != null)
                 return new ErrorDataResult<RatingGetDto>("Bu randevu için bu hedefe zaten değerlendirme yaptınız. Değerlendirme güncellenemez.");
@@ -161,11 +175,12 @@ namespace Business.Concrete
             // Yeni rating oluştur
             // Store için: TargetId = Store ID
             // FreeBarber/Customer için: TargetId = User ID
+            // ManuelBarber için: TargetId = ManuelBarber ID
             var rating = new Rating
             {
                 Id = Guid.NewGuid(),
                 AppointmentId = dto.AppointmentId,
-                TargetId = targetIdForRating, // Store ID veya User ID
+                TargetId = targetIdForRating, // Store ID, User ID veya ManuelBarber ID
                 RatedFromId = userId, // Her zaman User ID
                 Score = dto.Score,
                 Comment = dto.Comment,
@@ -254,9 +269,8 @@ namespace Business.Concrete
                 targetIdForRating = customerUser.Id; // Customer User ID
             else if (manuelBarber != null)
             {
-                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
-                if (manuelBarberStore != null)
-                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
+                // ManuelBarber için: TargetId = ManuelBarber ID
+                targetIdForRating = manuelBarber.Id;
             }
             
             if (targetIdForRating == Guid.Empty)
@@ -265,6 +279,7 @@ namespace Business.Concrete
             // Rating'leri getir
             // Store için: TargetId = Store ID
             // FreeBarber/Customer için: TargetId = User ID
+            // ManuelBarber için: TargetId = ManuelBarber ID
             var ratings = await _ratingDal.GetAll(x => x.TargetId == targetIdForRating);
             
             // Eğer rating yoksa boş liste döndür
@@ -437,9 +452,8 @@ namespace Business.Concrete
                 targetIdForRating = customerUser.Id; // Customer User ID
             else if (manuelBarber != null)
             {
-                var manuelBarberStore = await _barberStoreDal.Get(x => x.Id == manuelBarber.StoreId);
-                if (manuelBarberStore != null)
-                    targetIdForRating = manuelBarberStore.BarberStoreOwnerId; // ManuelBarber için store owner User ID
+                // ManuelBarber için: TargetId = ManuelBarber ID
+                targetIdForRating = manuelBarber.Id;
             }
             
             if (targetIdForRating == Guid.Empty)
@@ -448,6 +462,7 @@ namespace Business.Concrete
             // Rating'i getir
             // Store için: TargetId = Store ID
             // FreeBarber/Customer için: TargetId = User ID
+            // ManuelBarber için: TargetId = ManuelBarber ID
             var rating = await _ratingDal.Get(x => x.AppointmentId == appointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (rating == null)
                 return new ErrorDataResult<RatingGetDto>(null, "Değerlendirme bulunamadı.");
@@ -497,10 +512,10 @@ namespace Business.Concrete
             if (appointment.CustomerUserId == targetId)
                 return true;
 
-            // ManuelBarber ID kontrolü - ManuelBarber'a rating yapılamaz
+            // ManuelBarber ID kontrolü - ManuelBarber'a rating yapılabilir (randevuda varsa)
             var manuelBarber = await _manuelBarberDal.Get(x => x.Id == targetId);
-            if (manuelBarber != null)
-                return false; // ManuelBarber'a rating yapılamaz
+            if (manuelBarber != null && appointment.ManuelBarberId == manuelBarber.Id)
+                return true; // ManuelBarber'a rating yapılabilir
 
             return false;
         }

@@ -144,7 +144,9 @@ namespace Business.Concrete
                     
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
                     // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
-                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
+                    // Store bazlı thread'ler için StoreId geçilir
+                    Guid? storeIdForThread = store != null ? store.Id : null;
+                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
                 }
                 // Favori pasif edildiyse thread görünürlüğünü kontrol et
                 else if (!existingFavorite.IsActive && !isSelfFavorite && targetUserIdForThread != Guid.Empty)
@@ -181,7 +183,9 @@ namespace Business.Concrete
                     // Eğer karşı taraftan da favori yoksa veya pasifse, thread'i kaldır
                     if (!isReverseFavoriteActive)
                     {
-                        var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread);
+                        // Store bazlı thread'ler için StoreId geçilir
+                        Guid? storeIdForThread = store != null ? store.Id : null;
+                        var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
                         if (thread != null)
                         {
                             // Her iki tarafa da threadRemoved gönder
@@ -197,7 +201,9 @@ namespace Business.Concrete
                         
                         // Thread'i güncelle (EnsureFavoriteThreadAsync thread güncellemesini yapar)
                         // Bu metod her iki kullanıcıya da thread update push eder
-                        await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
+                        // Store bazlı thread'ler için StoreId geçilir
+                        Guid? storeIdForThread = store != null ? store.Id : null;
+                        await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
                     }
                 }
                 
@@ -262,7 +268,9 @@ namespace Business.Concrete
                     
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
                     // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
-                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread);
+                    // Store bazlı thread'ler için StoreId geçilir
+                    Guid? storeIdForThread = store != null ? store.Id : null;
+                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
                 }
                 
                 // FavoriteCount hesapla (aktif favoriler)

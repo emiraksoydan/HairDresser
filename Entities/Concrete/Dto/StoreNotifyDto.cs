@@ -16,5 +16,6 @@ namespace Entities.Concrete.Dto
         public string? ImageUrl { get; set; }
         public BarberType? Type { get; set; }
         public bool? IsInFavorites { get; set; } // Bu dükkan favorilerde mi?
+        public string? AddressDescription { get; set; } // Dükkan adres açıklaması
     }
 }

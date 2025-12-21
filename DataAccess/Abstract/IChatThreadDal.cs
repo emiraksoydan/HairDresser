@@ -26,7 +26,7 @@ namespace DataAccess.Abstract
         /// <summary>
         /// Gets or creates a favorite thread between two users
         /// </summary>
-        Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId);
+        Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null);
         
         /// <summary>
         /// Gets unread message count for a user (database-level sum for performance)

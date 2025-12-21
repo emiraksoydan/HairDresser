@@ -440,20 +440,23 @@ namespace Business.Concrete
                 appt.FreeBarberDecision
             );
 
-            // Decision verildikten sonra ilgili notification'ları read yap
-            // Decision button'ları gizlemek için notification'ları okundu yapıyoruz
-            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue)
-                .Select(x => x!.Value)
-                .Distinct()
-                .ToList();
-
-            // Actor (karar veren kişi - storeOwnerUserId) hariç diğer kullanıcıların notification'larını read yap
-            foreach (var userId in participantUserIds)
+            // ÖNEMLİ: Decision başarılı ise (Approved) notification'ları read yap
+            // Rejected durumunda read yapılmamalı (kullanıcı görmeli)
+            if (appt.Status == AppointmentStatus.Approved)
             {
-                if (userId != storeOwnerUserId)
+                var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                    .Where(x => x.HasValue)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+
+                // Actor (karar veren kişi - storeOwnerUserId) hariç diğer kullanıcıların notification'larını read yap
+                foreach (var userId in participantUserIds)
                 {
-                    await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                    if (userId != storeOwnerUserId)
+                    {
+                        await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                    }
                 }
             }
 
@@ -570,20 +573,23 @@ namespace Business.Concrete
                 appt.FreeBarberDecision
             );
 
-            // Decision verildikten sonra ilgili notification'ları read yap
-            // Decision button'ları gizlemek için notification'ları okundu yapıyoruz
-            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue)
-                .Select(x => x!.Value)
-                .Distinct()
-                .ToList();
-
-            // Actor (karar veren kişi - freeBarberUserId) hariç diğer kullanıcıların notification'larını read yap
-            foreach (var userId in participantUserIds)
+            // ÖNEMLİ: Decision başarılı ise (Approved) notification'ları read yap
+            // Rejected durumunda read yapılmamalı (kullanıcı görmeli)
+            if (appt.Status == AppointmentStatus.Approved)
             {
-                if (userId != freeBarberUserId)
+                var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                    .Where(x => x.HasValue)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+
+                // Actor (karar veren kişi - freeBarberUserId) hariç diğer kullanıcıların notification'larını read yap
+                foreach (var userId in participantUserIds)
                 {
-                    await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                    if (userId != freeBarberUserId)
+                    {
+                        await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
+                    }
                 }
             }
 

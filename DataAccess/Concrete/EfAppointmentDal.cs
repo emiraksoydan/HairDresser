@@ -184,6 +184,7 @@ namespace DataAccess.Concrete
             {
                 case AppointmentFilter.Active:
                     // Sadece Approved durumundaki randevular aktif tab'da görünmeli
+                    // Pending randevular sadece notification'larda görünür (decision butonları ile)
                     query = query.Where(x => x.Status == AppointmentStatus.Approved);
                     break;
                 case AppointmentFilter.Completed:
@@ -230,7 +231,8 @@ namespace DataAccess.Concrete
                     s.StoreName,
                     s.PricingType,
                     s.PricingValue,
-                    s.Type
+                    s.Type,
+                    s.AddressDescription
                 })
                 .ToListAsync();
             
@@ -246,7 +248,8 @@ namespace DataAccess.Concrete
                 s.StoreName,
                 s.PricingType,
                 s.PricingValue,
-                s.Type
+                s.Type,
+                s.AddressDescription
             });
 
             // B) FREE BARBER
@@ -437,6 +440,7 @@ namespace DataAccess.Concrete
                         dto.PricingType = sInfo.PricingType;
                         dto.PricingValue = sInfo.PricingValue;
                         dto.StoreType = sInfo.Type; // Store Type
+                        dto.StoreAddressDescription = sInfo.AddressDescription; // Store Address Description
 
                         if (imagesDict.TryGetValue(realStoreId, out var img)) dto.StoreImage = img;
                         dto.IsStoreFavorite = favSet.Contains(realStoreId);

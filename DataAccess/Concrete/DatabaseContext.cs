@@ -73,9 +73,12 @@ namespace DataAccess.Concrete
                 .HasFilter("[AppointmentId] IS NOT NULL");
 
             // Favori thread'ler için composite index (her iki yönü desteklemek için)
+            // Store bazlı thread'ler için: StoreId + FavoriteFromUserId + FavoriteToUserId
+            // Diğer favori thread'ler için: FavoriteFromUserId + FavoriteToUserId (StoreId null)
             modelBuilder.Entity<ChatThread>()
-                .HasIndex(x => new { x.FavoriteFromUserId, x.FavoriteToUserId })
-                .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
+                .HasIndex(x => new { x.FavoriteFromUserId, x.FavoriteToUserId, x.StoreId })
+                .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL")
+                .IsUnique();
 
             modelBuilder.Entity<ChatMessage>()
                 .HasIndex(x => new { x.ThreadId, x.CreatedAt });

@@ -69,19 +69,19 @@ namespace Api.BackgroundServices
                             await freeBarberDal.Update(fb);
                         }
                     }
-                    // Mevcut notification'ları güncelle: Type ve payload status'u güncelle
-                    // ÖNEMLİ: Bu notification'ları SignalR ile de push etmeliyiz (veri tutarlılığı için)
+                    // ÖNEMLİ: Notification Type değişmemeli - sadece payload güncellenmeli
+                    // Mevcut notification'ları bul (herhangi bir type olabilir - AppointmentCreated, AppointmentApproved, vb.)
                     var existingNotifications = await db.Notifications
-                        .Where(n => n.AppointmentId == appt.Id
-                                 && n.Type == NotificationType.AppointmentCreated)
+                        .Where(n => n.AppointmentId == appt.Id)
                         .ToListAsync(stoppingToken);
 
-                    // Mevcut notification'ları güncelle
+                    // Mevcut notification'ları olan kullanıcılar (bunların notification'ları güncellenecek)
+                    var usersWithExistingNotifications = existingNotifications.Select(n => n.UserId).Distinct().ToList();
+
+                    // Mevcut notification'ları güncelle: Sadece payload'daki status'u güncelle, Type değiştirme
                     foreach (var notif in existingNotifications)
                     {
-                        notif.Type = NotificationType.AppointmentUnanswered;
-                        
-                        // Payload'daki status'u da güncelle (veri tutarlılığı için)
+                        // Payload'daki status'u güncelle (veri tutarlılığı için)
                         if (!string.IsNullOrEmpty(notif.PayloadJson) && notif.PayloadJson.Trim() != "{}")
                         {
                             try
@@ -102,23 +102,29 @@ namespace Api.BackgroundServices
                                 // Mevcut tüm property'leri kopyala (status hariç)
                                 foreach (var prop in root.EnumerateObject())
                                 {
-                                    if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase))
-                                        continue; // Status'u atla, yeni değerle güncelleyeceğiz
+                                    if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
+                                        prop.Name.Equals("storeDecision", StringComparison.OrdinalIgnoreCase) ||
+                                        prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase))
+                                        continue; // Status ve decision'ları atla, yeni değerle güncelleyeceğiz
                                     
                                     // Value'yü object'e çevir (basit tipler için)
                                     payloadDict[prop.Name] = prop.Value.ValueKind switch
                                     {
                                         System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
-                                        System.Text.Json.JsonValueKind.Number => prop.Value.GetDecimal(),
+                                        System.Text.Json.JsonValueKind.Number => prop.Value.TryGetInt32(out var intVal) ? (object)intVal : prop.Value.GetDecimal(),
                                         System.Text.Json.JsonValueKind.True => true,
                                         System.Text.Json.JsonValueKind.False => false,
                                         System.Text.Json.JsonValueKind.Null => null,
+                                        System.Text.Json.JsonValueKind.Object => JsonSerializer.Deserialize<object>(prop.Value.GetRawText()),
+                                        System.Text.Json.JsonValueKind.Array => JsonSerializer.Deserialize<object[]>(prop.Value.GetRawText()),
                                         _ => prop.Value.GetRawText() // Complex types için raw text
                                     };
                                 }
                                 
-                                // Status'u Unanswered olarak ekle/güncelle
-                                payloadDict["status"] = "Unanswered";
+                                // Status ve decision'ları Unanswered olarak ekle/güncelle
+                                payloadDict["status"] = (int)AppointmentStatus.Unanswered;
+                                payloadDict["storeDecision"] = appt.StoreDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)appt.StoreDecision;
+                                payloadDict["freeBarberDecision"] = appt.FreeBarberDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)appt.FreeBarberDecision;
                                 
                                 // Geri JSON string'e çevir
                                 notif.PayloadJson = JsonSerializer.Serialize(payloadDict, options);
@@ -136,7 +142,7 @@ namespace Api.BackgroundServices
                             var updatedDto = new Entities.Concrete.Dto.NotificationDto
                             {
                                 Id = notif.Id,
-                                Type = notif.Type,
+                                Type = notif.Type, // Type değişmedi - aynı kaldı
                                 AppointmentId = notif.AppointmentId,
                                 Title = notif.Title,
                                 Body = notif.Body,
@@ -152,14 +158,42 @@ namespace Api.BackgroundServices
                         }
                     }
 
-                    // ÖNEMLİ: Eğer hiç notification yoksa (nadir durum), yeni AppointmentUnanswered notification gönder
-                    // Çünkü mevcut notification'ları güncelledik ama eğer hiç notification yoksa,
-                    // ilgili kişilere bildirim gitmemiş olabilir. Bu durumda NotifyAsync ile yeni notification'lar gönder.
-                    if (existingNotifications.Count == 0)
+                    // ÖNEMLİ: Mevcut notification'ı olmayan kullanıcılara yeni AppointmentUnanswered notification gönder
+                    // Tüm ilgili kullanıcıları belirle
+                    var allParticipantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                        .Where(x => x.HasValue)
+                        .Select(x => x!.Value)
+                        .Distinct()
+                        .ToList();
+
+                    // Mevcut notification'ı olmayan kullanıcılar
+                    var usersWithoutNotifications = allParticipantUserIds
+                        .Where(userId => !usersWithExistingNotifications.Contains(userId))
+                        .ToList();
+
+                    // Bu kullanıcılara yeni AppointmentUnanswered notification gönder
+                    if (usersWithoutNotifications.Any())
                     {
                         try
                         {
-                            _logger.LogInformation("AppointmentTimeoutWorker: No existing notifications found for appointment {AppointmentId}, sending new AppointmentUnanswered notifications", appt.Id);
+                            _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}", 
+                                usersWithoutNotifications.Count, appt.Id);
+                            
+                            // Her kullanıcı için manuel olarak AppointmentUnanswered notification gönder
+                            // NotifyAsync tüm kullanıcılara gönderir, ama biz sadece notification'ı olmayanlara göndermek istiyoruz
+                            // Bu yüzden CreateAndPushAsync'i direkt kullanmalıyız
+                            var notificationSvc = scope.ServiceProvider.GetRequiredService<Business.Abstract.INotificationService>();
+                            
+                            // AppointmentNotifyManager'dan title ve payload oluşturmak için
+                            // Basit bir yaklaşım: NotifyAsync'i çağırmak ama sadece belirli kullanıcılara göndermek
+                            // Ancak NotifyAsync tüm kullanıcılara gönderir
+                            // En iyi yaklaşım: Her kullanıcı için ayrı ayrı CreateAndPushAsync çağırmak
+                            // Ama title ve payload oluşturmak için AppointmentNotifyManager.NotifyAsyncInternal mantığına ihtiyacımız var
+                            
+                            // Geçici çözüm: NotifyAsync'i çağırmak - CreateAndPushAsync içinde duplicate kontrolü var
+                            // Ama type farklı olduğu için yeni notification oluşturulur (bu istediğimiz davranış)
+                            // Mevcut notification'ı olan kullanıcılar için: Zaten yukarıda güncellendi
+                            // Mevcut notification'ı olmayan kullanıcılar için: Yeni AppointmentUnanswered gönderilecek
                             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
                         }
                         catch (Exception ex)

@@ -18,6 +18,11 @@ namespace Entities.Concrete.Entities
         // Favori thread için: hangi kullanıcı favoriye ekledi, hangi kullanıcı favoriye eklendi
         public Guid? FavoriteFromUserId { get; set; }
         public Guid? FavoriteToUserId { get; set; }
+        
+        // Store bazlı favori thread'leri için: StoreId (her dükkan için ayrı thread)
+        // Store favori thread'inde: StoreId dolu olmalı, FavoriteFromUserId/FavoriteToUserId user ID'ler
+        // Diğer favori thread'lerinde (Customer-FreeBarber): StoreId null
+        public Guid? StoreId { get; set; }
 
         public Guid? CustomerUserId { get; set; }
         public Guid? StoreOwnerUserId { get; set; }

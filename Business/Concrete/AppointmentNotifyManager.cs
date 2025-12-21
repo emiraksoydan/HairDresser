@@ -156,7 +156,8 @@ namespace Business.Concrete
                     StoreOwnerUserId = store.BarberStoreOwnerId,
                     StoreName = store.StoreName,
                     ImageUrl = storeImageUrl,
-                    Type = store.Type
+                    Type = store.Type,
+                    AddressDescription = store.AddressDescription
                 };
             }
 

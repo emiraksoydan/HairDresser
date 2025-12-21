@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class mig1 : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -123,6 +123,7 @@ namespace DataAccess.Migrations
                     AppointmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     FavoriteFromUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     FavoriteToUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CustomerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     StoreOwnerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     FreeBarberUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -444,9 +445,10 @@ namespace DataAccess.Migrations
                 filter: "[AppointmentId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ChatThreads_FavoriteFromUserId_FavoriteToUserId",
+                name: "IX_ChatThreads_FavoriteFromUserId_FavoriteToUserId_StoreId",
                 table: "ChatThreads",
-                columns: new[] { "FavoriteFromUserId", "FavoriteToUserId" },
+                columns: new[] { "FavoriteFromUserId", "FavoriteToUserId", "StoreId" },
+                unique: true,
                 filter: "[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(

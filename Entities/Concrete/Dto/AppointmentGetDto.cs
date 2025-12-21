@@ -31,6 +31,7 @@ namespace Entities.Concrete.Dto
         public bool IsStoreFavorite { get; set; }
         public double? MyRatingForStore { get; set; }
         public string? MyCommentForStore { get; set; }
+        public string? StoreAddressDescription { get; set; } // Dükkan adres açıklaması
 
         public BarberType StoreType { get; set; }
         public double? StoreAverageRating { get; set; } // Store'un ortalama rating'i

@@ -298,6 +298,9 @@ namespace DataAccess.Migrations
                     b.Property<string>("LastMessagePreview")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("StoreOwnerUserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -313,7 +316,8 @@ namespace DataAccess.Migrations
                         .IsUnique()
                         .HasFilter("[AppointmentId] IS NOT NULL");
 
-                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId")
+                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId", "StoreId")
+                        .IsUnique()
                         .HasFilter("[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
                     b.ToTable("ChatThreads");

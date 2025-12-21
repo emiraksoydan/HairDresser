@@ -83,13 +83,15 @@ namespace DataAccess.Concrete
                 .ToListAsync();
         }
 
-        public async Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId)
+        public async Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null)
         {
             // Her iki yönü de kontrol et (from->to veya to->from)
+            // Store bazlı thread'ler için StoreId de eşleşmeli
             var thread = await Context.ChatThreads
                 .FirstOrDefaultAsync(t => !t.AppointmentId.HasValue &&
                                          ((t.FavoriteFromUserId == fromUserId && t.FavoriteToUserId == toUserId) ||
-                                          (t.FavoriteFromUserId == toUserId && t.FavoriteToUserId == fromUserId)));
+                                          (t.FavoriteFromUserId == toUserId && t.FavoriteToUserId == fromUserId)) &&
+                                         (storeId == null ? t.StoreId == null : t.StoreId == storeId));
             return thread;
         }
 

@@ -24,16 +24,71 @@ namespace Business.Concrete
         public async Task<IDataResult<Guid>> CreateAndPushAsync(Guid userId, NotificationType type, Guid? appointmentId, string title, object payload, string? body = null)
         {
             // DUPLICATE KONTROLÜ: Aynı userId, appointmentId ve type'a sahip okunmamış notification var mı?
-            // ÖNEMLİ: Bazı notification type'ları için (örn: AppointmentDecisionUpdated) duplicate'a izin verebiliriz
-            // Ama genelde aynı appointmentId ve type için duplicate olmamalı
+            // ÖNEMLİ: Notification Type değişmemeli - sadece payload güncellenmeli
             if (appointmentId.HasValue)
             {
-                // AppointmentUnanswered ve AppointmentDecisionUpdated için duplicate'a izin ver
-                // Çünkü bunlar durum güncellemeleri ve birden fazla gönderilebilir
-                var allowDuplicates = type == NotificationType.AppointmentUnanswered || 
-                                     type == NotificationType.AppointmentDecisionUpdated;
-                
-                if (!allowDuplicates)
+                // AppointmentUnanswered için özel kontrol:
+                // Eğer kullanıcıya bu appointment için herhangi bir notification varsa, onu güncelle (type değiştirme, sadece payload)
+                // Eğer hiç notification yoksa, yeni AppointmentUnanswered oluştur
+                if (type == NotificationType.AppointmentUnanswered)
+                {
+                    // Bu appointment için herhangi bir notification var mı? (type fark etmez)
+                    var existingAny = await notificationDal.Get(x => 
+                        x.UserId == userId && 
+                        x.AppointmentId == appointmentId);
+                    
+                    if (existingAny != null)
+                    {
+                        // Mevcut notification var - sadece payload'ı güncelle, type değiştirme
+                        existingAny.Title = title;
+                        existingAny.Body = body;
+                        existingAny.PayloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                            WriteIndented = false
+                        });
+                        existingAny.CreatedAt = DateTime.UtcNow; // Zamanı güncelle
+                        
+                        await notificationDal.Update(existingAny);
+                        
+                        var dto = new NotificationDto
+                        {
+                            Id = existingAny.Id,
+                            Type = existingAny.Type, // Type değişmedi - aynı kaldı
+                            AppointmentId = existingAny.AppointmentId,
+                            Title = existingAny.Title,
+                            Body = existingAny.Body,
+                            PayloadJson = existingAny.PayloadJson,
+                            CreatedAt = existingAny.CreatedAt,
+                            IsRead = existingAny.IsRead
+                        };
+                        
+                        // Güncellenmiş notification'ı SignalR ile push et
+                        await realtime.PushNotificationAsync(userId, dto);
+                        
+                        // Badge count güncellemesi (recipient için)
+                        try
+                        {
+                            var badges = await badgeService.GetCountsAsync(userId);
+                            if (badges.Success)
+                                await realtime.PushBadgeAsync(userId, badges.Data);
+                        }
+                        catch
+                        {
+                            // Badge güncellemesi başarısız olursa devam et, kritik değil
+                        }
+                        
+                        return new SuccessDataResult<Guid>(existingAny.Id);
+                    }
+                    // Eğer hiç notification yoksa, aşağıda yeni oluşturulacak
+                }
+                // AppointmentDecisionUpdated için duplicate'a izin ver
+                else if (type == NotificationType.AppointmentDecisionUpdated)
+                {
+                    // AppointmentDecisionUpdated için duplicate'a izin ver (birden fazla gönderilebilir)
+                }
+                // Diğer type'lar için: Aynı type için duplicate kontrolü yap
+                else
                 {
                     var existing = await notificationDal.Get(x => 
                         x.UserId == userId && 
