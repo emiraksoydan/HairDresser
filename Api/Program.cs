@@ -156,8 +156,7 @@ builder.Services.AddSignalR(options =>
 
 var app = builder.Build();
 
-
-
+// Seed Categories
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

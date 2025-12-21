@@ -32,5 +32,17 @@ namespace Business.Concrete
             var categories = await categoriesDal.GetAll();
             return new SuccessDataResult<List<Category>>(categories);
         }
+
+        public async Task<IDataResult<List<Category>>> GetParentCategories()
+        {
+            var categories = await categoriesDal.GetAll(x => x.ParentId == null);
+            return new SuccessDataResult<List<Category>>(categories, "Ana kategoriler getirildi");
+        }
+
+        public async Task<IDataResult<List<Category>>> GetChildCategories(Guid parentId)
+        {
+            var categories = await categoriesDal.GetAll(x => x.ParentId == parentId);
+            return new SuccessDataResult<List<Category>>(categories, "Alt kategoriler getirildi");
+        }
     }
 }

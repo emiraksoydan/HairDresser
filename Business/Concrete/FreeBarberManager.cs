@@ -94,6 +94,12 @@ namespace Business.Concrete
             return new SuccessDataResult<List<FreeBarberGetDto>>(getFreeBarberResult);
         }
 
+        public async Task<IDataResult<List<FreeBarberGetDto>>> GetFilteredFreeBarbersAsync(FilterRequestDto filter)
+        {
+            var result = await freeBarberDal.GetFilteredFreeBarbersAsync(filter);
+            return new SuccessDataResult<List<FreeBarberGetDto>>(result, "Filtrelenmiş serbest berberler getirildi");
+        }
+
         public async Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId)
         {
             var result = await freeBarberDal.GetPanelDetailById(panelId);

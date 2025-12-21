@@ -48,6 +48,15 @@ namespace Api.Controllers
             var result = await _freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance);
             return result.Success ? Ok(result.Data) : BadRequest(result);
         }
+
+        [HttpPost("filtered")]
+        public async Task<IActionResult> GetFiltered([FromBody] FilterRequestDto filter)
+        {
+            filter.CurrentUserId = CurrentUserId; // Set current user for favorites
+            var result = await _freeBarberService.GetFilteredFreeBarbersAsync(filter);
+            return result.Success ? Ok(result.Data) : BadRequest(result);
+        }
+
         [HttpGet("mypanel")]
         public async Task<IActionResult> GetMine()
         {

@@ -17,6 +17,7 @@ namespace Entities.Concrete.Dto
         public BarberType Type { get; set; }
         public double Rating { get; set; }
         public int FavoriteCount { get; set; }
+        public bool IsFavorited { get; set; }
         public bool IsAvailable { get; set; }
         public double DistanceKm { get; set; }
         public int ReviewCount { get; set; }

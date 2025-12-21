@@ -36,5 +36,19 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : NotFound(result);
         }
 
+        [HttpGet("parents")]
+        public async Task<IActionResult> GetParentCategories()
+        {
+            var result = await _categoryService.GetParentCategories();
+            return result.Success ? Ok(result) : NotFound(result);
+        }
+
+        [HttpGet("children/{parentId}")]
+        public async Task<IActionResult> GetChildCategories(Guid parentId)
+        {
+            var result = await _categoryService.GetChildCategories(parentId);
+            return result.Success ? Ok(result) : NotFound(result);
+        }
+
     }
 }

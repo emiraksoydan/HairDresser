@@ -83,6 +83,12 @@ namespace Business.Concrete
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
         }
 
+        public async Task<IDataResult<List<BarberStoreGetDto>>> GetFilteredStoresAsync(FilterRequestDto filter)
+        {
+            var result = await barberStoreDal.GetFilteredStoresAsync(filter);
+            return new SuccessDataResult<List<BarberStoreGetDto>>(result, "Filtrelenmiş berber dükkanları getirildi");
+        }
+
         public async Task<IDataResult<BarberStoreMineDto>> GetBarberStoreForUsers(Guid storeId)
         {
             var result = await barberStoreDal.GetBarberStoreForUsers(storeId);

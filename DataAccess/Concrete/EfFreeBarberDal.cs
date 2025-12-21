@@ -362,5 +362,249 @@ namespace DataAccess.Concrete
                 Longitude = freeBarber.Longitude,
             };
         }
+
+        public async Task<List<FreeBarberGetDto>> GetFilteredFreeBarbersAsync(FilterRequestDto filter)
+        {
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
+            
+            // Base query
+            var query = _context.FreeBarbers.AsNoTracking().AsQueryable();
+
+            // 1. Konum filtresi (nearby)
+            if (filter.Latitude.HasValue && filter.Longitude.HasValue)
+            {
+                var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
+                var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(
+                    filter.Latitude.Value, 
+                    filter.Longitude.Value, 
+                    distance
+                );
+                query = query.Where(fb => 
+                    fb.Latitude >= minLat && fb.Latitude <= maxLat &&
+                    fb.Longitude >= minLon && fb.Longitude <= maxLon
+                );
+            }
+
+            // 2. İsim araması
+            if (!string.IsNullOrWhiteSpace(filter.SearchQuery))
+            {
+                var searchLower = filter.SearchQuery.ToLower();
+                query = query.Where(fb => 
+                    (fb.FirstName + " " + fb.LastName).ToLower().Contains(searchLower)
+                );
+            }
+
+            // 3. Ana kategori filtresi (BarberType)
+            if (filter.MainCategory.HasValue)
+            {
+                query = query.Where(fb => fb.Type == filter.MainCategory.Value);
+            }
+
+            // 4. Müsaitlik filtresi
+            if (filter.IsAvailable.HasValue)
+            {
+                query = query.Where(fb => fb.IsAvailable == filter.IsAvailable.Value);
+            }
+
+            // FreeBarber bilgilerini al
+            var freeBarbers = await query
+                .Select(fb => new
+                {
+                    fb.Id,
+                    fb.FirstName,
+                    fb.LastName,
+                    fb.Latitude,
+                    fb.Longitude,
+                    fb.Type,
+                    fb.IsAvailable
+                })
+                .ToListAsync();
+
+            if (!freeBarbers.Any())
+                return new List<FreeBarberGetDto>();
+
+            var freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+
+            // Offerings
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => freeBarberIds.Contains(o.OwnerId))
+                .Select(o => new
+                {
+                    o.OwnerId,
+                    o.Id,
+                    Offering = new ServiceOfferingGetDto
+                    {
+                        Id = o.Id,
+                        ServiceName = o.ServiceName,
+                        Price = o.Price
+                    }
+                })
+                .ToListAsync();
+
+            var offeringsDict = offerings
+                .GroupBy(o => o.OwnerId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Offering).ToList());
+
+            // 5. Hizmet filtresi (ServiceOffering ID listesi)
+            if (filter.ServiceIds != null && filter.ServiceIds.Any())
+            {
+                var freeBarbersWithServices = offerings
+                    .Where(o => filter.ServiceIds.Contains(o.Id))
+                    .Select(o => o.OwnerId)
+                    .Distinct()
+                    .ToList();
+                
+                freeBarbers = freeBarbers.Where(fb => freeBarbersWithServices.Contains(fb.Id)).ToList();
+                freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            }
+
+            // 6. Fiyat filtresi (min offering price)
+            if (filter.MinPrice.HasValue || filter.MaxPrice.HasValue)
+            {
+                var validFreeBarbers = new List<Guid>();
+                
+                foreach (var fb in freeBarbers)
+                {
+                    var fbOfferings = offeringsDict.GetValueOrDefault(fb.Id, new List<ServiceOfferingGetDto>());
+                    if (!fbOfferings.Any()) continue;
+                    
+                    var minPrice = fbOfferings.Min(o => o.Price);
+                    
+                    bool matches = true;
+                    if (filter.MinPrice.HasValue && minPrice < filter.MinPrice.Value)
+                        matches = false;
+                    if (filter.MaxPrice.HasValue && minPrice > filter.MaxPrice.Value)
+                        matches = false;
+                    
+                    if (matches)
+                        validFreeBarbers.Add(fb.Id);
+                }
+                
+                freeBarbers = freeBarbers.Where(fb => validFreeBarbers.Contains(fb.Id)).ToList();
+                freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            }
+
+            // Rating bilgileri
+            var ratingStats = await _context.Ratings
+                .AsNoTracking()
+                .Where(r => freeBarberIds.Contains(r.TargetId))
+                .GroupBy(r => r.TargetId)
+                .Select(g => new
+                {
+                    FreeBarber = g.Key,
+                    AvgRating = g.Average(x => (double)x.Score),
+                    ReviewCount = g.Count()
+                })
+                .ToListAsync();
+
+            var ratingDict = ratingStats.ToDictionary(x => x.FreeBarber, x => new { x.AvgRating, x.ReviewCount });
+
+            // 7. Puanlama filtresi
+            if (filter.MinRating.HasValue && filter.MinRating.Value > 0)
+            {
+                freeBarbers = freeBarbers.Where(fb => 
+                    ratingDict.ContainsKey(fb.Id) && 
+                    ratingDict[fb.Id].AvgRating >= filter.MinRating.Value
+                ).ToList();
+                freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            }
+
+            // Favorite bilgileri
+            var favoriteStats = await _context.Favorites
+                .AsNoTracking()
+                .Where(f => freeBarberIds.Contains(f.FavoritedToId) && f.IsActive)
+                .GroupBy(f => f.FavoritedToId)
+                .Select(g => new
+                {
+                    FreeBarber = g.Key,
+                    FavoriteCount = g.Count()
+                })
+                .ToListAsync();
+
+            var favoriteDict = favoriteStats.ToDictionary(x => x.FreeBarber, x => x.FavoriteCount);
+
+            // 8. Favori filtresi
+            if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
+            {
+                var userFavorites = await _context.Favorites
+                    .AsNoTracking()
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && f.IsActive && freeBarberIds.Contains(f.FavoritedToId))
+                    .Select(f => f.FavoritedToId)
+                    .ToListAsync();
+                
+                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.Id)).ToList();
+                freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            }
+
+            // User IsFavorited bilgisi
+            var isFavoritedDict = new Dictionary<Guid, bool>();
+            if (filter.CurrentUserId.HasValue)
+            {
+                var userFavs = await _context.Favorites
+                    .AsNoTracking()
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && freeBarberIds.Contains(f.FavoritedToId))
+                    .Select(f => new { f.FavoritedToId, f.IsActive })
+                    .ToListAsync();
+                
+                isFavoritedDict = userFavs.ToDictionary(x => x.FavoritedToId, x => x.IsActive);
+            }
+
+            // Images
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.OwnerType == ImageOwnerType.FreeBarber && freeBarberIds.Contains(i.ImageOwnerId))
+                .Select(i => new
+                {
+                    i.ImageOwnerId,
+                    Image = new ImageGetDto
+                    {
+                        Id = i.Id,
+                        ImageUrl = i.ImageUrl
+                    }
+                })
+                .ToListAsync();
+
+            var imagesDict = images
+                .GroupBy(i => i.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Image).ToList());
+
+            // DTO'ları oluştur
+            var result = freeBarbers.Select(fb =>
+            {
+                var rating = ratingDict.GetValueOrDefault(fb.Id);
+                var fbOfferings = offeringsDict.GetValueOrDefault(fb.Id, new List<ServiceOfferingGetDto>());
+                
+                return new FreeBarberGetDto
+                {
+                    Id = fb.Id,
+                    FullName = $"{fb.FirstName} {fb.LastName}",
+                    Latitude = fb.Latitude,
+                    Longitude = fb.Longitude,
+                    Type = fb.Type,
+                    IsAvailable = fb.IsAvailable,
+                    Rating = rating != null ? Math.Round(rating.AvgRating, 2) : 0,
+                    ReviewCount = rating?.ReviewCount ?? 0,
+                    FavoriteCount = favoriteDict.GetValueOrDefault(fb.Id, 0),
+                    IsFavorited = isFavoritedDict.GetValueOrDefault(fb.Id, false),
+                    Offerings = fbOfferings,
+                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>())
+                };
+            }).ToList();
+
+            // 9. Fiyat sıralaması (min offering price bazlı)
+            if (!string.IsNullOrWhiteSpace(filter.PriceSort) && filter.PriceSort != "none")
+            {
+                result = filter.PriceSort == "asc"
+                    ? result.OrderBy(fb => fb.Offerings.Any() ? fb.Offerings.Min(o => o.Price) : decimal.MaxValue).ToList()
+                    : result.OrderByDescending(fb => fb.Offerings.Any() ? fb.Offerings.Min(o => o.Price) : 0).ToList();
+            }
+
+            // 10. Pagination
+            var skip = (filter.PageNumber - 1) * filter.PageSize;
+            result = result.Skip(skip).Take(filter.PageSize).ToList();
+
+            return result;
+        }
     }
 }

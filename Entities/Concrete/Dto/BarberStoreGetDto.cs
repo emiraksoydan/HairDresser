@@ -19,13 +19,14 @@ namespace Entities.Concrete.Dto
         public double Rating { get; set; }
         public double DistanceKm { get; set; }
         public int FavoriteCount { get; set; }
+        public bool IsFavorited { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public string AddressDescription { get; set; }
         public bool IsOpenNow { get; set; }
         public int ReviewCount { get; set; }
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
-
+        public List<ServiceOfferingGetDto> Offerings { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
 
     }

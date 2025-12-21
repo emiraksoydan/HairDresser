@@ -517,6 +517,247 @@ namespace DataAccess.Concrete
             return result;
         }
 
+        public async Task<List<BarberStoreGetDto>> GetFilteredStoresAsync(FilterRequestDto filter)
+        {
+            var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
+            
+            // Base query
+            var query = _context.BarberStores.AsNoTracking().AsQueryable();
+
+            // 1. Konum filtresi (nearby)
+            if (filter.Latitude.HasValue && filter.Longitude.HasValue)
+            {
+                var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
+                var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(
+                    filter.Latitude.Value, 
+                    filter.Longitude.Value, 
+                    distance
+                );
+                query = query.Where(s => 
+                    s.Latitude >= minLat && s.Latitude <= maxLat &&
+                    s.Longitude >= minLon && s.Longitude <= maxLon
+                );
+            }
+
+            // 2. İsim araması
+            if (!string.IsNullOrWhiteSpace(filter.SearchQuery))
+            {
+                var searchLower = filter.SearchQuery.ToLower();
+                query = query.Where(s => s.StoreName.ToLower().Contains(searchLower));
+            }
+
+            // 3. Ana kategori filtresi (BarberType)
+            if (filter.MainCategory.HasValue)
+            {
+                query = query.Where(s => s.Type == filter.MainCategory.Value);
+            }
+
+            // 4. Pricing Type filtresi
+            if (!string.IsNullOrWhiteSpace(filter.PricingType) && filter.PricingType != "all")
+            {
+                if (filter.PricingType == "rent")
+                    query = query.Where(s => s.PricingType == PricingType.Rent);
+                else if (filter.PricingType == "percent")
+                    query = query.Where(s => s.PricingType == PricingType.Percent);
+            }
+
+            // 5. Fiyat aralığı filtresi
+            if (filter.MinPrice.HasValue)
+                query = query.Where(s => s.PricingValue >= (double)filter.MinPrice.Value);
+            
+            if (filter.MaxPrice.HasValue)
+                query = query.Where(s => s.PricingValue <= (double)filter.MaxPrice.Value);
+
+            // Store bilgilerini al
+            var stores = await query
+                .Select(s => new
+                {
+                    s.Id,
+                    s.StoreName,
+                    s.Latitude,
+                    s.Longitude,
+                    s.PricingType,
+                    s.PricingValue,
+                    s.Type,
+                    s.AddressDescription,
+                    s.BarberStoreOwnerId
+                })
+                .ToListAsync();
+
+            if (!stores.Any())
+                return new List<BarberStoreGetDto>();
+
+            var storeIds = stores.Select(s => s.Id).ToList();
+
+            // 6. Hizmet filtresi (ServiceOffering ID listesi)
+            if (filter.ServiceIds != null && filter.ServiceIds.Any())
+            {
+                var storesWithServices = await _context.ServiceOfferings
+                    .AsNoTracking()
+                    .Where(o => storeIds.Contains(o.OwnerId) && filter.ServiceIds.Contains(o.Id))
+                    .Select(o => o.OwnerId)
+                    .Distinct()
+                    .ToListAsync();
+                
+                stores = stores.Where(s => storesWithServices.Contains(s.Id)).ToList();
+                storeIds = stores.Select(s => s.Id).ToList();
+            }
+
+            // Rating bilgileri
+            var ratingStats = await _context.Ratings
+                .AsNoTracking()
+                .Where(r => storeIds.Contains(r.TargetId))
+                .GroupBy(r => r.TargetId)
+                .Select(g => new
+                {
+                    StoreId = g.Key,
+                    AvgRating = g.Average(x => (double)x.Score),
+                    ReviewCount = g.Count()
+                })
+                .ToListAsync();
+
+            var ratingDict = ratingStats.ToDictionary(x => x.StoreId, x => new { x.AvgRating, x.ReviewCount });
+
+            // 7. Puanlama filtresi
+            if (filter.MinRating.HasValue && filter.MinRating.Value > 0)
+            {
+                stores = stores.Where(s => 
+                    ratingDict.ContainsKey(s.Id) && 
+                    ratingDict[s.Id].AvgRating >= filter.MinRating.Value
+                ).ToList();
+                storeIds = stores.Select(s => s.Id).ToList();
+            }
+
+            // Favorite bilgileri
+            var favoriteStats = await _context.Favorites
+                .AsNoTracking()
+                .Where(f => storeIds.Contains(f.FavoritedToId) && f.IsActive)
+                .GroupBy(f => f.FavoritedToId)
+                .Select(g => new
+                {
+                    StoreId = g.Key,
+                    FavoriteCount = g.Count()
+                })
+                .ToListAsync();
+
+            var favoriteDict = favoriteStats.ToDictionary(x => x.StoreId, x => x.FavoriteCount);
+
+            // 8. Favori filtresi
+            if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
+            {
+                var userFavorites = await _context.Favorites
+                    .AsNoTracking()
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && f.IsActive && storeIds.Contains(f.FavoritedToId))
+                    .Select(f => f.FavoritedToId)
+                    .ToListAsync();
+                
+                stores = stores.Where(s => userFavorites.Contains(s.Id)).ToList();
+                storeIds = stores.Select(s => s.Id).ToList();
+            }
+
+            // User IsFavorited bilgisi
+            var isFavoritedDict = new Dictionary<Guid, bool>();
+            if (filter.CurrentUserId.HasValue)
+            {
+                var userFavs = await _context.Favorites
+                    .AsNoTracking()
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && storeIds.Contains(f.FavoritedToId))
+                    .Select(f => new { f.FavoritedToId, f.IsActive })
+                    .ToListAsync();
+                
+                isFavoritedDict = userFavs.ToDictionary(x => x.FavoritedToId, x => x.IsActive);
+            }
+
+            // Offerings
+            var offerings = await _context.ServiceOfferings
+                .AsNoTracking()
+                .Where(o => storeIds.Contains(o.OwnerId))
+                .Select(o => new
+                {
+                    o.OwnerId,
+                    Offering = new ServiceOfferingGetDto
+                    {
+                        Id = o.Id,
+                        ServiceName = o.ServiceName,
+                        Price = o.Price
+                    }
+                })
+                .ToListAsync();
+
+            var offeringsDict = offerings
+                .GroupBy(o => o.OwnerId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Offering).ToList());
+
+            // Working hours
+            var hours = await _context.WorkingHours
+                .AsNoTracking()
+                .Where(w => storeIds.Contains(w.OwnerId))
+                .ToListAsync();
+
+            var hoursDict = hours
+                .GroupBy(h => h.OwnerId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Images
+            var images = await _context.Images
+                .AsNoTracking()
+                .Where(i => i.OwnerType == ImageOwnerType.Store && storeIds.Contains(i.ImageOwnerId))
+                .Select(i => new
+                {
+                    i.ImageOwnerId,
+                    Image = new ImageGetDto
+                    {
+                        Id = i.Id,
+                        ImageUrl = i.ImageUrl
+                    }
+                })
+                .ToListAsync();
+
+            var imagesDict = images
+                .GroupBy(i => i.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Image).ToList());
+
+            // DTO'ları oluştur
+            var result = stores.Select(s =>
+            {
+                var storeHours = hoursDict.GetValueOrDefault(s.Id, new List<WorkingHour>());
+                var rating = ratingDict.GetValueOrDefault(s.Id);
+                
+                return new BarberStoreGetDto
+                {
+                    Id = s.Id,
+                    StoreName = s.StoreName,
+                    Latitude = s.Latitude,
+                    Longitude = s.Longitude,
+                    PricingType = s.PricingType.ToString(),
+                    PricingValue = s.PricingValue,
+                    Type = s.Type,
+                    AddressDescription = s.AddressDescription,
+                    Rating = rating != null ? Math.Round(rating.AvgRating, 2) : 0,
+                    ReviewCount = rating?.ReviewCount ?? 0,
+                    FavoriteCount = favoriteDict.GetValueOrDefault(s.Id, 0),
+                    IsFavorited = isFavoritedDict.GetValueOrDefault(s.Id, false),
+                    IsOpenNow = OpenControl.IsOpenNow(storeHours, nowLocal),
+                    Offerings = offeringsDict.GetValueOrDefault(s.Id, new List<ServiceOfferingGetDto>()),
+                    ServiceOfferings = offeringsDict.GetValueOrDefault(s.Id, new List<ServiceOfferingGetDto>()),
+                    ImageList = imagesDict.GetValueOrDefault(s.Id, new List<ImageGetDto>())
+                };
+            }).ToList();
+
+            // 9. Fiyat sıralaması
+            if (!string.IsNullOrWhiteSpace(filter.PriceSort) && filter.PriceSort != "none")
+            {
+                result = filter.PriceSort == "asc"
+                    ? result.OrderBy(s => s.PricingValue).ToList()
+                    : result.OrderByDescending(s => s.PricingValue).ToList();
+            }
+
+            // 10. Pagination
+            var skip = (filter.PageNumber - 1) * filter.PageSize;
+            result = result.Skip(skip).Take(filter.PageSize).ToList();
+
+            return result;
+        }
        
     }
 }

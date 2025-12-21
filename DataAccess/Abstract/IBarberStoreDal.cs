@@ -13,6 +13,9 @@ namespace DataAccess.Abstract
     public interface IBarberStoreDal : IEntityRepository<BarberStore>
     {
         Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1.0);
+        
+        // Filtreleme ve arama
+        Task<List<BarberStoreGetDto>> GetFilteredStoresAsync(FilterRequestDto filter);
 
         Task<List<BarberStoreMineDto>> GetMineStores(Guid currentUserId);
 
