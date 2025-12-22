@@ -35,6 +35,9 @@ namespace Entities.Concrete.Dto
 
         // Müsaitlik (FreeBarber için)
         public bool? IsAvailable { get; set; }
+        
+        // Açık/Kapalı durumu (Store için)
+        public bool? IsOpenNow { get; set; }
 
         // Puanlama
         public int? MinRating { get; set; } // 0-5

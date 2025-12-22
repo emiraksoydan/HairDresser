@@ -422,6 +422,18 @@ namespace Business.Concrete
                         // 2. toUserId -> StoreId yönünde (Store sahibi kendisini favoriye eklemiş olabilir, ama bu mantıklı değil)
                         // Store sahibi (toUserId) StoreId'yi favoriye eklemiş olabilir, ama bu thread için mantıklı değil
                         // Bu yüzden sadece fromUserId -> StoreId kontrolü yeterli
+                        //
+                        // Ek kural: Karşı taraf userId bazlı favori yaptıysa (StoreOwner -> Customer vb.) thread görünür kalmalı
+                        if (!isFavoriteActive)
+                        {
+                            var favUser1 = await favoriteDal.GetByUsersAsync(fromUserId, toUserId);
+                            if (favUser1 != null && favUser1.IsActive) isFavoriteActive = true;
+                        }
+                        if (!isFavoriteActive)
+                        {
+                            var favUser2 = await favoriteDal.GetByUsersAsync(toUserId, fromUserId);
+                            if (favUser2 != null && favUser2.IsActive) isFavoriteActive = true;
+                        }
                     }
                     else
                     {
@@ -679,6 +691,17 @@ namespace Business.Concrete
                 {
                     isFavoriteActive = true;
                 }
+                // Ek kural: Karşı taraf userId bazlı favori yaptıysa thread görünür kalmalı
+                if (!isFavoriteActive)
+                {
+                    var favUser1 = await favoriteDal.GetByUsersAsync(fromUserId, toUserId);
+                    if (favUser1 != null && favUser1.IsActive) isFavoriteActive = true;
+                }
+                if (!isFavoriteActive)
+                {
+                    var favUser2 = await favoriteDal.GetByUsersAsync(toUserId, fromUserId);
+                    if (favUser2 != null && favUser2.IsActive) isFavoriteActive = true;
+                }
             }
             else
             {
@@ -848,6 +871,17 @@ namespace Business.Concrete
                     {
                         isFavoriteActive = true;
                     }
+                    // Ek kural: Karşı taraf userId bazlı favori yaptıysa thread görünür kalmalı
+                    if (!isFavoriteActive)
+                    {
+                        var favUser1 = await favoriteDal.GetByUsersAsync(fromUserId, toUserId);
+                        if (favUser1 != null && favUser1.IsActive) isFavoriteActive = true;
+                    }
+                    if (!isFavoriteActive)
+                    {
+                        var favUser2 = await favoriteDal.GetByUsersAsync(toUserId, fromUserId);
+                        if (favUser2 != null && favUser2.IsActive) isFavoriteActive = true;
+                    }
                 }
                 else
                 {
@@ -953,6 +987,18 @@ namespace Business.Concrete
                 // 2. toUserId -> StoreId yönünde (Store sahibi kendisini favoriye eklemiş olabilir, ama bu mantıklı değil)
                 // Store sahibi (toUserId) StoreId'yi favoriye eklemiş olabilir, ama bu thread için mantıklı değil
                 // Bu yüzden sadece fromUserId -> StoreId kontrolü yeterli
+                //
+                // Ek kural: Karşı taraf userId bazlı favori yaptıysa (StoreOwner -> Customer vb.) thread görünür kalmalı
+                if (!isFavoriteActive)
+                {
+                    var favUser1 = await favoriteDal.GetByUsersAsync(fromUserId, toUserId);
+                    if (favUser1 != null && favUser1.IsActive) isFavoriteActive = true;
+                }
+                if (!isFavoriteActive)
+                {
+                    var favUser2 = await favoriteDal.GetByUsersAsync(toUserId, fromUserId);
+                    if (favUser2 != null && favUser2.IsActive) isFavoriteActive = true;
+                }
             }
             else
             {

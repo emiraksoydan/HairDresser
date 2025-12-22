@@ -589,16 +589,27 @@ namespace DataAccess.Concrete
 
             var storeIds = stores.Select(s => s.Id).ToList();
 
-            // 6. Hizmet filtresi (ServiceOffering ID listesi)
+            // 6. Hizmet filtresi (CategoryId listesi)
+            // Not: ServiceOffering tablosu serviceName tuttuğu için, Category.Id -> Category.Name map edip ServiceName ile eşliyoruz.
+            // Backward compatibility: Eğer istemci ServiceOffering.Id gönderirse onu da destekliyoruz.
             if (filter.ServiceIds != null && filter.ServiceIds.Any())
             {
+                var categoryNames = await _context.Categories
+                    .AsNoTracking()
+                    .Where(c => filter.ServiceIds.Contains(c.Id))
+                    .Select(c => c.Name)
+                    .ToListAsync();
+
                 var storesWithServices = await _context.ServiceOfferings
                     .AsNoTracking()
-                    .Where(o => storeIds.Contains(o.OwnerId) && filter.ServiceIds.Contains(o.Id))
+                    .Where(o =>
+                        storeIds.Contains(o.OwnerId) &&
+                        (filter.ServiceIds.Contains(o.Id) || categoryNames.Contains(o.ServiceName))
+                    )
                     .Select(o => o.OwnerId)
                     .Distinct()
                     .ToListAsync();
-                
+
                 stores = stores.Where(s => storesWithServices.Contains(s.Id)).ToList();
                 storeIds = stores.Select(s => s.Id).ToList();
             }
@@ -642,7 +653,7 @@ namespace DataAccess.Concrete
 
             var favoriteDict = favoriteStats.ToDictionary(x => x.StoreId, x => x.FavoriteCount);
 
-            // 8. Favori filtresi
+            // 8. Favori filtresi (kullanıcının favorileri + kendi dükkanları)
             if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
             {
                 var userFavorites = await _context.Favorites
@@ -651,7 +662,8 @@ namespace DataAccess.Concrete
                     .Select(f => f.FavoritedToId)
                     .ToListAsync();
                 
-                stores = stores.Where(s => userFavorites.Contains(s.Id)).ToList();
+                // Kullanıcının favorileri + kendi dükkanları (BarberStoreOwnerId == CurrentUserId)
+                stores = stores.Where(s => userFavorites.Contains(s.Id) || s.BarberStoreOwnerId == filter.CurrentUserId.Value).ToList();
                 storeIds = stores.Select(s => s.Id).ToList();
             }
 
@@ -744,17 +756,19 @@ namespace DataAccess.Concrete
                 };
             }).ToList();
 
-            // 9. Fiyat sıralaması
+            // 9. IsOpenNow filtresi (true => açık, false => kapalı)
+            if (filter.IsOpenNow.HasValue)
+            {
+                result = result.Where(s => s.IsOpenNow == filter.IsOpenNow.Value).ToList();
+            }
+
+            // 10. Fiyat sıralaması
             if (!string.IsNullOrWhiteSpace(filter.PriceSort) && filter.PriceSort != "none")
             {
                 result = filter.PriceSort == "asc"
                     ? result.OrderBy(s => s.PricingValue).ToList()
                     : result.OrderByDescending(s => s.PricingValue).ToList();
             }
-
-            // 10. Pagination
-            var skip = (filter.PageNumber - 1) * filter.PageSize;
-            result = result.Skip(skip).Take(filter.PageSize).ToList();
 
             return result;
         }

@@ -411,6 +411,7 @@ namespace DataAccess.Concrete
                 .Select(fb => new
                 {
                     fb.Id,
+                    fb.FreeBarberUserId,
                     fb.FirstName,
                     fb.LastName,
                     fb.Latitude,
@@ -446,15 +447,23 @@ namespace DataAccess.Concrete
                 .GroupBy(o => o.OwnerId)
                 .ToDictionary(g => g.Key, g => g.Select(x => x.Offering).ToList());
 
-            // 5. Hizmet filtresi (ServiceOffering ID listesi)
+            // 5. Hizmet filtresi (CategoryId listesi)
+            // Not: ServiceOffering tablosu serviceName tuttuğu için, Category.Id -> Category.Name map edip ServiceName ile eşliyoruz.
+            // Backward compatibility: Eğer istemci ServiceOffering.Id gönderirse onu da destekliyoruz.
             if (filter.ServiceIds != null && filter.ServiceIds.Any())
             {
+                var categoryNames = await _context.Categories
+                    .AsNoTracking()
+                    .Where(c => filter.ServiceIds.Contains(c.Id))
+                    .Select(c => c.Name)
+                    .ToListAsync();
+
                 var freeBarbersWithServices = offerings
-                    .Where(o => filter.ServiceIds.Contains(o.Id))
+                    .Where(o => filter.ServiceIds.Contains(o.Id) || categoryNames.Contains(o.Offering.ServiceName))
                     .Select(o => o.OwnerId)
                     .Distinct()
                     .ToList();
-                
+
                 freeBarbers = freeBarbers.Where(fb => freeBarbersWithServices.Contains(fb.Id)).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
             }
@@ -524,7 +533,7 @@ namespace DataAccess.Concrete
 
             var favoriteDict = favoriteStats.ToDictionary(x => x.FreeBarber, x => x.FavoriteCount);
 
-            // 8. Favori filtresi
+            // 8. Favori filtresi (kullanıcının favorileri + kendi paneli)
             if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
             {
                 var userFavorites = await _context.Favorites
@@ -533,7 +542,8 @@ namespace DataAccess.Concrete
                     .Select(f => f.FavoritedToId)
                     .ToListAsync();
                 
-                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.Id)).ToList();
+                // Kullanıcının favorileri + kendi paneli (FreeBarberUserId == CurrentUserId)
+                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.Id) || fb.FreeBarberUserId == filter.CurrentUserId.Value).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
             }
 
@@ -599,10 +609,6 @@ namespace DataAccess.Concrete
                     ? result.OrderBy(fb => fb.Offerings.Any() ? fb.Offerings.Min(o => o.Price) : decimal.MaxValue).ToList()
                     : result.OrderByDescending(fb => fb.Offerings.Any() ? fb.Offerings.Min(o => o.Price) : 0).ToList();
             }
-
-            // 10. Pagination
-            var skip = (filter.PageNumber - 1) * filter.PageSize;
-            result = result.Skip(skip).Take(filter.PageSize).ToList();
 
             return result;
         }
