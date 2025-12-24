@@ -7,7 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Api.BackgroundServices
 {
@@ -20,193 +24,310 @@ namespace Api.BackgroundServices
         private readonly BackgroundServicesSettings _settings = backgroundServicesSettings.Value;
         private readonly ILogger<AppointmentTimeoutWorker> _logger = logger;
 
-        [TransactionScopeAspect]
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-
                 var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-                var notifySvc = scope.ServiceProvider.GetRequiredService<IAppointmentNotifyService>();
-                var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
-                var realtime = scope.ServiceProvider.GetRequiredService<IRealTimePublisher>();
 
                 var now = DateTime.UtcNow;
+                const int batchSize = 50; // Her seferde 50 appointment işle
 
-                var expired = await db.Appointments
-                    .Where(a => a.Status == AppointmentStatus.Pending
-                             && a.PendingExpiresAt != null
-                             && a.PendingExpiresAt <= now)
-                    .ToListAsync(stoppingToken);
+                // Toplam expired appointment sayısını kontrol et
+                var totalExpiredCount = await db.Appointments
+                    .CountAsync(a => a.Status == AppointmentStatus.Pending
+                                  && a.PendingExpiresAt != null
+                                  && a.PendingExpiresAt <= now, stoppingToken);
 
-                if (expired.Any())
+                if (totalExpiredCount > 0)
                 {
-                    _logger.LogInformation("AppointmentTimeoutWorker: Found {Count} expired appointments", expired.Count);
+                    _logger.LogInformation("AppointmentTimeoutWorker: Found {Count} expired appointments, processing in batches of {BatchSize}", 
+                        totalExpiredCount, batchSize);
                 }
 
-                // Her appointment için işlem yap
-                foreach (var appt in expired)
+                // Batch'ler halinde işle
+                int processedCount = 0;
+                while (processedCount < totalExpiredCount)
                 {
-                    appt.Status = AppointmentStatus.Unanswered;
-                    appt.PendingExpiresAt = null;
-                    appt.UpdatedAt = DateTime.UtcNow;
-
-                    if (appt.StoreDecision == DecisionStatus.Pending)
-                        appt.StoreDecision = DecisionStatus.NoAnswer;
-
-                    if (appt.FreeBarberDecision == DecisionStatus.Pending)
-                        appt.FreeBarberDecision = DecisionStatus.NoAnswer;
-
-                    // freebarber release
-                    if (appt.FreeBarberUserId.HasValue)
-                    {
-                        var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == appt.FreeBarberUserId.Value);
-                        if (fb != null)
-                        {
-                            fb.IsAvailable = true;
-                            fb.UpdatedAt = DateTime.UtcNow;
-                            await freeBarberDal.Update(fb);
-                        }
-                    }
-                    // ÖNEMLİ: Notification Type değişmemeli - sadece payload güncellenmeli
-                    // Mevcut notification'ları bul (herhangi bir type olabilir - AppointmentCreated, AppointmentApproved, vb.)
-                    var existingNotifications = await db.Notifications
-                        .Where(n => n.AppointmentId == appt.Id)
+                    // Bir batch al
+                    var expiredBatch = await db.Appointments
+                        .Where(a => a.Status == AppointmentStatus.Pending
+                                 && a.PendingExpiresAt != null
+                                 && a.PendingExpiresAt <= now)
+                        .OrderBy(a => a.PendingExpiresAt) // En eski olanları önce işle
+                        .Take(batchSize)
                         .ToListAsync(stoppingToken);
 
-                    // Mevcut notification'ları olan kullanıcılar (bunların notification'ları güncellenecek)
-                    var usersWithExistingNotifications = existingNotifications.Select(n => n.UserId).Distinct().ToList();
+                    if (!expiredBatch.Any())
+                        break; // Daha fazla expired appointment yok
 
-                    // Mevcut notification'ları güncelle: Sadece payload'daki status'u güncelle, Type değiştirme
-                    foreach (var notif in existingNotifications)
+                    // Batch içindeki her appointment için ayrı transaction ile işlem yap
+                    foreach (var appt in expiredBatch)
                     {
-                        // Payload'daki status'u güncelle (veri tutarlılığı için)
-                        if (!string.IsNullOrEmpty(notif.PayloadJson) && notif.PayloadJson.Trim() != "{}")
-                        {
-                            try
-                            {
-                                var options = new JsonSerializerOptions 
-                                { 
-                                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                                    WriteIndented = false 
-                                };
-                                
-                                // Mevcut payload'ı parse et ve status'u güncelle
-                                using var doc = JsonDocument.Parse(notif.PayloadJson);
-                                var root = doc.RootElement;
-                                
-                                // Yeni bir dictionary oluştur (object tipinde değerler için)
-                                var payloadDict = new Dictionary<string, object?>();
-                                
-                                // Mevcut tüm property'leri kopyala (status hariç)
-                                foreach (var prop in root.EnumerateObject())
-                                {
-                                    if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
-                                        prop.Name.Equals("storeDecision", StringComparison.OrdinalIgnoreCase) ||
-                                        prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase))
-                                        continue; // Status ve decision'ları atla, yeni değerle güncelleyeceğiz
-                                    
-                                    // Value'yü object'e çevir (basit tipler için)
-                                    payloadDict[prop.Name] = prop.Value.ValueKind switch
-                                    {
-                                        System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
-                                        System.Text.Json.JsonValueKind.Number => prop.Value.TryGetInt32(out var intVal) ? (object)intVal : prop.Value.GetDecimal(),
-                                        System.Text.Json.JsonValueKind.True => true,
-                                        System.Text.Json.JsonValueKind.False => false,
-                                        System.Text.Json.JsonValueKind.Null => null,
-                                        System.Text.Json.JsonValueKind.Object => JsonSerializer.Deserialize<object>(prop.Value.GetRawText()),
-                                        System.Text.Json.JsonValueKind.Array => JsonSerializer.Deserialize<object[]>(prop.Value.GetRawText()),
-                                        _ => prop.Value.GetRawText() // Complex types için raw text
-                                    };
-                                }
-                                
-                                // Status ve decision'ları Unanswered olarak ekle/güncelle
-                                payloadDict["status"] = (int)AppointmentStatus.Unanswered;
-                                payloadDict["storeDecision"] = appt.StoreDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)appt.StoreDecision;
-                                payloadDict["freeBarberDecision"] = appt.FreeBarberDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)appt.FreeBarberDecision;
-                                
-                                // Geri JSON string'e çevir
-                                notif.PayloadJson = JsonSerializer.Serialize(payloadDict, options);
-                            }
-                            catch (Exception ex)
-                            {
-                                // Payload parse edilemezse log ve devam et
-                                _logger.LogWarning(ex, "Failed to update notification payload for notification {NotificationId}", notif.Id);
-                            }
-                        }
-                        
-                        // Güncellenmiş notification'ı SignalR ile push et (veri tutarlılığı için)
                         try
                         {
-                            var updatedDto = new Entities.Concrete.Dto.NotificationDto
-                            {
-                                Id = notif.Id,
-                                Type = notif.Type, // Type değişmedi - aynı kaldı
-                                AppointmentId = notif.AppointmentId,
-                                Title = notif.Title,
-                                Body = notif.Body,
-                                PayloadJson = notif.PayloadJson,
-                                CreatedAt = notif.CreatedAt,
-                                IsRead = notif.IsRead
-                            };
-                            await realtime.PushNotificationAsync(notif.UserId, updatedDto);
+                            await ProcessExpiredAppointmentAsync(appt, scope, stoppingToken);
+                            processedCount++;
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Failed to push updated notification {NotificationId} to SignalR", notif.Id);
+                            // Bir appointment başarısız olursa diğerlerini etkilemesin
+                            _logger.LogError(ex, "Failed to process expired appointment {AppointmentId}", appt.Id);
+                            processedCount++; // Sayacı artır ki sonsuz döngüye girmesin
                         }
                     }
 
-                    // ÖNEMLİ: Mevcut notification'ı olmayan kullanıcılara yeni AppointmentUnanswered notification gönder
-                    // Tüm ilgili kullanıcıları belirle
-                    var allParticipantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                        .Where(x => x.HasValue)
-                        .Select(x => x!.Value)
-                        .Distinct()
-                        .ToList();
-
-                    // Mevcut notification'ı olmayan kullanıcılar
-                    var usersWithoutNotifications = allParticipantUserIds
-                        .Where(userId => !usersWithExistingNotifications.Contains(userId))
-                        .ToList();
-
-                    // Bu kullanıcılara yeni AppointmentUnanswered notification gönder
-                    if (usersWithoutNotifications.Any())
+                    // Batch işlendikten sonra kısa bir bekleme (database'e fazla yük bindirmemek için)
+                    if (processedCount < totalExpiredCount)
                     {
-                        try
-                        {
-                            _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}", 
-                                usersWithoutNotifications.Count, appt.Id);
-                            
-                            // Her kullanıcı için manuel olarak AppointmentUnanswered notification gönder
-                            // NotifyAsync tüm kullanıcılara gönderir, ama biz sadece notification'ı olmayanlara göndermek istiyoruz
-                            // Bu yüzden CreateAndPushAsync'i direkt kullanmalıyız
-                            var notificationSvc = scope.ServiceProvider.GetRequiredService<Business.Abstract.INotificationService>();
-                            
-                            // AppointmentNotifyManager'dan title ve payload oluşturmak için
-                            // Basit bir yaklaşım: NotifyAsync'i çağırmak ama sadece belirli kullanıcılara göndermek
-                            // Ancak NotifyAsync tüm kullanıcılara gönderir
-                            // En iyi yaklaşım: Her kullanıcı için ayrı ayrı CreateAndPushAsync çağırmak
-                            // Ama title ve payload oluşturmak için AppointmentNotifyManager.NotifyAsyncInternal mantığına ihtiyacımız var
-                            
-                            // Geçici çözüm: NotifyAsync'i çağırmak - CreateAndPushAsync içinde duplicate kontrolü var
-                            // Ama type farklı olduğu için yeni notification oluşturulur (bu istediğimiz davranış)
-                            // Mevcut notification'ı olan kullanıcılar için: Zaten yukarıda güncellendi
-                            // Mevcut notification'ı olmayan kullanıcılar için: Yeni AppointmentUnanswered gönderilecek
-                            await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", appt.Id);
-                        }
+                        await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken);
                     }
                 }
 
-                if (expired.Count > 0)
-                    await db.SaveChangesAsync(stoppingToken);
+                if (processedCount > 0)
+                {
+                    _logger.LogInformation("AppointmentTimeoutWorker: Processed {ProcessedCount} expired appointments", processedCount);
+                }
 
                 await Task.Delay(TimeSpan.FromSeconds(_settings.AppointmentTimeoutWorkerIntervalSeconds), stoppingToken);
+            }
+        }
+
+        /// <summary>
+        /// Her expired appointment için ayrı transaction içinde işlem yapar
+        /// Bir appointment başarısız olursa diğerleri etkilenmez
+        /// </summary>
+        [TransactionScopeAspect]
+        private async Task ProcessExpiredAppointmentAsync(
+            Entities.Concrete.Entities.Appointment appt,
+            IServiceScope scope,
+            CancellationToken stoppingToken)
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            var notifySvc = scope.ServiceProvider.GetRequiredService<IAppointmentNotifyService>();
+            var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
+            var realtime = scope.ServiceProvider.GetRequiredService<IRealTimePublisher>();
+
+            // ÖNEMLİ: Entity detached durumda olabilir, DbContext'e attach et veya tekrar çek
+            // Daha güvenli yaklaşım: Entity'yi tekrar çek (tracked olacak)
+            var trackedAppt = await db.Appointments.FindAsync(new object[] { appt.Id }, stoppingToken);
+            if (trackedAppt == null)
+            {
+                _logger.LogWarning("Appointment {AppointmentId} not found in database", appt.Id);
+                return;
+            }
+
+            // Appointment status'unu güncelle
+            UpdateAppointmentStatus(trackedAppt);
+
+            // FreeBarber'ı release et
+            await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
+            // Mevcut notification'ları güncelle ve yeni notification'lar gönder
+            await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
+
+            // ÖNEMLİ: TransactionScopeAspect sadece TransactionScope oluşturur, SaveChanges çağırmaz
+            // Bu yüzden manuel olarak SaveChangesAsync çağırmalıyız
+            // TransactionScope içinde SaveChanges çağırmak güvenlidir - transaction commit edilene kadar değişiklikler yazılmaz
+            await db.SaveChangesAsync(stoppingToken);
+            
+            // TransactionScopeAspect scope.Complete() çağırdığında transaction commit edilecek
+        }
+
+        /// <summary>
+        /// Appointment status'unu Unanswered olarak günceller
+        /// </summary>
+        private static void UpdateAppointmentStatus(Entities.Concrete.Entities.Appointment appt)
+        {
+            appt.Status = AppointmentStatus.Unanswered;
+            appt.PendingExpiresAt = null;
+            appt.UpdatedAt = DateTime.UtcNow;
+
+            if (appt.StoreDecision == DecisionStatus.Pending)
+                appt.StoreDecision = DecisionStatus.NoAnswer;
+
+            if (appt.FreeBarberDecision == DecisionStatus.Pending)
+                appt.FreeBarberDecision = DecisionStatus.NoAnswer;
+        }
+
+        /// <summary>
+        /// FreeBarber'ı release eder (IsAvailable = true)
+        /// </summary>
+        private async Task ReleaseFreeBarberAsync(
+            Entities.Concrete.Entities.Appointment appt,
+            DataAccess.Abstract.IFreeBarberDal freeBarberDal,
+            CancellationToken stoppingToken)
+        {
+            if (!appt.FreeBarberUserId.HasValue)
+                return;
+
+            var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == appt.FreeBarberUserId.Value);
+            if (fb != null)
+            {
+                fb.IsAvailable = true;
+                fb.UpdatedAt = DateTime.UtcNow;
+                await freeBarberDal.Update(fb);
+            }
+        }
+
+        /// <summary>
+        /// Mevcut notification'ları günceller ve yeni notification'lar gönderir
+        /// </summary>
+        private async Task UpdateAndSendNotificationsAsync(
+            Entities.Concrete.Entities.Appointment trackedAppt,
+            DatabaseContext db,
+            IAppointmentNotifyService notifySvc,
+            IRealTimePublisher realtime,
+            IServiceScope scope,
+            CancellationToken stoppingToken)
+        {
+            // ÖNEMLİ: Notification Type değişmemeli - sadece payload güncellenmeli
+            // Mevcut notification'ları bul (herhangi bir type olabilir - AppointmentCreated, AppointmentApproved, vb.)
+            var existingNotifications = await db.Notifications
+                .Where(n => n.AppointmentId == trackedAppt.Id)
+                .ToListAsync(stoppingToken);
+
+            // Mevcut notification'ları olan kullanıcılar (bunların notification'ları güncellenecek)
+            var usersWithExistingNotifications = existingNotifications.Select(n => n.UserId).Distinct().ToList();
+
+            // Mevcut notification'ları güncelle: Sadece payload'daki status'u güncelle, Type değiştirme
+            foreach (var notif in existingNotifications)
+            {
+                await UpdateNotificationPayloadAsync(notif, trackedAppt, db, realtime, stoppingToken);
+            }
+
+            // ÖNEMLİ: Mevcut notification'ı olmayan kullanıcılara yeni AppointmentUnanswered notification gönder
+            var allParticipantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            var usersWithoutNotifications = allParticipantUserIds
+                .Where(userId => !usersWithExistingNotifications.Contains(userId))
+                .ToList();
+
+            if (usersWithoutNotifications.Any())
+            {
+                await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
+            }
+        }
+
+        /// <summary>
+        /// Notification payload'ını günceller ve SignalR ile push eder
+        /// </summary>
+        private async Task UpdateNotificationPayloadAsync(
+            Entities.Concrete.Entities.Notification notif,
+            Entities.Concrete.Entities.Appointment trackedAppt,
+            DatabaseContext db,
+            IRealTimePublisher realtime,
+            CancellationToken stoppingToken)
+        {
+            // Payload'daki status'u güncelle (veri tutarlılığı için)
+            if (string.IsNullOrEmpty(notif.PayloadJson) || notif.PayloadJson.Trim() == "{}")
+                return;
+
+            try
+            {
+                var options = new JsonSerializerOptions 
+                { 
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false 
+                };
+                
+                // Mevcut payload'ı parse et ve status'u güncelle
+                using var doc = JsonDocument.Parse(notif.PayloadJson);
+                var root = doc.RootElement;
+                
+                // Yeni bir dictionary oluştur (object tipinde değerler için)
+                var payloadDict = new Dictionary<string, object?>();
+                
+                // Mevcut tüm property'leri kopyala (status hariç)
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
+                        prop.Name.Equals("storeDecision", StringComparison.OrdinalIgnoreCase) ||
+                        prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase))
+                        continue; // Status ve decision'ları atla, yeni değerle güncelleyeceğiz
+                    
+                    // Value'yü object'e çevir (basit tipler için)
+                    payloadDict[prop.Name] = prop.Value.ValueKind switch
+                    {
+                        System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
+                        System.Text.Json.JsonValueKind.Number => prop.Value.TryGetInt32(out var intVal) ? (object)intVal : prop.Value.GetDecimal(),
+                        System.Text.Json.JsonValueKind.True => true,
+                        System.Text.Json.JsonValueKind.False => false,
+                        System.Text.Json.JsonValueKind.Null => null,
+                        System.Text.Json.JsonValueKind.Object => JsonSerializer.Deserialize<object>(prop.Value.GetRawText()),
+                        System.Text.Json.JsonValueKind.Array => JsonSerializer.Deserialize<object[]>(prop.Value.GetRawText()),
+                        _ => prop.Value.GetRawText() // Complex types için raw text
+                    };
+                }
+                
+                // Status ve decision'ları Unanswered olarak ekle/güncelle
+                payloadDict["status"] = (int)AppointmentStatus.Unanswered;
+                payloadDict["storeDecision"] = trackedAppt.StoreDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)trackedAppt.StoreDecision;
+                payloadDict["freeBarberDecision"] = trackedAppt.FreeBarberDecision == DecisionStatus.Pending ? (int)DecisionStatus.NoAnswer : (int)trackedAppt.FreeBarberDecision;
+                
+                // Geri JSON string'e çevir
+                notif.PayloadJson = JsonSerializer.Serialize(payloadDict, options);
+                
+                // ÖNEMLİ: Notification'ı DbContext'e attach et veya Update çağrısı yap
+                // DbContext tarafından track edilmesi için
+                db.Notifications.Update(notif);
+            }
+            catch (Exception ex)
+            {
+                // Payload parse edilemezse log ve devam et
+                _logger.LogWarning(ex, "Failed to update notification payload for notification {NotificationId}", notif.Id);
+                return;
+            }
+            
+            // Güncellenmiş notification'ı SignalR ile push et (veri tutarlılığı için)
+            try
+            {
+                var updatedDto = new Entities.Concrete.Dto.NotificationDto
+                {
+                    Id = notif.Id,
+                    Type = notif.Type, // Type değişmedi - aynı kaldı
+                    AppointmentId = notif.AppointmentId,
+                    Title = notif.Title,
+                    Body = notif.Body,
+                    PayloadJson = notif.PayloadJson,
+                    CreatedAt = notif.CreatedAt,
+                    IsRead = notif.IsRead
+                };
+                await realtime.PushNotificationAsync(notif.UserId, updatedDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to push updated notification {NotificationId} to SignalR", notif.Id);
+            }
+        }
+
+        /// <summary>
+        /// Yeni AppointmentUnanswered notification'ları gönderir
+        /// </summary>
+        private async Task SendNewUnansweredNotificationsAsync(
+            Entities.Concrete.Entities.Appointment trackedAppt,
+            IAppointmentNotifyService notifySvc,
+            List<Guid> usersWithoutNotifications,
+            CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}", 
+                    usersWithoutNotifications.Count, trackedAppt.Id);
+                
+                // NotifyAsync tüm kullanıcılara gönderir, ama CreateAndPushAsync içinde duplicate kontrolü var
+                // Mevcut notification'ı olan kullanıcılar için: Zaten yukarıda güncellendi
+                // Mevcut notification'ı olmayan kullanıcılar için: Yeni AppointmentUnanswered gönderilecek
+                await notifySvc.NotifyAsync(trackedAppt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", trackedAppt.Id);
+                // Notification gönderimi başarısız olsa bile appointment update'i commit edilmeli
             }
         }
     }
