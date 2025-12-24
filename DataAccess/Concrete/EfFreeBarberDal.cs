@@ -425,6 +425,7 @@ namespace DataAccess.Concrete
                 return new List<FreeBarberGetDto>();
 
             var freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+            var freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
 
             // Offerings
             var offerings = await _context.ServiceOfferings
@@ -466,6 +467,7 @@ namespace DataAccess.Concrete
 
                 freeBarbers = freeBarbers.Where(fb => freeBarbersWithServices.Contains(fb.Id)).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+                freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
             }
 
             // 6. Fiyat filtresi (min offering price)
@@ -492,12 +494,13 @@ namespace DataAccess.Concrete
                 
                 freeBarbers = freeBarbers.Where(fb => validFreeBarbers.Contains(fb.Id)).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+                freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
             }
 
             // Rating bilgileri
             var ratingStats = await _context.Ratings
                 .AsNoTracking()
-                .Where(r => freeBarberIds.Contains(r.TargetId))
+                .Where(r => freeBarberUserIds.Contains(r.TargetId))
                 .GroupBy(r => r.TargetId)
                 .Select(g => new
                 {
@@ -512,17 +515,18 @@ namespace DataAccess.Concrete
             // 7. Puanlama filtresi
             if (filter.MinRating.HasValue && filter.MinRating.Value > 0)
             {
-                freeBarbers = freeBarbers.Where(fb => 
-                    ratingDict.ContainsKey(fb.Id) && 
-                    ratingDict[fb.Id].AvgRating >= filter.MinRating.Value
+                freeBarbers = freeBarbers.Where(fb =>
+                    ratingDict.ContainsKey(fb.FreeBarberUserId) &&
+                    ratingDict[fb.FreeBarberUserId].AvgRating >= filter.MinRating.Value
                 ).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+                freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
             }
 
             // Favorite bilgileri
             var favoriteStats = await _context.Favorites
                 .AsNoTracking()
-                .Where(f => freeBarberIds.Contains(f.FavoritedToId) && f.IsActive)
+                .Where(f => freeBarberUserIds.Contains(f.FavoritedToId) && f.IsActive)
                 .GroupBy(f => f.FavoritedToId)
                 .Select(g => new
                 {
@@ -538,13 +542,14 @@ namespace DataAccess.Concrete
             {
                 var userFavorites = await _context.Favorites
                     .AsNoTracking()
-                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && f.IsActive && freeBarberIds.Contains(f.FavoritedToId))
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && f.IsActive && freeBarberUserIds.Contains(f.FavoritedToId))
                     .Select(f => f.FavoritedToId)
                     .ToListAsync();
                 
                 // Kullanıcının favorileri + kendi paneli (FreeBarberUserId == CurrentUserId)
-                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.Id) || fb.FreeBarberUserId == filter.CurrentUserId.Value).ToList();
+                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.FreeBarberUserId) || fb.FreeBarberUserId == filter.CurrentUserId.Value).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
+                freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
             }
 
             // User IsFavorited bilgisi
@@ -553,7 +558,7 @@ namespace DataAccess.Concrete
             {
                 var userFavs = await _context.Favorites
                     .AsNoTracking()
-                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && freeBarberIds.Contains(f.FavoritedToId))
+                    .Where(f => f.FavoritedFromId == filter.CurrentUserId.Value && freeBarberUserIds.Contains(f.FavoritedToId))
                     .Select(f => new { f.FavoritedToId, f.IsActive })
                     .ToListAsync();
                 
@@ -582,7 +587,7 @@ namespace DataAccess.Concrete
             // DTO'ları oluştur
             var result = freeBarbers.Select(fb =>
             {
-                var rating = ratingDict.GetValueOrDefault(fb.Id);
+                var rating = ratingDict.GetValueOrDefault(fb.FreeBarberUserId);
                 var fbOfferings = offeringsDict.GetValueOrDefault(fb.Id, new List<ServiceOfferingGetDto>());
                 
                 return new FreeBarberGetDto
@@ -595,8 +600,8 @@ namespace DataAccess.Concrete
                     IsAvailable = fb.IsAvailable,
                     Rating = rating != null ? Math.Round(rating.AvgRating, 2) : 0,
                     ReviewCount = rating?.ReviewCount ?? 0,
-                    FavoriteCount = favoriteDict.GetValueOrDefault(fb.Id, 0),
-                    IsFavorited = isFavoritedDict.GetValueOrDefault(fb.Id, false),
+                    FavoriteCount = favoriteDict.GetValueOrDefault(fb.FreeBarberUserId, 0),
+                    IsFavorited = isFavoritedDict.GetValueOrDefault(fb.FreeBarberUserId, false),
                     Offerings = fbOfferings,
                     ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>())
                 };
