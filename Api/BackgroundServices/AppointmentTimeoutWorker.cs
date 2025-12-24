@@ -220,7 +220,7 @@ namespace Api.BackgroundServices
                 try
                 {
                     _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}", 
-                        usersWithoutNotifications.Count, appt.Id);
+                        usersWithoutNotifications.Count, trackedAppt.Id);
                     
                     // Her kullanıcı için manuel olarak AppointmentUnanswered notification gönder
                     // NotifyAsync tüm kullanıcılara gönderir, ama biz sadece notification'ı olmayanlara göndermek istiyoruz
@@ -241,15 +241,17 @@ namespace Api.BackgroundServices
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", appt.Id);
+                    _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", trackedAppt.Id);
                     // Notification gönderimi başarısız olsa bile appointment update'i commit edilmeli
                 }
             }
 
-            // ÖNEMLİ: TransactionScopeAspect otomatik olarak SaveChanges'i çağıracak
-            // Bu yüzden manuel SaveChangesAsync çağrısına gerek yok
-            // DbContext değişiklikleri otomatik olarak track ediyor (trackedAppt ve notif.Update() sayesinde)
-            // TransactionScopeAspect reflection ile DbContext'i bulup SaveChanges'i çağıracak
+            // ÖNEMLİ: TransactionScopeAspect sadece TransactionScope oluşturur, SaveChanges çağırmaz
+            // Bu yüzden manuel olarak SaveChangesAsync çağırmalıyız
+            // TransactionScope içinde SaveChanges çağırmak güvenlidir - transaction commit edilene kadar değişiklikler yazılmaz
+            await db.SaveChangesAsync(stoppingToken);
+            
+            // TransactionScopeAspect scope.Complete() çağırdığında transaction commit edilecek
         }
     }
 }
