@@ -12,7 +12,7 @@ namespace Entities.Concrete.Dto
     {
         public Guid StoreId { get; set; }
         public Guid? ChairId { get; set; } 
-        public DateOnly AppointmentDate { get; set; }
+        public DateOnly? AppointmentDate { get; set; } // İsteğime Göre senaryosunda null olabilir
         public TimeSpan? StartTime { get; set; }
         public TimeSpan? EndTime { get; set; }
         public Guid? FreeBarberUserId { get; set; } 
@@ -21,5 +21,16 @@ namespace Entities.Concrete.Dto
         public double? RequestLatitude { get; set; }
         public double? RequestLongitude { get; set; }
 
+        // Customer -> FreeBarber randevusu için yeni alanlar
+        /// <summary>
+        /// StoreSelectionType - İsteğime Göre (0) veya Dükkan Seç (1)
+        /// Sadece Customer -> FreeBarber randevusunda kullanılır
+        /// </summary>
+        public StoreSelectionType? StoreSelectionType { get; set; }
+        
+        /// <summary>
+        /// Randevu notu - Müşteri tarafından yazılır (hizmetler, fiyatlar, saat bilgisi)
+        /// </summary>
+        public string? Note { get; set; }
     }
 }

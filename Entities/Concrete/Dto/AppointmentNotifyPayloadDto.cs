@@ -13,7 +13,7 @@ namespace Entities.Concrete.Dto
         public Guid AppointmentId { get; set; }
         public string EventKey { get; set; } = null!;     
         public string RecipientRole { get; set; } = null!; 
-        public DateOnly Date { get; set; }
+        public DateOnly? Date { get; set; }
         public TimeSpan? StartTime { get; set; }
         public TimeSpan? EndTime { get; set; }
         public Guid? ActorUserId { get; set; }           
@@ -26,6 +26,10 @@ namespace Entities.Concrete.Dto
         public AppointmentStatus? Status { get; set; }
         public DecisionStatus? StoreDecision { get; set; }
         public DecisionStatus? FreeBarberDecision { get; set; }
+        public DecisionStatus? CustomerDecision { get; set; }
+        public StoreSelectionType? StoreSelectionType { get; set; }
+        public DateTime? PendingExpiresAt { get; set; }
+        public string? Note { get; set; }
 
         // Service offerings - Frontend'de hizmet butonlarını göstermek için
         public List<ServiceOfferingGetDto>? ServiceOfferings { get; set; }

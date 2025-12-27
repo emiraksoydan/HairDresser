@@ -36,11 +36,30 @@ namespace Api.Controllers
             return Ok(data);
         }
 
+        [HttpPost("customer-to-freebarber")]
+        public async Task<IActionResult> CreateCustomerToFreeBarber([FromBody] CreateAppointmentRequestDto req)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.CreateCustomerToFreeBarberAsync(userId, req);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
         [HttpPost("customer")]
         public async Task<IActionResult> CreateCustomer([FromBody] CreateAppointmentRequestDto req)
         {
             var userId = User.GetUserIdOrThrow();
             var result = await _svc.CreateCustomerToStoreAndFreeBarberControlAsync(userId, req);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+        
+        [HttpPost("{id:guid}/add-store")]
+        public async Task<IActionResult> AddStoreToAppointment(
+            Guid id,
+            [FromBody] AddStoreToAppointmentRequestDto req)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.AddStoreToExistingAppointmentAsync(
+                userId, id, req.StoreId, req.ChairId, req.AppointmentDate, req.StartTime, req.EndTime, req.ServiceOfferingIds);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
@@ -75,6 +94,14 @@ namespace Api.Controllers
         {
             var userId = User.GetUserIdOrThrow();
             var result = await _svc.FreeBarberDecisionAsync(userId, id, approve);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+        
+        [HttpPost("{id:guid}/customer-decision")]
+        public async Task<IActionResult> CustomerDecision(Guid id, [FromQuery] bool approve)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.CustomerDecisionAsync(userId, id, approve);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 

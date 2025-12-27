@@ -33,9 +33,6 @@ namespace Business.Concrete
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
             if (appt is null) return new ErrorDataResult<ChatMessageDto>(Messages.AppointmentNotFound);
 
-            if (appt.Status is not (AppointmentStatus.Pending or AppointmentStatus.Approved))
-                return new ErrorDataResult<ChatMessageDto>(Messages.ChatOnlyForActiveAppointments);
-
             // yetki: sender katılımcı mı?
             var isParticipant =
                 appt.CustomerUserId == senderUserId ||
@@ -44,11 +41,83 @@ namespace Business.Concrete
 
             if (!isParticipant) return new ErrorDataResult<ChatMessageDto>(Messages.NotAParticipant);
 
+            // Mesaj gönderme kontrolü: Randevu status kontrolü VEYA favori kontrolü
+            bool canSendMessage = false;
+            
+            // 1. Randevu status kontrolü: Pending veya Approved ise mesaj gönderilebilir
+            if (appt.Status is AppointmentStatus.Pending or AppointmentStatus.Approved)
+            {
+                canSendMessage = true;
+            }
+            // 2. Randevu status uygun değilse, favori kontrolü yap
+            else
+            {
+                // Katılımcılar arasında aktif favori var mı kontrol et
+                var participants = new[] { appt.CustomerUserId, appt.FreeBarberUserId, appt.BarberStoreUserId }
+                    .Where(x => x.HasValue && x.Value != senderUserId)
+                    .Select(x => x!.Value)
+                    .ToList();
+
+                foreach (var participantId in participants)
+                {
+                    // İki yönlü favori kontrolü: sender -> participant veya participant -> sender
+                    var favorite1 = await favoriteDal.GetByUsersAsync(senderUserId, participantId);
+                    if (favorite1 != null && favorite1.IsActive)
+                    {
+                        canSendMessage = true;
+                        break;
+                    }
+                    
+                    var favorite2 = await favoriteDal.GetByUsersAsync(participantId, senderUserId);
+                    if (favorite2 != null && favorite2.IsActive)
+                    {
+                        canSendMessage = true;
+                        break;
+                    }
+                }
+
+                // Store bazlı favori kontrolü (eğer store varsa)
+                if (!canSendMessage && appt.BarberStoreUserId.HasValue)
+                {
+                    // Store bilgisini al (storeId için) - zaten aşağıda alınıyor ama burada da alalım
+                    var storeForFavoriteCheck = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId.Value);
+                    if (storeForFavoriteCheck != null)
+                    {
+                        // sender -> store favori kontrolü (storeId ile)
+                        var favoriteStore1 = await favoriteDal.Get(x => 
+                            x.FavoritedFromId == senderUserId && 
+                            x.FavoritedToId == storeForFavoriteCheck.Id && 
+                            x.IsActive);
+                        if (favoriteStore1 != null)
+                        {
+                            canSendMessage = true;
+                        }
+                    }
+                    
+                    // store owner -> sender favori kontrolü (user bazlı)
+                    if (!canSendMessage)
+                    {
+                        var favoriteStore2 = await favoriteDal.GetByUsersAsync(appt.BarberStoreUserId.Value, senderUserId);
+                        if (favoriteStore2 != null && favoriteStore2.IsActive)
+                        {
+                            canSendMessage = true;
+                        }
+                    }
+                }
+            }
+
+            if (!canSendMessage)
+                return new ErrorDataResult<ChatMessageDto>("Mesaj göndermek için randevu aktif olmalı veya karşılıklı favori olmalısınız.");
+
             // Performance: Use Get instead of GetAll().FirstOrDefault()
             var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
-            var barberStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
-            if (barberStore is null)
-                return new ErrorDataResult<ChatMessageDto>(Messages.StoreNotFound);
+            BarberStore? barberStore = null;
+            if (appt.BarberStoreUserId.HasValue)
+            {
+                barberStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId);
+                if (barberStore is null)
+                    return new ErrorDataResult<ChatMessageDto>(Messages.StoreNotFound);
+            }
             
             if (thread is null)
             {
@@ -57,7 +126,7 @@ namespace Business.Concrete
                     Id = Guid.NewGuid(),
                     AppointmentId = appointmentId,
                     CustomerUserId = appt.CustomerUserId,
-                    StoreOwnerUserId = barberStore.BarberStoreOwnerId,     
+                    StoreOwnerUserId = appt.BarberStoreUserId,
                     FreeBarberUserId = appt.FreeBarberUserId,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow

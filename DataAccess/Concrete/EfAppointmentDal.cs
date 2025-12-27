@@ -47,8 +47,9 @@ namespace DataAccess.Concrete
                 .Where(a => a.ChairId != null
                     && chairIds.Contains(a.ChairId.Value)
                     && a.AppointmentDate == dateOnly
-                    && (a.Status == AppointmentStatus.Pending || a.Status == AppointmentStatus.Approved))
-                .Select(a => new { ChairId = a.ChairId!.Value, a.StartTime, a.EndTime })
+                    && (a.Status == AppointmentStatus.Pending || a.Status == AppointmentStatus.Approved)
+                    && a.StartTime.HasValue && a.EndTime.HasValue) // Nullable kontrolü
+                .Select(a => new { ChairId = a.ChairId!.Value, StartTime = a.StartTime!.Value, EndTime = a.EndTime!.Value })
                 .ToListAsync(ct);
 
             var apptMap = appts
@@ -400,9 +401,9 @@ namespace DataAccess.Concrete
                 {
                     Id = appt.Id,
                     Status = appt.Status,
-                    AppointmentDate = appt.AppointmentDate,
-                    StartTime = appt.StartTime,
-                    EndTime = appt.EndTime,
+                    AppointmentDate = appt.AppointmentDate, // Nullable
+                    StartTime = appt.StartTime, // Nullable
+                    EndTime = appt.EndTime, // Nullable
                     CreatedAt = appt.CreatedAt,
                     ChairId = appt.ChairId,
                     AppointmentRequester = appt.RequestedBy,

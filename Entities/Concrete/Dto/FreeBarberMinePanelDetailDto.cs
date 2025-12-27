@@ -1,4 +1,4 @@
-﻿using Entities.Concrete.Enums;
+using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +10,7 @@ namespace Entities.Concrete.Dto
     public class FreeBarberMinePanelDetailDto
     {
         public Guid Id { get; set; }
+        public Guid FreeBarberUserId { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public BarberType Type { get; set; }
@@ -22,3 +23,4 @@ namespace Entities.Concrete.Dto
 
     }
 }
+

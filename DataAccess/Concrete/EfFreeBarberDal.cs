@@ -80,6 +80,7 @@ namespace DataAccess.Concrete
             return new FreeBarberMinePanelDto
             {
                 Id = freeBarber.Id,
+                FreeBarberUserId = freeBarber.FreeBarberUserId,
                 Type = freeBarber.Type,
                 FullName = freeBarber.FirstName + " " + freeBarber.LastName,
                 IsAvailable = freeBarber.IsAvailable,
@@ -157,6 +158,7 @@ namespace DataAccess.Concrete
             return new FreeBarberMinePanelDto
             {
                 Id = freeBarber.Id,
+                FreeBarberUserId = freeBarber.FreeBarberUserId,
                 Type = freeBarber.Type,
                 FullName = freeBarber.FirstName + " " + freeBarber.LastName,
                 IsAvailable = freeBarber.IsAvailable,
@@ -282,6 +284,7 @@ namespace DataAccess.Concrete
                     return new FreeBarberGetDto
                     {
                         Id = s.Id,
+                        FreeBarberUserId = s.FreeBarberUserId,
                         IsAvailable = s.IsAvailable,
                         ImageList = images ?? new List<ImageGetDto>(),
                         Type = s.Type,
@@ -351,6 +354,7 @@ namespace DataAccess.Concrete
             return new FreeBarberMinePanelDetailDto
             {
                 Id = freeBarber.Id,
+                FreeBarberUserId = freeBarber.FreeBarberUserId,
                 Type = freeBarber.Type,
                 FirstName = freeBarber.FirstName,
                 LastName = freeBarber.LastName,
@@ -593,6 +597,7 @@ namespace DataAccess.Concrete
                 return new FreeBarberGetDto
                 {
                     Id = fb.Id,
+                    FreeBarberUserId = fb.FreeBarberUserId,
                     FullName = $"{fb.FirstName} {fb.LastName}",
                     Latitude = fb.Latitude,
                     Longitude = fb.Longitude,
@@ -619,3 +624,4 @@ namespace DataAccess.Concrete
         }
     }
 }
+

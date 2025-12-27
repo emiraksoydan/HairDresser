@@ -29,7 +29,13 @@ namespace Business.Abstract
         /// <summary>
         /// Updates notification payloads for an appointment (status, decisions) and pushes via SignalR
         /// </summary>
-        Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(Guid appointmentId, AppointmentStatus status, DecisionStatus? storeDecision = null, DecisionStatus? freeBarberDecision = null);
+        Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(
+            Guid appointmentId,
+            AppointmentStatus status,
+            DecisionStatus? storeDecision = null,
+            DecisionStatus? freeBarberDecision = null,
+            DecisionStatus? customerDecision = null,
+            DateTime? pendingExpiresAt = null);
 
     }
 }

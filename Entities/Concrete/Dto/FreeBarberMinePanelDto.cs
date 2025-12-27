@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +12,7 @@ namespace Entities.Concrete.Dto
     public class FreeBarberMinePanelDto : IDto
     {
         public Guid Id { get; set; }
+        public Guid FreeBarberUserId { get; set; }
         public string FullName { get; set; }
         public BarberType Type { get; set; }
         public double Rating { get; set; }
@@ -24,3 +25,4 @@ namespace Entities.Concrete.Dto
         public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
 }
+

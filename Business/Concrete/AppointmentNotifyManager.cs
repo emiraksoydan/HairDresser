@@ -341,6 +341,10 @@ namespace Business.Concrete
                     Status = appt.Status,
                     StoreDecision = appt.StoreDecision,
                     FreeBarberDecision = appt.FreeBarberDecision,
+                    CustomerDecision = appt.CustomerDecision,
+                    StoreSelectionType = appt.StoreSelectionType,
+                    PendingExpiresAt = appt.PendingExpiresAt,
+                    Note = appt.Note,
 
                     // Service offerings - Frontend'de hizmet butonlarını göstermek için
                     ServiceOfferings = serviceOfferings.Any() ? serviceOfferings : null,

@@ -8,9 +8,9 @@ namespace Entities.Concrete.Entities
     {
         public Guid Id { get; set; }
         public Guid? ChairId { get; set; } 
-        public TimeSpan StartTime { get; set; }
-        public TimeSpan EndTime { get; set; }
-        public DateOnly AppointmentDate { get; set; }
+        public TimeSpan? StartTime { get; set; } // İsteğime Göre senaryosunda null olabilir
+        public TimeSpan? EndTime { get; set; } // İsteğime Göre senaryosunda null olabilir
+        public DateOnly? AppointmentDate { get; set; } // İsteğime Göre senaryosunda null olabilir
         public AppointmentStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
@@ -19,13 +19,19 @@ namespace Entities.Concrete.Entities
         public Guid? FreeBarberUserId { get; set; }
         public Guid? ManuelBarberId { get; set; }
         public AppointmentRequester RequestedBy { get; set; }
+        public StoreSelectionType? StoreSelectionType { get; set; }
         public DecisionStatus StoreDecision { get; set; } = DecisionStatus.Pending;
         public DecisionStatus FreeBarberDecision { get; set; } = DecisionStatus.Pending;
+        public DecisionStatus CustomerDecision { get; set; } = DecisionStatus.Pending;
         public DateTime? PendingExpiresAt { get; set; }
         public Guid? CancelledByUserId { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public byte[]? RowVersion { get; set; }
+        /// <summary>
+        /// Randevu notu - Müşteri tarafından yazılır (Customer -> FreeBarber randevusunda)
+        /// </summary>
+        public string? Note { get; set; }
         public ICollection<AppointmentServiceOffering> ServiceOfferings { get; set; } = new List<AppointmentServiceOffering>();
     }
 }

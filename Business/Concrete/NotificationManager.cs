@@ -230,7 +230,13 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
-        public async Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(Guid appointmentId, AppointmentStatus status, DecisionStatus? storeDecision = null, DecisionStatus? freeBarberDecision = null)
+        public async Task<IDataResult<bool>> UpdateNotificationPayloadByAppointmentAsync(
+            Guid appointmentId,
+            AppointmentStatus status,
+            DecisionStatus? storeDecision = null,
+            DecisionStatus? freeBarberDecision = null,
+            DecisionStatus? customerDecision = null,
+            DateTime? pendingExpiresAt = null)
         {
             // Appointment'a ait tüm notification'ları bul (okunmuş/okunmamış fark etmez)
             var notifications = await notificationDal.GetAll(x => x.AppointmentId == appointmentId);
@@ -260,7 +266,9 @@ namespace Business.Concrete
                         // Status ve decision'ları atla, bunları aşağıda güncelleyeceğiz
                         if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
                             prop.Name.Equals("storeDecision", StringComparison.OrdinalIgnoreCase) ||
-                            prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase))
+                            prop.Name.Equals("freeBarberDecision", StringComparison.OrdinalIgnoreCase) ||
+                            prop.Name.Equals("customerDecision", StringComparison.OrdinalIgnoreCase) ||
+                            prop.Name.Equals("pendingExpiresAt", StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
                         }
@@ -285,6 +293,8 @@ namespace Business.Concrete
                         payloadDict["storeDecision"] = (int)storeDecision.Value;
                     if (freeBarberDecision.HasValue)
                         payloadDict["freeBarberDecision"] = (int)freeBarberDecision.Value;
+                    payloadDict["customerDecision"] = customerDecision.HasValue ? (int)customerDecision.Value : null;
+                    payloadDict["pendingExpiresAt"] = pendingExpiresAt;
                     
                     // Geri JSON string'e çevir
                     var options = new JsonSerializerOptions 

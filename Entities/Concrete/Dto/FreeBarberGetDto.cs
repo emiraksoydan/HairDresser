@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace Entities.Concrete.Dto
     public class FreeBarberGetDto : IDto
     {
         public Guid Id { get; set; }
+        public Guid FreeBarberUserId { get; set; }
         public string FullName { get; set; }
         public BarberType Type { get; set; }
         public double Rating { get; set; }
@@ -27,3 +28,4 @@ namespace Entities.Concrete.Dto
         public List<ServiceOfferingGetDto> Offerings { get; set; }
     }
 }
+

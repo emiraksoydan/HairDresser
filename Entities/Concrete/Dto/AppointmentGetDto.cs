@@ -10,9 +10,9 @@ namespace Entities.Concrete.Dto
         public Guid? ChairId { get; set; }
 
         public string? ChairName { get; set; }
-        public TimeSpan StartTime { get; set; }
-        public TimeSpan EndTime { get; set; }
-        public DateOnly AppointmentDate { get; set; }
+        public TimeSpan? StartTime { get; set; } // İsteğime Göre senaryosunda null olabilir
+        public TimeSpan? EndTime { get; set; } // İsteğime Göre senaryosunda null olabilir
+        public DateOnly? AppointmentDate { get; set; } // İsteğime Göre senaryosunda null olabilir
         public AppointmentStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
 
