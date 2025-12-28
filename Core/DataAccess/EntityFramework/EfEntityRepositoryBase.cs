@@ -39,9 +39,19 @@ namespace Core.DataAccess.EntityFramework
             return await context.Set<TEntity>().AnyAsync(filter);
         }
 
+        public async Task<bool> AnyAsync(IQueryable<TEntity> query)
+        {
+            return await query.AnyAsync();
+        }
+
         public async Task<int> CountAsync(Expression<Func<TEntity, bool>> filter)
         {
             return await context.Set<TEntity>().CountAsync(filter);
+        }
+
+        public IQueryable<TEntity> GetQueryable()
+        {
+            return context.Set<TEntity>();
         }
 
         public async Task<TEntity> Get(Expression<Func<TEntity, bool>> filter)

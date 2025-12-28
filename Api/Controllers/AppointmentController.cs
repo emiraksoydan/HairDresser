@@ -74,7 +74,16 @@ namespace Api.Controllers
 
         // 4) Store -> FreeBarber call
         [HttpPost("store")]
-        public async Task<IActionResult> CreateStoreToFreeBarber([FromBody] CreateAppointmentRequestDto req)
+        public async Task<IActionResult> CreateStoreToFreeBarber([FromBody] CreateStoreToFreeBarberRequestDto req)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.CreateStoreToFreeBarberAsync(userId, req);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        // 4b) Store -> FreeBarber call (Simplified - No date/time/services)
+        [HttpPost("store/call-freebarber")]
+        public async Task<IActionResult> CallFreeBarber([FromBody] CreateStoreToFreeBarberRequestDto req)
         {
             var userId = User.GetUserIdOrThrow();
             var result = await _svc.CreateStoreToFreeBarberAsync(userId, req);

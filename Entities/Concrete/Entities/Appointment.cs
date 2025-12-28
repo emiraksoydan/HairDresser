@@ -20,9 +20,9 @@ namespace Entities.Concrete.Entities
         public Guid? ManuelBarberId { get; set; }
         public AppointmentRequester RequestedBy { get; set; }
         public StoreSelectionType? StoreSelectionType { get; set; }
-        public DecisionStatus StoreDecision { get; set; } = DecisionStatus.Pending;
-        public DecisionStatus FreeBarberDecision { get; set; } = DecisionStatus.Pending;
-        public DecisionStatus CustomerDecision { get; set; } = DecisionStatus.Pending;
+        public DecisionStatus? StoreDecision { get; set; }
+        public DecisionStatus? FreeBarberDecision { get; set; }
+        public DecisionStatus? CustomerDecision { get; set; }
         public DateTime? PendingExpiresAt { get; set; }
         public Guid? CancelledByUserId { get; set; }
         public DateTime? ApprovedAt { get; set; }

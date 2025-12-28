@@ -1,4 +1,5 @@
 using Business.Abstract;
+using Business.Helpers;
 using Business.Resources;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
@@ -19,7 +20,8 @@ namespace Business.Concrete
              IFreeBarberDal freeBarberDal,
              IImageDal imageDal,
              IFavoriteDal favoriteDal,
-             IRealTimePublisher realtime
+             IRealTimePublisher realtime,
+             FavoriteHelper favoriteHelper
      ) : IChatService
     {
 
@@ -58,52 +60,23 @@ namespace Business.Concrete
                     .Select(x => x!.Value)
                     .ToList();
 
-                foreach (var participantId in participants)
+                // Store ID'yi al (eğer varsa)
+                Guid? storeId = null;
+                if (appt.BarberStoreUserId.HasValue)
                 {
-                    // İki yönlü favori kontrolü: sender -> participant veya participant -> sender
-                    var favorite1 = await favoriteDal.GetByUsersAsync(senderUserId, participantId);
-                    if (favorite1 != null && favorite1.IsActive)
-                    {
-                        canSendMessage = true;
-                        break;
-                    }
-                    
-                    var favorite2 = await favoriteDal.GetByUsersAsync(participantId, senderUserId);
-                    if (favorite2 != null && favorite2.IsActive)
-                    {
-                        canSendMessage = true;
-                        break;
-                    }
-                }
-
-                // Store bazlı favori kontrolü (eğer store varsa)
-                if (!canSendMessage && appt.BarberStoreUserId.HasValue)
-                {
-                    // Store bilgisini al (storeId için) - zaten aşağıda alınıyor ama burada da alalım
                     var storeForFavoriteCheck = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId.Value);
                     if (storeForFavoriteCheck != null)
                     {
-                        // sender -> store favori kontrolü (storeId ile)
-                        var favoriteStore1 = await favoriteDal.Get(x => 
-                            x.FavoritedFromId == senderUserId && 
-                            x.FavoritedToId == storeForFavoriteCheck.Id && 
-                            x.IsActive);
-                        if (favoriteStore1 != null)
-                        {
-                            canSendMessage = true;
-                        }
-                    }
-                    
-                    // store owner -> sender favori kontrolü (user bazlı)
-                    if (!canSendMessage)
-                    {
-                        var favoriteStore2 = await favoriteDal.GetByUsersAsync(appt.BarberStoreUserId.Value, senderUserId);
-                        if (favoriteStore2 != null && favoriteStore2.IsActive)
-                        {
-                            canSendMessage = true;
-                        }
+                        storeId = storeForFavoriteCheck.Id;
                     }
                 }
+
+                // Optimized: Tek query ile tüm favori kontrolü
+                canSendMessage = await favoriteHelper.IsFavoriteActiveMultipleParticipantsAsync(
+                    senderUserId, 
+                    participants, 
+                    storeId
+                );
             }
 
             if (!canSendMessage)
@@ -357,17 +330,68 @@ namespace Business.Concrete
                     if (!apptDict.TryGetValue(threadDto.AppointmentId!.Value, out var appt)) continue;
                     if (!threadDict.TryGetValue(threadDto.AppointmentId.Value, out var threadEntity)) continue;
 
-                    // ÖNEMLİ: Appointment thread görünürlüğü status'e göre kontrol edilmeli
-                    // Sadece Pending/Approved durumundaki appointment'lar için thread görünür olmalı
-                    // Favori thread mantığına benzer: En az bir aktif favori varsa görünür
-                    // Appointment thread mantığı: Status Pending/Approved ise görünür
-                    if (appt.Status != AppointmentStatus.Pending && appt.Status != AppointmentStatus.Approved)
+                    // ÖNEMLİ: Appointment thread görünürlüğü kontrolü
+                    // Thread görünür olması için iki koşuldan biri sağlanmalı:
+                    // 1. Status Pending veya Approved ise görünür
+                    // 2. Status Pending/Approved değilse, en az bir aktif favori varsa görünür (favori thread mantığı gibi)
+                    bool isStatusVisible = appt.Status == AppointmentStatus.Pending || appt.Status == AppointmentStatus.Approved;
+                    bool isFavoriteVisible = false;
+                    
+                    // Store bilgisini al (favori kontrolü için)
+                    storeDict.TryGetValue(appt.BarberStoreUserId ?? Guid.Empty, out var store);
+                    
+                    // Status uygun değilse favori kontrolü yap
+                    if (!isStatusVisible)
                     {
-                        // Status artık Pending/Approved değil - thread görünür olmamalı
+                        // Katılımcıları belirle (kendimiz hariç)
+                        var threadParticipantIds = new List<Guid>();
+                        if (appt.CustomerUserId.HasValue && appt.CustomerUserId.Value != userId)
+                            threadParticipantIds.Add(appt.CustomerUserId.Value);
+                        if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId.Value != userId)
+                            threadParticipantIds.Add(appt.FreeBarberUserId.Value);
+                        if (appt.BarberStoreUserId.HasValue && appt.BarberStoreUserId.Value != userId)
+                            threadParticipantIds.Add(appt.BarberStoreUserId.Value);
+                        
+                        // Store bazlı favori kontrolü (eğer store varsa)
+                        if (store != null && store.BarberStoreOwnerId != userId)
+                        {
+                            var favoriteStore = await favoriteDal.Get(x => 
+                                x.FavoritedFromId == userId && 
+                                x.FavoritedToId == store.Id && 
+                                x.IsActive);
+                            if (favoriteStore != null)
+                            {
+                                isFavoriteVisible = true;
+                            }
+                        }
+                        
+                        // User bazlı favori kontrolü
+                        if (!isFavoriteVisible && threadParticipantIds.Any())
+                        {
+                            foreach (var participantId in threadParticipantIds)
+                            {
+                                var favorite1 = await favoriteDal.GetByUsersAsync(userId, participantId);
+                                if (favorite1 != null && favorite1.IsActive)
+                                {
+                                    isFavoriteVisible = true;
+                                    break;
+                                }
+                                
+                                var favorite2 = await favoriteDal.GetByUsersAsync(participantId, userId);
+                                if (favorite2 != null && favorite2.IsActive)
+                                {
+                                    isFavoriteVisible = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Thread görünür değilse atla
+                    if (!isStatusVisible && !isFavoriteVisible)
+                    {
                         continue;
                     }
-
-                    storeDict.TryGetValue(appt.BarberStoreUserId ?? Guid.Empty, out var store);
                     threadDto.Title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
                     
                     // Status'u appointment'tan güncelle (threadDto.Status zaten appointment'tan geliyor ama güncel olması için)
@@ -1307,17 +1331,14 @@ namespace Business.Concrete
             return new SuccessDataResult<Guid>(thread.Id);
         }
 
-        public async Task PushAppointmentThreadCreatedAsync(Guid appointmentId)
+        private async Task PushAppointmentThreadAsync(Guid appointmentId, PushThreadAction action)
         {
-            // Appointment thread'i oluşturulduğunda veya güncellendiğinde tüm katılımcılara thread detaylarını gönder
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
             if (appt == null) return;
 
             var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
             if (thread == null) return;
 
-            // Sadece Pending/Approved durumlarında thread görünür olmalı
-            // Eğer durum Pending/Approved değilse threadRemoved event'i gönderilmeli (UpdateThreadOnAppointmentStatusChangeAsync'te yapılıyor)
             if (appt.Status != AppointmentStatus.Pending && appt.Status != AppointmentStatus.Approved)
                 return;
 
@@ -1327,29 +1348,21 @@ namespace Business.Concrete
                 .Distinct()
                 .ToList();
 
-            // Tüm katılımcıların UserType'larını al (participant bilgilerini doğru göstermek için)
-            var participantUsers = await userDal.GetAll(u => participants.Contains(u.Id));
-            var participantUserTypeDict = participantUsers.ToDictionary(u => u.Id, u => u.UserType);
+            var users = await userDal.GetAll(u => participants.Contains(u.Id));
+            var userDict = users.ToDictionary(u => u.Id);
 
-            // Store bilgisi
             BarberStore? store = null;
             if (appt.BarberStoreUserId.HasValue)
             {
                 store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId.Value);
             }
 
-            // Kullanıcı bilgilerini batch olarak çek
-            var users = await userDal.GetAll(u => participants.Contains(u.Id));
-            var userDict = users.ToDictionary(u => u.Id);
-
-            // Store dict
             var storeDict = new Dictionary<Guid, BarberStore>();
             if (store != null)
             {
                 storeDict[store.BarberStoreOwnerId] = store;
             }
 
-            // FreeBarber dict
             var freeBarberDict = new Dictionary<Guid, FreeBarber>();
             if (appt.FreeBarberUserId.HasValue)
             {
@@ -1360,33 +1373,9 @@ namespace Business.Concrete
                 }
             }
 
-            // Image'ları batch olarak çek (GetLatestImageAsync kullanarak)
-            // User image'ları için user.Id (ImageOwnerId = user.Id, OwnerType = User)
-            var userImageDict = new Dictionary<Guid, string?>();
-            foreach (var user in users)
-            {
-                var img = await imageDal.GetLatestImageAsync(user.Id, ImageOwnerType.User);
-                if (img != null)
-                    userImageDict[user.Id] = img.ImageUrl;
-            }
-
-            // Store image'ları için store.Id (ImageOwnerId = store.Id, OwnerType = Store)
-            var storeImageDict = new Dictionary<Guid, string?>();
-            foreach (var storeEntity in storeDict.Values)
-            {
-                var img = await imageDal.GetLatestImageAsync(storeEntity.Id, ImageOwnerType.Store);
-                if (img != null)
-                    storeImageDict[storeEntity.Id] = img.ImageUrl;
-            }
-
-            // FreeBarber image'ları için freeBarber.Id (ImageOwnerId = freeBarber.Id, OwnerType = FreeBarber)
-            var freeBarberImageDict = new Dictionary<Guid, string?>();
-            foreach (var freeBarberEntity in freeBarberDict.Values)
-            {
-                var img = await imageDal.GetLatestImageAsync(freeBarberEntity.Id, ImageOwnerType.FreeBarber);
-                if (img != null)
-                    freeBarberImageDict[freeBarberEntity.Id] = img.ImageUrl;
-            }
+            var userImageDict = await GetImagesForUsersAsync(users.Select(u => u.Id).ToList());
+            var storeImageDict = await GetImagesForStoresAsync(storeDict.Values.Select(s => s.Id).ToList());
+            var freeBarberImageDict = await GetImagesForFreeBarberAsync(freeBarberDict.Values.Select(f => f.Id).ToList());
 
             foreach (var userId in participants)
             {
@@ -1510,8 +1499,10 @@ namespace Business.Concrete
                         Participants = participantsList
                     };
 
-                    // ThreadCreated gönder (yeni thread oluşturulduğunda)
-                    await realtime.PushChatThreadCreatedAsync(userId, threadDto);
+                    if (action == PushThreadAction.Created)
+                        await realtime.PushChatThreadCreatedAsync(userId, threadDto);
+                    else
+                        await realtime.PushChatThreadUpdatedAsync(userId, threadDto);
                 }
                 catch
                 {
@@ -1520,218 +1511,14 @@ namespace Business.Concrete
             }
         }
 
+        public async Task PushAppointmentThreadCreatedAsync(Guid appointmentId)
+        {
+            await PushAppointmentThreadAsync(appointmentId, PushThreadAction.Created);
+        }
+
         public async Task PushAppointmentThreadUpdatedAsync(Guid appointmentId)
         {
-            // Appointment thread'i güncellendiğinde (status değiştiğinde) tüm katılımcılara thread detaylarını gönder
-            // PushAppointmentThreadCreatedAsync ile aynı mantık, ama threadUpdated event'i gönderir
-            var appt = await appointmentDal.Get(x => x.Id == appointmentId);
-            if (appt == null) return;
-
-            var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
-            if (thread == null) return;
-
-            // Sadece Pending/Approved durumlarında thread görünür olmalı
-            // Eğer durum Pending/Approved değilse threadRemoved event'i gönderilmeli (UpdateThreadOnAppointmentStatusChangeAsync'te yapılıyor)
-            if (appt.Status != AppointmentStatus.Pending && appt.Status != AppointmentStatus.Approved)
-                return;
-
-            var participants = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue)
-                .Select(x => x!.Value)
-                .Distinct()
-                .ToList();
-
-            // Tüm katılımcıların UserType'larını al (participant bilgilerini doğru göstermek için)
-            var participantUsers = await userDal.GetAll(u => participants.Contains(u.Id));
-            var participantUserTypeDict = participantUsers.ToDictionary(u => u.Id, u => u.UserType);
-
-            // Store bilgisi
-            BarberStore? store = null;
-            if (appt.BarberStoreUserId.HasValue)
-            {
-                store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == appt.BarberStoreUserId.Value);
-            }
-
-            // Kullanıcı bilgilerini batch olarak çek
-            var users = await userDal.GetAll(u => participants.Contains(u.Id));
-            var userDict = users.ToDictionary(u => u.Id);
-
-            // Store dict
-            var storeDict = new Dictionary<Guid, BarberStore>();
-            if (store != null)
-            {
-                storeDict[store.BarberStoreOwnerId] = store;
-            }
-
-            // FreeBarber dict
-            var freeBarberDict = new Dictionary<Guid, FreeBarber>();
-            if (appt.FreeBarberUserId.HasValue)
-            {
-                var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == appt.FreeBarberUserId.Value);
-                if (freeBarber != null)
-                {
-                    freeBarberDict[freeBarber.FreeBarberUserId] = freeBarber;
-                }
-            }
-
-            // Image'ları batch olarak çek (GetLatestImageAsync kullanarak)
-            // User image'ları için user.Id (ImageOwnerId = user.Id, OwnerType = User)
-            var userImageDict = new Dictionary<Guid, string?>();
-            foreach (var user in users)
-            {
-                var img = await imageDal.GetLatestImageAsync(user.Id, ImageOwnerType.User);
-                if (img != null)
-                    userImageDict[user.Id] = img.ImageUrl;
-            }
-
-            // Store image'ları için store.Id (ImageOwnerId = store.Id, OwnerType = Store)
-            var storeImageDict = new Dictionary<Guid, string?>();
-            foreach (var storeEntity in storeDict.Values)
-            {
-                var img = await imageDal.GetLatestImageAsync(storeEntity.Id, ImageOwnerType.Store);
-                if (img != null)
-                    storeImageDict[storeEntity.Id] = img.ImageUrl;
-            }
-
-            // FreeBarber image'ları için freeBarber.Id (ImageOwnerId = freeBarber.Id, OwnerType = FreeBarber)
-            var freeBarberImageDict = new Dictionary<Guid, string?>();
-            foreach (var freeBarberEntity in freeBarberDict.Values)
-            {
-                var img = await imageDal.GetLatestImageAsync(freeBarberEntity.Id, ImageOwnerType.FreeBarber);
-                if (img != null)
-                    freeBarberImageDict[freeBarberEntity.Id] = img.ImageUrl;
-            }
-
-            foreach (var userId in participants)
-            {
-                try
-                {
-                    var title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
-
-                    // Participants listesini oluştur - ÖNEMLİ: Sadece kendi userId'miz hariç diğer participant'ları göster
-                    var participantsList = new List<ChatThreadParticipantDto>();
-
-                    // Customer participant - sadece kendimiz değilsek ekle
-                    if (appt.CustomerUserId.HasValue && appt.CustomerUserId.Value != userId)
-                    {
-                        if (userDict.TryGetValue(appt.CustomerUserId.Value, out var customerUser))
-                        {
-                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (thread.CustomerUserId == appt.CustomerUserId.Value)
-                            {
-                                userImageDict.TryGetValue(customerUser.Id, out var customerImageUrl);
-                                participantsList.Add(new ChatThreadParticipantDto
-                                {
-                                    UserId = customerUser.Id,
-                                    DisplayName = $"{customerUser.FirstName} {customerUser.LastName}",
-                                    ImageUrl = customerImageUrl,
-                                    UserType = customerUser.UserType,
-                                    BarberType = null
-                                });
-                            }
-                        }
-                    }
-
-                    // Store participant - sadece kendimiz değilsek ekle
-                    if (appt.BarberStoreUserId.HasValue && store != null)
-                    {
-                        // Store sahibi userId'si ile karşılaştır - ÖNEMLİ: Kendi store bilgilerimizi değil, karşı tarafın bilgilerini göster
-                        if (store.BarberStoreOwnerId != userId)
-                        {
-                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (thread.StoreOwnerUserId == store.BarberStoreOwnerId || 
-                                (thread.StoreOwnerUserId.HasValue && thread.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
-                            {
-                                storeImageDict.TryGetValue(store.Id, out var storeImageUrl);
-                                participantsList.Add(new ChatThreadParticipantDto
-                                {
-                                    UserId = store.BarberStoreOwnerId,
-                                    DisplayName = store.StoreName,
-                                    ImageUrl = storeImageUrl,
-                                    UserType = UserType.BarberStore,
-                                    BarberType = store.Type
-                                });
-                            }
-                        }
-                    }
-
-                    // FreeBarber participant - sadece kendimiz değilsek ekle
-                    if (appt.FreeBarberUserId.HasValue && appt.FreeBarberUserId.Value != userId)
-                    {
-                        if (freeBarberDict.TryGetValue(appt.FreeBarberUserId.Value, out var freeBarberEntity))
-                        {
-                            // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (thread.FreeBarberUserId == freeBarberEntity.FreeBarberUserId || 
-                                (thread.FreeBarberUserId.HasValue && thread.FreeBarberUserId.Value == freeBarberEntity.FreeBarberUserId))
-                            {
-                                freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
-                                participantsList.Add(new ChatThreadParticipantDto
-                                {
-                                    UserId = appt.FreeBarberUserId.Value,
-                                    DisplayName = $"{freeBarberEntity.FirstName} {freeBarberEntity.LastName}",
-                                    ImageUrl = freeBarberImageUrl,
-                                    UserType = UserType.FreeBarber,
-                                    BarberType = freeBarberEntity.Type
-                                });
-                            }
-                        }
-                    }
-
-                    // UnreadCount'u thread entity'den al
-                    int unreadCount = 0;
-                    if (thread.CustomerUserId == userId)
-                        unreadCount = thread.CustomerUnreadCount;
-                    else if (thread.StoreOwnerUserId == userId)
-                        unreadCount = thread.StoreUnreadCount;
-                    else if (thread.FreeBarberUserId == userId)
-                        unreadCount = thread.FreeBarberUnreadCount;
-
-                    // Mevcut kullanıcının (userId) profil resmini al
-                    string? currentUserImageUrlForThisUser = null;
-                    if (userDict.TryGetValue(userId, out var currentUserEntity))
-                    {
-                        if (currentUserEntity.UserType == UserType.Customer)
-                        {
-                            userImageDict.TryGetValue(currentUserEntity.Id, out currentUserImageUrlForThisUser);
-                        }
-                        else if (currentUserEntity.UserType == UserType.BarberStore)
-                        {
-                            if (storeDict.TryGetValue(userId, out var userStore))
-                            {
-                                storeImageDict.TryGetValue(userStore.Id, out currentUserImageUrlForThisUser);
-                            }
-                        }
-                        else if (currentUserEntity.UserType == UserType.FreeBarber)
-                        {
-                            if (freeBarberDict.TryGetValue(userId, out var userFreeBarber))
-                            {
-                                freeBarberImageDict.TryGetValue(userFreeBarber.Id, out currentUserImageUrlForThisUser);
-                            }
-                        }
-                    }
-
-                    var threadDto = new ChatThreadListItemDto
-                    {
-                        ThreadId = thread.Id,
-                        AppointmentId = appt.Id,
-                        Status = appt.Status,
-                        IsFavoriteThread = false,
-                        Title = title,
-                        LastMessagePreview = thread.LastMessagePreview,
-                        LastMessageAt = thread.LastMessageAt,
-                        UnreadCount = unreadCount,
-                        CurrentUserImageUrl = currentUserImageUrlForThisUser,
-                        Participants = participantsList
-                    };
-
-                    // ThreadUpdated gönder (mevcut thread güncellendiğinde)
-                    await realtime.PushChatThreadUpdatedAsync(userId, threadDto);
-                }
-                catch
-                {
-                    // Hata durumunda devam et
-                }
-            }
+            await PushAppointmentThreadAsync(appointmentId, PushThreadAction.Updated);
         }
 
         public async Task PushFavoriteThreadUpdatedAsync(Guid fromUserId, Guid toUserId, Guid threadId)
@@ -2054,6 +1841,48 @@ namespace Business.Concrete
             }
 
             return new SuccessDataResult<bool>(true);
+        }
+
+        private async Task<Dictionary<Guid, string?>> GetImagesForUsersAsync(List<Guid> userIds)
+        {
+            if (userIds == null || userIds.Count == 0)
+                return new Dictionary<Guid, string?>();
+
+            var images = await imageDal.GetAll(img =>
+                userIds.Contains(img.ImageOwnerId) &&
+                img.OwnerType == ImageOwnerType.User);
+
+            return images
+                .GroupBy(img => img.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
+        }
+
+        private async Task<Dictionary<Guid, string?>> GetImagesForStoresAsync(List<Guid> storeIds)
+        {
+            if (storeIds == null || storeIds.Count == 0)
+                return new Dictionary<Guid, string?>();
+
+            var images = await imageDal.GetAll(img =>
+                storeIds.Contains(img.ImageOwnerId) &&
+                img.OwnerType == ImageOwnerType.Store);
+
+            return images
+                .GroupBy(img => img.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
+        }
+
+        private async Task<Dictionary<Guid, string?>> GetImagesForFreeBarberAsync(List<Guid> freeBarberIds)
+        {
+            if (freeBarberIds == null || freeBarberIds.Count == 0)
+                return new Dictionary<Guid, string?>();
+
+            var images = await imageDal.GetAll(img =>
+                freeBarberIds.Contains(img.ImageOwnerId) &&
+                img.OwnerType == ImageOwnerType.FreeBarber);
+
+            return images
+                .GroupBy(img => img.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
         }
     }
 }

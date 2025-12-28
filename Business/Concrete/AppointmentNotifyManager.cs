@@ -22,7 +22,8 @@ namespace Business.Concrete
         IBadgeService badgeService,
         IRealTimePublisher realtime,
         IFavoriteService favoriteService,
-        IFreeBarberDal freeBarberDal
+        IFreeBarberDal freeBarberDal,
+        IBadgeUpdateService badgeUpdateService
     ) : IAppointmentNotifyService
     {
         // Overload 1: AppointmentId ile (mevcut randevular için - transaction dışında)
@@ -38,7 +39,7 @@ namespace Business.Concrete
                 return new ErrorResult(Messages.AppointmentNotFound);
             }
             
-            return await NotifyAsyncInternal(appt, type, actorUserId, extra);
+            return await NotifyAsyncInternal(appt, type, actorUserId, extra, recipientUserIds: null);
         }
 
         // Appointment entity ile (yeni oluşturulan randevular için - transaction içinde)
@@ -53,7 +54,38 @@ namespace Business.Concrete
                 return new ErrorResult(Messages.AppointmentNotFound);
             }
             
-            return await NotifyAsyncInternal(appointment, type, actorUserId, extra);
+            return await NotifyAsyncInternal(appointment, type, actorUserId, extra, recipientUserIds: null);
+        }
+
+        public async Task<IResult> NotifyToRecipientsAsync(
+            Guid appointmentId,
+            NotificationType type,
+            IReadOnlyCollection<Guid> recipientUserIds,
+            Guid? actorUserId = null,
+            object? extra = null)
+        {
+            var appt = await appointmentDal.Get(x => x.Id == appointmentId);
+            if (appt is null)
+            {
+                return new ErrorResult(Messages.AppointmentNotFound);
+            }
+
+            return await NotifyAsyncInternal(appt, type, actorUserId, extra, recipientUserIds);
+        }
+
+        public async Task<IResult> NotifyWithAppointmentToRecipientsAsync(
+            Entities.Concrete.Entities.Appointment appointment,
+            NotificationType type,
+            IReadOnlyCollection<Guid> recipientUserIds,
+            Guid? actorUserId = null,
+            object? extra = null)
+        {
+            if (appointment is null)
+            {
+                return new ErrorResult(Messages.AppointmentNotFound);
+            }
+
+            return await NotifyAsyncInternal(appointment, type, actorUserId, extra, recipientUserIds);
         }
 
         // Internal method: Ortak bildirim gönderme mantığı
@@ -61,7 +93,8 @@ namespace Business.Concrete
             Entities.Concrete.Entities.Appointment appt,
             NotificationType type,
             Guid? actorUserId = null,
-            object? extra = null)
+            object? extra = null,
+            IReadOnlyCollection<Guid>? recipientUserIds = null)
         {
             // ÖNEMLİ: Randevu oluşturulduğunda status Pending olmalı, Unanswered olmamalı
             // Eğer AppointmentCreated notification'ı gönderiliyorsa ve status Unanswered ise,
@@ -77,11 +110,23 @@ namespace Business.Concrete
             // AppointmentUnanswered durumunda TÜM ilgili kişilere bildirim gitmeli (actor dahil)
             // Diğer durumlarda gönderen kişi (actor) hariç tutulmalı
             // ÖNEMLİ: actorUserId null olabilir (örn: background service'ten gelen AppointmentUnanswered)
-            var recipients = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue && (type == NotificationType.AppointmentUnanswered || !actorUserId.HasValue || x.Value != actorUserId.Value))
+            var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
+                .Where(x => x.HasValue)
                 .Select(x => x!.Value)
                 .Distinct()
                 .ToList();
+
+            var recipients = (recipientUserIds ?? participantUserIds)
+                .Where(participantUserIds.Contains)
+                .Distinct()
+                .ToList();
+
+            if (type != NotificationType.AppointmentUnanswered && actorUserId.HasValue)
+            {
+                recipients = recipients
+                    .Where(x => x != actorUserId.Value)
+                    .ToList();
+            }
 
             // Eğer hiç recipient yoksa hata döndür
             if (recipients.Count == 0)
@@ -92,11 +137,7 @@ namespace Business.Concrete
             // ÖNEMLİ: Payload için TÜM ilgili kullanıcıların bilgilerini çek (recipients değil)
             // Çünkü payload'da customer, store owner, free barber bilgileri olmalı
             // Örneğin customer appointment oluşturduğunda, store owner customer bilgisini görmeli
-            var allRelevantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                .Where(x => x.HasValue)
-                .Select(x => x!.Value)
-                .Distinct()
-                .ToList();
+            var allRelevantUserIds = participantUserIds;
 
             // tek seferde summary çek - TÜM ilgili kullanıcılar için
             var userMapRes = await userSummarySvc.GetManyAsync(allRelevantUserIds);
@@ -292,6 +333,12 @@ namespace Business.Concrete
                 bool? isStoreFavorite = null;
                 bool? isFreeBarberFavorite = null;
 
+                string? note = appt.Note;
+                if (role == "store" && appt.StoreSelectionType == StoreSelectionType.StoreSelection)
+                {
+                    note = null;
+                }
+
                 // Customer favorilerde mi? (Customer UserId ile kontrol et)
                 if (payloadCustomer != null && appt.CustomerUserId.HasValue && role != "customer")
                 {
@@ -344,7 +391,7 @@ namespace Business.Concrete
                     CustomerDecision = appt.CustomerDecision,
                     StoreSelectionType = appt.StoreSelectionType,
                     PendingExpiresAt = appt.PendingExpiresAt,
-                    Note = appt.Note,
+                    Note = note,
 
                     // Service offerings - Frontend'de hizmet butonlarını göstermek için
                     ServiceOfferings = serviceOfferings.Any() ? serviceOfferings : null,
@@ -367,10 +414,14 @@ namespace Business.Concrete
                 );
             }
 
-            // ÖNEMLİ: Badge count güncellemesi - tüm recipient'lara push et
+            // ÖNEMLİ: Badge count güncellemesi - tüm recipient'lara schedule et
             // Transaction commit sonrası badge count doğru hesaplanacak
-            // NotificationManager.CreateAndPushAsync içinde zaten badge push ediliyor
-            // Burada ekstra badge push etmeye gerek yok, çünkü her notification için badge push ediliyor
+            // NotificationManager.CreateAndPushAsync içinde zaten badge schedule ediliyor
+            // Ancak ekstra güvence için tüm recipient'lar için de schedule ediyoruz
+            foreach (var userId in recipients)
+            {
+                badgeUpdateService.ScheduleBadgeUpdate(userId);
+            }
 
             return new SuccessResult();
         }
@@ -385,26 +436,50 @@ namespace Business.Concrete
                     Messages.AppointmentCreatedNotification,
 
                 NotificationType.AppointmentApproved => 
-                    role == "customer" ? Messages.AppointmentApprovedNotification :
-                    Messages.AppointmentApprovedNotification,
+                    "Randevu Onaylandı",
 
                 NotificationType.AppointmentRejected => 
-                    role == "customer" ? Messages.AppointmentRejectedNotification :
-                    Messages.AppointmentRejectedNotification,
+                    "Randevu Reddedildi",
 
-                NotificationType.AppointmentCancelled => Messages.AppointmentCancelledNotification,
-                NotificationType.AppointmentCompleted => Messages.AppointmentCompletedNotification,
+                NotificationType.AppointmentCancelled => 
+                    "Randevu İptal Edildi",
+                    
+                NotificationType.AppointmentCompleted => 
+                    "Randevu Tamamlandı",
+                
+                NotificationType.AppointmentDecisionUpdated =>
+                    string.Empty,
+                
+                // 3'lü sistem bildirimleri
+                NotificationType.FreeBarberRejectedInitial => 
+                    "Serbest Berber Randevuyu Reddetti",
+                    
+                NotificationType.StoreRejectedSelection => 
+                    "Dükkan Randevuyu Reddetti",
+                    
+                NotificationType.StoreApprovedSelection => 
+                    "Dükkan Randevuyu Onayladı",
+                    
+                NotificationType.StoreSelectionTimeout => 
+                    "Dükkan Süresinde Cevap Vermedi",
+                    
+                NotificationType.CustomerRejectedFinal => 
+                    "Müşteri Randevuyu Reddetti",
+                    
+                NotificationType.CustomerApprovedFinal => 
+                    "Müşteri Randevuyu Onayladı",
+                    
+                NotificationType.CustomerFinalTimeout => 
+                    "Müşteri Süresinde Cevap Vermedi",
                 
                 NotificationType.AppointmentUnanswered =>
                     // Karar vermesi gereken kişiye "Randevuyu cevaplamadınız", diğerlerine "Randevunuz cevaplanamadı"
-                    // StoreDecision ve FreeBarberDecision null değil, DecisionStatus enum'ı (Pending, NoAnswer, Approved, Rejected)
-                    // Pending veya NoAnswer ise karar verilmemiş demektir
                     ((role == "store" && (appt.StoreDecision == DecisionStatus.Pending || appt.StoreDecision == DecisionStatus.NoAnswer)) || 
                      (role == "freebarber" && (appt.FreeBarberDecision == DecisionStatus.Pending || appt.FreeBarberDecision == DecisionStatus.NoAnswer)))
-                        ? "Randevuyu cevaplamadınız"
-                        : "Randevunuz cevaplanamadı",
+                        ? "Randevuyu Cevaplamadınız"
+                        : "Randevunuz Cevaplanamadı",
                         
-                _ => Messages.NotificationDefault
+                _ => "Bildirim"
             };
         }
     }

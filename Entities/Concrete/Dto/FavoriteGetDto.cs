@@ -40,6 +40,9 @@ namespace Entities.Concrete.Dto
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string? ImageUrl { get; set; }
+        public double Rating { get; set; } // Ortalama rating
+        public int FavoriteCount { get; set; } // Favori sayısı
+        public int ReviewCount { get; set; } // Yorum sayısı
     }
 
     public class ManuelBarberFavoriteDto

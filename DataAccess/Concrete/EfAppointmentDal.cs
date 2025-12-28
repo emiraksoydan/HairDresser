@@ -184,8 +184,7 @@ namespace DataAccess.Concrete
             switch (appointmentFilter)
             {
                 case AppointmentFilter.Active:
-                    // Sadece Approved durumundaki randevular aktif tab'da görünmeli
-                    // Pending randevular sadece notification'larda görünür (decision butonları ile)
+                    // Active tab'da sadece Approved randevular görünmeli (Pending'ler gözükmeyecek)
                     query = query.Where(x => x.Status == AppointmentStatus.Approved);
                     break;
                 case AppointmentFilter.Completed:
@@ -407,6 +406,11 @@ namespace DataAccess.Concrete
                     CreatedAt = appt.CreatedAt,
                     ChairId = appt.ChairId,
                     AppointmentRequester = appt.RequestedBy,
+                    StoreDecision = appt.StoreDecision,
+                    FreeBarberDecision = appt.FreeBarberDecision,
+                    CustomerDecision = appt.CustomerDecision,
+                    StoreSelectionType = appt.StoreSelectionType,
+                    Note = appt.Note,
                 };
 
                 // Hizmetler (Services) ve Toplam Fiyat

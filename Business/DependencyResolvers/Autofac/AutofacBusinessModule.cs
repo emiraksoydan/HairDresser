@@ -2,6 +2,7 @@ using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Abstract;
 using Business.Concrete;
+using Business.Helpers;
 using Business.Mapping;
 using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
@@ -46,6 +47,10 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
             builder.RegisterType<FavoriteManager>().As<IFavoriteService>().InstancePerLifetimeScope();
+
+            // Helper classes (N+1 query optimization)
+            builder.RegisterType<FavoriteHelper>().InstancePerLifetimeScope();
+            builder.RegisterType<AppointmentBusinessRules>().InstancePerLifetimeScope();
 
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();

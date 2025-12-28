@@ -546,6 +546,25 @@ namespace Business.Concrete
             var customerUsers = await _userDal.GetAll(x => targetUserIds.Contains(x.Id));
             var customerUserDict = customerUsers.ToDictionary(u => u.Id, u => u);
 
+            // Customer için Rating & ReviewCount - TargetId = Customer User ID
+            var customerUserIds = customerUsers.Select(u => u.Id).ToList();
+            var customerRatingStats = await _context.Ratings
+                .AsNoTracking()
+                .Where(r => customerUserIds.Contains(r.TargetId))
+                .GroupBy(r => r.TargetId)
+                .Select(g => new { UserId = g.Key, AvgRating = g.Average(x => (double)x.Score), ReviewCount = g.Count() })
+                .ToListAsync();
+            var customerRatingDict = customerRatingStats.ToDictionary(x => x.UserId, x => new { x.AvgRating, x.ReviewCount });
+
+            // Customer için Favorite count (sadece aktif favoriler) - FavoritedToId = Customer User ID
+            var customerFavoriteStats = await _context.Favorites
+                .AsNoTracking()
+                .Where(f => customerUserIds.Contains(f.FavoritedToId) && f.IsActive)
+                .GroupBy(f => f.FavoritedToId)
+                .Select(g => new { UserId = g.Key, FavoriteCount = g.Count() })
+                .ToListAsync();
+            var customerFavoriteDict = customerFavoriteStats.ToDictionary(x => x.UserId, x => x.FavoriteCount);
+
             // Image'ları getir (Customer ve ManuelBarber için)
             var userImageIds = customerUsers.Where(u => u.ImageId.HasValue).Select(u => u.ImageId!.Value).ToList();
             var userImages = await _context.Images
@@ -595,12 +614,19 @@ namespace Business.Concrete
                     dto.TargetType = FavoriteTargetType.Customer;
                     dto.TargetName = $"{customerUser.FirstName} {customerUser.LastName}";
                     var imageUrl = customerUser.ImageId.HasValue && userImages.TryGetValue(customerUser.ImageId.Value, out var url) ? url : null;
+                    
+                    customerRatingDict.TryGetValue(customerUser.Id, out var ratingInfo);
+                    customerFavoriteDict.TryGetValue(customerUser.Id, out var favCount);
+                    
                     dto.Customer = new UserFavoriteDto
                     {
                         Id = customerUser.Id,
                         FirstName = customerUser.FirstName,
                         LastName = customerUser.LastName,
-                        ImageUrl = imageUrl
+                        ImageUrl = imageUrl,
+                        Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2),
+                        ReviewCount = ratingInfo?.ReviewCount ?? 0,
+                        FavoriteCount = favCount
                     };
                 }
 

@@ -57,6 +57,17 @@ namespace Entities.Concrete.Dto
         public double? MyRatingForCustomer { get; set; }
         public string? MyCommentForCustomer { get; set; }
         public double? CustomerAverageRating { get; set; } // Customer'ın ortalama rating'i
+        
+        // --- Decision Statuses (3'lü sistem için) ---
+        public DecisionStatus? StoreDecision { get; set; }
+        public DecisionStatus? FreeBarberDecision { get; set; }
+        public DecisionStatus? CustomerDecision { get; set; }
+        
+        // --- StoreSelectionType (3'lü sistem için) ---
+        public StoreSelectionType? StoreSelectionType { get; set; }
+        
+        // --- Note ---
+        public string? Note { get; set; }
     }
 
     // --- YENİ: Hizmet Detayı İçin Küçük DTO ---

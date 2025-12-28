@@ -98,6 +98,27 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<Rating>()
                 .HasIndex(x => new { x.TargetId, x.Score });
 
+            // Favorite indexes for performance (N+1 query optimization)
+            modelBuilder.Entity<Favorite>()
+                .HasIndex(x => new { x.FavoritedFromId, x.FavoritedToId, x.IsActive });
+
+            modelBuilder.Entity<Favorite>()
+                .HasIndex(x => new { x.FavoritedToId, x.FavoritedFromId, x.IsActive });
+
+            modelBuilder.Entity<Favorite>()
+                .HasIndex(x => new { x.FavoritedToId, x.IsActive });
+
+            // Image indexes for efficient owner-based lookups
+            modelBuilder.Entity<Image>()
+                .HasIndex(x => new { x.OwnerType, x.ImageOwnerId });
+
+            modelBuilder.Entity<Image>()
+                .HasIndex(x => x.ImageOwnerId);
+
+            // AppointmentServiceOffering index for appointment-based queries
+            modelBuilder.Entity<AppointmentServiceOffering>()
+                .HasIndex(x => x.AppointmentId);
+
             // Price precision ve scale ayarları
             modelBuilder.Entity<ServiceOffering>()
                 .Property(x => x.Price)

@@ -1,4 +1,4 @@
-﻿using Business.Abstract;
+using Business.Abstract;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Configuration;
 using DataAccess.Concrete;
@@ -33,16 +33,16 @@ namespace Api.BackgroundServices
                 var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
 
                 var now = DateTime.UtcNow;
-                const int batchSize = 50; // Her seferde 50 appointment iÅŸle
+                const int batchSize = 50; // Her seferde 50 appointment işle
 
-                // Toplam expired appointment sayÄ±sÄ±nÄ± kontrol et
+                // Toplam expired appointment sayısını kontrol et
                 var totalExpiredCount = await db.Appointments
                     .CountAsync(a => a.Status == AppointmentStatus.Pending
                                   && a.PendingExpiresAt != null
                                   && a.PendingExpiresAt <= now, stoppingToken);
 
 
-                // Batch'ler halinde iÅŸle
+                // Batch'ler halinde işle
                 int processedCount = 0;
                 while (processedCount < totalExpiredCount)
                 {
@@ -51,7 +51,7 @@ namespace Api.BackgroundServices
                         .Where(a => a.Status == AppointmentStatus.Pending
                                  && a.PendingExpiresAt != null
                                  && a.PendingExpiresAt <= now)
-                        .OrderBy(a => a.PendingExpiresAt) // En eski olanlarÄ± Ã¶nce iÅŸle
+                        .OrderBy(a => a.PendingExpiresAt) // En eski olanları önce işle
                         .Take(batchSize)
                         .ToListAsync(stoppingToken);
 
@@ -67,11 +67,11 @@ namespace Api.BackgroundServices
                         }
                         catch (Exception ex)
                         {
-                            processedCount++; // SayacÄ± artÄ±r ki sonsuz dÃ¶ngÃ¼ye girmesin
+                            processedCount++; // Sayacı artır ki sonsuz döngüye girmesin
                         }
                     }
 
-                    // Batch iÅŸlendikten sonra kÄ±sa bir bekleme (database'e fazla yÃ¼k bindirmemek iÃ§in)
+                    // Batch işlendikten sonra kısa bir bekleme (database'e fazla yük bindirmemek için)
                     if (processedCount < totalExpiredCount)
                     {
                         await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken);
@@ -93,6 +93,7 @@ namespace Api.BackgroundServices
             var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
             var threadDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IChatThreadDal>();
             var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
+            var badgeUpdateService = scope.ServiceProvider.GetRequiredService<IBadgeUpdateService>();
 
             var trackedAppt = await db.Appointments
                 .FirstOrDefaultAsync(a => a.Id == appt.Id, stoppingToken);
@@ -109,39 +110,61 @@ namespace Api.BackgroundServices
                 var overallExpiresAt = trackedAppt.CreatedAt.AddMinutes(StoreSelectionTotalMinutes);
                 if (now < overallExpiresAt)
                 {
+                    // Store 5dk cevap vermedi
                     if (trackedAppt.BarberStoreUserId.HasValue &&
                         trackedAppt.StoreDecision == DecisionStatus.Pending)
                     {
+                        var storeOwnerUserId = trackedAppt.BarberStoreUserId;
+                        var freeBarberUserId = trackedAppt.FreeBarberUserId;
                         trackedAppt.StoreDecision = DecisionStatus.NoAnswer;
                         trackedAppt.UpdatedAt = now;
+                        trackedAppt.PendingExpiresAt = overallExpiresAt;
+                        // Özel bildirim tipi: StoreSelectionTimeout
+                        var recipients = new List<Guid>();
+                        if (storeOwnerUserId.HasValue) recipients.Add(storeOwnerUserId.Value);
+                        if (freeBarberUserId.HasValue) recipients.Add(freeBarberUserId.Value);
+                        if (recipients.Count > 0)
+                            await notifySvc.NotifyToRecipientsAsync(trackedAppt.Id, NotificationType.StoreSelectionTimeout, recipients, actorUserId: null);
+
 
                         ClearStoreSelectionSlot(trackedAppt);
-                        trackedAppt.PendingExpiresAt = overallExpiresAt;
 
                         await db.SaveChangesAsync(stoppingToken);
-                        await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
-                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
+                        
+                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
                         return;
                     }
 
+                    // Müşteri 30dk içinde cevap vermedi (Store onayladıktan sonra)
                     if (trackedAppt.BarberStoreUserId.HasValue &&
                         trackedAppt.StoreDecision == DecisionStatus.Approved &&
                         trackedAppt.CustomerDecision == DecisionStatus.Pending)
                     {
+                        var storeOwnerUserId = trackedAppt.BarberStoreUserId;
+                        var freeBarberUserId = trackedAppt.FreeBarberUserId;
+                        var customerUserId = trackedAppt.CustomerUserId;
                         trackedAppt.CustomerDecision = DecisionStatus.NoAnswer;
                         trackedAppt.UpdatedAt = now;
-
-                        ClearStoreSelectionSlot(trackedAppt);
                         trackedAppt.StoreDecision = DecisionStatus.Pending;
                         trackedAppt.PendingExpiresAt = overallExpiresAt;
+                        // Özel bildirim tipi: CustomerFinalTimeout
+                        var recipients = new List<Guid>();
+                        if (storeOwnerUserId.HasValue) recipients.Add(storeOwnerUserId.Value);
+                        if (freeBarberUserId.HasValue) recipients.Add(freeBarberUserId.Value);
+                        if (customerUserId.HasValue) recipients.Add(customerUserId.Value);
+                        if (recipients.Count > 0)
+                            await notifySvc.NotifyToRecipientsAsync(trackedAppt.Id, NotificationType.CustomerFinalTimeout, recipients, actorUserId: null);
+
+
+                        ClearStoreSelectionSlot(trackedAppt);
 
                         await db.SaveChangesAsync(stoppingToken);
-                        await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
-                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
+                        
+                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
                         return;
                     }
                 }
@@ -158,7 +181,7 @@ namespace Api.BackgroundServices
 
             await db.SaveChangesAsync(stoppingToken);
             await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
-            await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
+            await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
         }
 
         /// <summary>
@@ -176,7 +199,7 @@ namespace Api.BackgroundServices
             if (appt.FreeBarberDecision == DecisionStatus.Pending)
                 appt.FreeBarberDecision = DecisionStatus.NoAnswer;
             
-            // CustomerDecision iÃ§in de NoAnswer ekle (Customer -> FreeBarber + Store senaryosunda)
+            // CustomerDecision için de NoAnswer ekle (Customer -> FreeBarber + Store senaryosunda)
             if (appt.CustomerDecision == DecisionStatus.Pending)
                 appt.CustomerDecision = DecisionStatus.NoAnswer;
         }
@@ -202,7 +225,7 @@ namespace Api.BackgroundServices
         }
 
         /// <summary>
-        /// FreeBarber'Ä± release eder (IsAvailable = true)
+        /// FreeBarber'ı release eder (IsAvailable = true)
         /// </summary>
         private async Task ReleaseFreeBarberAsync(
             Entities.Concrete.Entities.Appointment appt,
@@ -222,32 +245,33 @@ namespace Api.BackgroundServices
         }
 
         /// <summary>
-        /// Mevcut notification'larÄ± gÃ¼nceller ve yeni notification'lar gÃ¶nderir
+        /// Mevcut notification'ları günceller ve yeni notification'lar gönderir
         /// </summary>
         private async Task UpdateAndSendNotificationsAsync(
             Entities.Concrete.Entities.Appointment trackedAppt,
             DatabaseContext db,
             IAppointmentNotifyService notifySvc,
             IRealTimePublisher realtime,
+            IBadgeUpdateService badgeUpdateService,
             IServiceScope scope,
             CancellationToken stoppingToken)
         {
-            // Ã–NEMLÄ°: Notification Type deÄŸiÅŸmemeli - sadece payload gÃ¼ncellenmeli
-            // Mevcut notification'larÄ± bul (herhangi bir type olabilir - AppointmentCreated, AppointmentApproved, vb.)
+            // ÖNEMLİ: Notification Type değişmemeli - sadece payload güncellenmeli
+            // Mevcut notification'ları bul (herhangi bir type olabilir - AppointmentCreated, AppointmentApproved, vb.)
             var existingNotifications = await db.Notifications
                 .Where(n => n.AppointmentId == trackedAppt.Id)
                 .ToListAsync(stoppingToken);
 
-            // Mevcut notification'larÄ± olan kullanÄ±cÄ±lar (bunlarÄ±n notification'larÄ± gÃ¼ncellenecek)
+            // Mevcut notification'ları olan kullanıcılar (bunların notification'ları güncellenecek)
             var usersWithExistingNotifications = existingNotifications.Select(n => n.UserId).Distinct().ToList();
 
-            // Mevcut notification'larÄ± gÃ¼ncelle: Sadece payload'daki status'u gÃ¼ncelle, Type deÄŸiÅŸtirme
+            // Mevcut notification'ları güncelle: Sadece payload'daki status'u güncelle, Type değiştirme
             foreach (var notif in existingNotifications)
             {
                 await UpdateNotificationPayloadAsync(notif, trackedAppt, db, realtime, stoppingToken);
             }
 
-            // Ã–NEMLÄ°: Mevcut notification'Ä± olmayan kullanÄ±cÄ±lara yeni AppointmentUnanswered notification gÃ¶nder
+            // ÖNEMLİ: Mevcut notification'ı olmayan kullanıcılara yeni AppointmentUnanswered notification gönder
             var allParticipantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
@@ -262,10 +286,12 @@ namespace Api.BackgroundServices
             {
                 await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
             }
+
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
         }
 
         /// <summary>
-        /// Notification payload'Ä±nÄ± gÃ¼nceller ve SignalR ile push eder
+        /// Notification payload'ını günceller ve SignalR ile push eder
         /// </summary>
         private async Task UpdateNotificationPayloadAsync(
             Entities.Concrete.Entities.Notification notif,
@@ -274,7 +300,7 @@ namespace Api.BackgroundServices
             IRealTimePublisher realtime,
             CancellationToken stoppingToken)
         {
-            // Payload'daki status'u gÃ¼ncelle (veri tutarlÄ±lÄ±ÄŸÄ± iÃ§in)
+            // Payload'daki status'u güncelle (veri tutarlılığı için)
             if (string.IsNullOrEmpty(notif.PayloadJson) || notif.PayloadJson.Trim() == "{}")
                 return;
 
@@ -286,14 +312,14 @@ namespace Api.BackgroundServices
                     WriteIndented = false
                 };
 
-                // Mevcut payload'Ä± parse et ve status'u gÃ¼ncelle
+                // Mevcut payload'ı parse et ve status'u güncelle
                 using var doc = JsonDocument.Parse(notif.PayloadJson);
                 var root = doc.RootElement;
 
-                // Yeni bir dictionary oluÅŸtur (object tipinde deÄŸerler iÃ§in)
+                // Yeni bir dictionary oluştur (object tipinde değerler için)
                 var payloadDict = new Dictionary<string, object?>();
 
-                // Mevcut tÃ¼m property'leri kopyala (status hariÃ§)
+                // Mevcut tüm property'leri kopyala (status hariç)
                 foreach (var prop in root.EnumerateObject())
                 {
                     if (prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) ||
@@ -303,7 +329,7 @@ namespace Api.BackgroundServices
                         prop.Name.Equals("pendingExpiresAt", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    // Value'yÃ¼ object'e Ã§evir (basit tipler iÃ§in)
+                    // Value'yü object'e çevir (basit tipler için)
                     payloadDict[prop.Name] = prop.Value.ValueKind switch
                     {
                         System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
@@ -313,7 +339,7 @@ namespace Api.BackgroundServices
                         System.Text.Json.JsonValueKind.Null => null,
                         System.Text.Json.JsonValueKind.Object => JsonSerializer.Deserialize<object>(prop.Value.GetRawText()),
                         System.Text.Json.JsonValueKind.Array => JsonSerializer.Deserialize<object[]>(prop.Value.GetRawText()),
-                        _ => prop.Value.GetRawText() // Complex types iÃ§in raw text
+                        _ => prop.Value.GetRawText() // Complex types için raw text
                     };
                 }
 
@@ -324,11 +350,11 @@ namespace Api.BackgroundServices
                 payloadDict["customerDecision"] = (int)trackedAppt.CustomerDecision;
                 payloadDict["pendingExpiresAt"] = trackedAppt.PendingExpiresAt;
 
-                // Geri JSON string'e Ã§evir
+                // Geri JSON string'e çevir
                 notif.PayloadJson = JsonSerializer.Serialize(payloadDict, options);
 
-                // Ã–NEMLÄ°: Notification'Ä± DbContext'e attach et veya Update Ã§aÄŸrÄ±sÄ± yap
-                // DbContext tarafÄ±ndan track edilmesi iÃ§in
+                // ÖNEMLİ: Notification'ı DbContext'e attach et veya Update çağrısı yap
+                // DbContext tarafından track edilmesi için
                 db.Notifications.Update(notif);
             }
             catch (Exception ex)
@@ -338,13 +364,13 @@ namespace Api.BackgroundServices
                 return;
             }
 
-            // GÃ¼ncellenmiÅŸ notification'Ä± SignalR ile push et (veri tutarlÄ±lÄ±ÄŸÄ± iÃ§in)
+            // Güncellenmiş notification'ı SignalR ile push et (veri tutarlılığı için)
             try
             {
                 var updatedDto = new Entities.Concrete.Dto.NotificationDto
                 {
                     Id = notif.Id,
-                    Type = notif.Type, // Type deÄŸiÅŸmedi - aynÄ± kaldÄ±
+                    Type = notif.Type, // Type değişmedi - aynı kaldı
                     AppointmentId = notif.AppointmentId,
                     Title = notif.Title,
                     Body = notif.Body,
@@ -361,7 +387,7 @@ namespace Api.BackgroundServices
         }
 
         /// <summary>
-        /// Yeni AppointmentUnanswered notification'larÄ± gÃ¶nderir
+        /// Yeni AppointmentUnanswered notification'ları gönderir
         /// </summary>
         private async Task SendNewUnansweredNotificationsAsync(
             Entities.Concrete.Entities.Appointment trackedAppt,
@@ -374,22 +400,16 @@ namespace Api.BackgroundServices
                 _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}",
                     usersWithoutNotifications.Count, trackedAppt.Id);
 
-                // NotifyAsync tÃ¼m kullanÄ±cÄ±lara gÃ¶nderir, ama CreateAndPushAsync iÃ§inde duplicate kontrolÃ¼ var
-                // Mevcut notification'Ä± olan kullanÄ±cÄ±lar iÃ§in: Zaten yukarÄ±da gÃ¼ncellendi
-                // Mevcut notification'Ä± olmayan kullanÄ±cÄ±lar iÃ§in: Yeni AppointmentUnanswered gÃ¶nderilecek
+                // NotifyAsync tüm kullanıcılara gönderir, ama CreateAndPushAsync içinde duplicate kontrolü var
+                // Mevcut notification'ı olan kullanıcılar için: Zaten yukarıda güncellendi
+                // Mevcut notification'ı olmayan kullanıcılar için: Yeni AppointmentUnanswered gönderilecek
                 await notifySvc.NotifyAsync(trackedAppt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send AppointmentUnanswered notifications for appointment {AppointmentId}", trackedAppt.Id);
-                // Notification gÃ¶nderimi baÅŸarÄ±sÄ±z olsa bile appointment update'i commit edilmeli
+                // Notification gönderimi başarısız olsa bile appointment update'i commit edilmeli
             }
         }
     }
 }
-
-
-
-
-
-
