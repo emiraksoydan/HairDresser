@@ -45,7 +45,7 @@ namespace Business.Concrete
 
             // Mesaj gönderme kontrolü: Randevu status kontrolü VEYA favori kontrolü
             bool canSendMessage = false;
-            
+
             // 1. Randevu status kontrolü: Pending veya Approved ise mesaj gönderilebilir
             if (appt.Status is AppointmentStatus.Pending or AppointmentStatus.Approved)
             {
@@ -73,8 +73,8 @@ namespace Business.Concrete
 
                 // Optimized: Tek query ile tüm favori kontrolü
                 canSendMessage = await favoriteHelper.IsFavoriteActiveMultipleParticipantsAsync(
-                    senderUserId, 
-                    participants, 
+                    senderUserId,
+                    participants,
                     storeId
                 );
             }
@@ -91,7 +91,7 @@ namespace Business.Concrete
                 if (barberStore is null)
                     return new ErrorDataResult<ChatMessageDto>(Messages.StoreNotFound);
             }
-            
+
             if (thread is null)
             {
                 thread = new ChatThread
@@ -221,7 +221,7 @@ namespace Business.Concrete
             if (currentUser == null)
                 return new ErrorDataResult<List<ChatThreadListItemDto>>("Kullanıcı bulunamadı");
             var currentUserType = currentUser.UserType;
-            
+
             // Mevcut kullanıcının profil resmini al
             string? currentUserImageUrl = null;
             if (currentUserType == UserType.Customer)
@@ -336,10 +336,10 @@ namespace Business.Concrete
                     // 2. Status Pending/Approved değilse, en az bir aktif favori varsa görünür (favori thread mantığı gibi)
                     bool isStatusVisible = appt.Status == AppointmentStatus.Pending || appt.Status == AppointmentStatus.Approved;
                     bool isFavoriteVisible = false;
-                    
+
                     // Store bilgisini al (favori kontrolü için)
                     storeDict.TryGetValue(appt.BarberStoreUserId ?? Guid.Empty, out var store);
-                    
+
                     // Status uygun değilse favori kontrolü yap
                     if (!isStatusVisible)
                     {
@@ -351,20 +351,20 @@ namespace Business.Concrete
                             threadParticipantIds.Add(appt.FreeBarberUserId.Value);
                         if (appt.BarberStoreUserId.HasValue && appt.BarberStoreUserId.Value != userId)
                             threadParticipantIds.Add(appt.BarberStoreUserId.Value);
-                        
+
                         // Store bazlı favori kontrolü (eğer store varsa)
                         if (store != null && store.BarberStoreOwnerId != userId)
                         {
-                            var favoriteStore = await favoriteDal.Get(x => 
-                                x.FavoritedFromId == userId && 
-                                x.FavoritedToId == store.Id && 
+                            var favoriteStore = await favoriteDal.Get(x =>
+                                x.FavoritedFromId == userId &&
+                                x.FavoritedToId == store.Id &&
                                 x.IsActive);
                             if (favoriteStore != null)
                             {
                                 isFavoriteVisible = true;
                             }
                         }
-                        
+
                         // User bazlı favori kontrolü
                         if (!isFavoriteVisible && threadParticipantIds.Any())
                         {
@@ -376,7 +376,7 @@ namespace Business.Concrete
                                     isFavoriteVisible = true;
                                     break;
                                 }
-                                
+
                                 var favorite2 = await favoriteDal.GetByUsersAsync(participantId, userId);
                                 if (favorite2 != null && favorite2.IsActive)
                                 {
@@ -386,14 +386,14 @@ namespace Business.Concrete
                             }
                         }
                     }
-                    
+
                     // Thread görünür değilse atla
                     if (!isStatusVisible && !isFavoriteVisible)
                     {
                         continue;
                     }
                     threadDto.Title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
-                    
+
                     // Status'u appointment'tan güncelle (threadDto.Status zaten appointment'tan geliyor ama güncel olması için)
                     threadDto.Status = appt.Status;
 
@@ -428,7 +428,7 @@ namespace Business.Concrete
                         if (store.BarberStoreOwnerId != userId)
                         {
                             // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (threadEntity.StoreOwnerUserId == store.BarberStoreOwnerId || 
+                            if (threadEntity.StoreOwnerUserId == store.BarberStoreOwnerId ||
                                 (threadEntity.StoreOwnerUserId.HasValue && threadEntity.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
                             {
                                 var imageUrl = storeImageDict.TryGetValue(store.Id, out var imgUrl) ? imgUrl : null;
@@ -454,7 +454,7 @@ namespace Business.Concrete
                         if (freeBarber != null)
                         {
                             // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (threadEntity.FreeBarberUserId == freeBarber.FreeBarberUserId || 
+                            if (threadEntity.FreeBarberUserId == freeBarber.FreeBarberUserId ||
                                 (threadEntity.FreeBarberUserId.HasValue && threadEntity.FreeBarberUserId.Value == freeBarber.FreeBarberUserId))
                             {
                                 var imageUrl = freeBarberImageDict.TryGetValue(freeBarber.Id, out var imgUrl) ? imgUrl : null;
@@ -497,11 +497,11 @@ namespace Business.Concrete
                     // Favori aktif mi kontrol et - en az bir tarafın favori olması yeterli
                     // Store bazlı thread'ler için: StoreId ile favori kontrolü yapılır
                     // Diğer thread'ler için: User ID bazlı favori kontrolü yapılır
-                    
+
                     bool isFavoriteActive = false;
                     var fromUserId = threadEntity.FavoriteFromUserId!.Value;
                     var toUserId = threadEntity.FavoriteToUserId!.Value;
-                    
+
                     // Store bazlı thread'ler için StoreId ile favori kontrolü
                     if (threadEntity.StoreId.HasValue)
                     {
@@ -537,7 +537,7 @@ namespace Business.Concrete
                         {
                             isFavoriteActive = true;
                         }
-                        
+
                         // 2. toUserId -> fromUserId yönünde favori kontrolü
                         if (!isFavoriteActive)
                         {
@@ -548,7 +548,7 @@ namespace Business.Concrete
                             }
                         }
                     }
-                    
+
                     // En az bir tarafın favori olması yeterli (aktif olmalı)
                     if (!isFavoriteActive) continue; // Hiçbiri aktif değilse thread'i atla
 
@@ -568,16 +568,16 @@ namespace Business.Concrete
                             if (store.BarberStoreOwnerId == userId)
                             {
                                 // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
-                                var otherUserId = threadEntity.FavoriteFromUserId == userId 
-                                    ? threadEntity.FavoriteToUserId!.Value 
+                                var otherUserId = threadEntity.FavoriteFromUserId == userId
+                                    ? threadEntity.FavoriteToUserId!.Value
                                     : threadEntity.FavoriteFromUserId!.Value;
-                                
+
                                 var otherUser = await userDal.Get(u => u.Id == otherUserId);
                                 if (otherUser == null) continue;
-                                
+
                                 participantUserId = otherUser.Id;
                                 participantUserType = otherUser.UserType;
-                                
+
                                 if (otherUser.UserType == UserType.Customer)
                                 {
                                     displayName = $"{otherUser.FirstName} {otherUser.LastName}";
@@ -623,8 +623,8 @@ namespace Business.Concrete
                     else
                     {
                         // Store bazlı değil, User ID bazlı thread
-                        var otherUserId = threadEntity.FavoriteFromUserId == userId 
-                            ? threadEntity.FavoriteToUserId!.Value 
+                        var otherUserId = threadEntity.FavoriteFromUserId == userId
+                            ? threadEntity.FavoriteToUserId!.Value
                             : threadEntity.FavoriteFromUserId!.Value;
 
                         // Diğer kullanıcının bilgilerini çek
@@ -673,7 +673,7 @@ namespace Business.Concrete
                     }
 
                     threadDto.Title = displayName;
-                    
+
                     // Participant bilgilerini ayarla
                     // ÖNEMLİ: participantUserId kendi userId'miz değil, diğer kullanıcının userId'si olmalı
                     if (participantUserId == userId || participantUserId == Guid.Empty)
@@ -681,7 +681,7 @@ namespace Business.Concrete
                         // Kendi bilgilerimiz participant olarak eklenmiş veya geçersiz - bu yanlış, atla
                         continue;
                     }
-                    
+
                     threadDto.Participants = new List<ChatThreadParticipantDto>
                     {
                         new ChatThreadParticipantDto
@@ -771,9 +771,9 @@ namespace Business.Concrete
             // Diğer thread'ler için: User ID bazlı favori kontrolü yapılır
             var fromUserId = thread.FavoriteFromUserId!.Value;
             var toUserId = thread.FavoriteToUserId!.Value;
-            
+
             bool isFavoriteActive = false;
-            
+
             // Store bazlı thread'ler için StoreId ile favori kontrolü
             if (thread.StoreId.HasValue)
             {
@@ -805,7 +805,7 @@ namespace Business.Concrete
                 {
                     isFavoriteActive = true;
                 }
-                
+
                 // 2. toUserId -> fromUserId yönünde
                 if (!isFavoriteActive)
                 {
@@ -816,7 +816,7 @@ namespace Business.Concrete
                     }
                 }
             }
-            
+
             if (!isFavoriteActive)
                 return new ErrorDataResult<ChatMessageDto>("Favori aktif değil, mesaj gönderilemez");
 
@@ -838,7 +838,7 @@ namespace Business.Concrete
 
             // Unread count artır (sender dışındaki katılımcıya)
             var otherUserId = thread.FavoriteFromUserId == senderUserId ? thread.FavoriteToUserId : thread.FavoriteFromUserId;
-            
+
             if (otherUserId.HasValue)
             {
                 // Thread'deki user mapping'leri kullan (EnsureFavoriteThreadAsync'te set edilmiş)
@@ -945,15 +945,15 @@ namespace Business.Concrete
             {
                 // Favori thread
                 isParticipant = thread.FavoriteFromUserId == userId || thread.FavoriteToUserId == userId;
-                
+
                 // Favori aktif mi kontrolü - en az bir tarafın favori olması yeterli
                 // Store bazlı thread'ler için: StoreId ile favori kontrolü yapılır
                 // Diğer thread'ler için: User ID bazlı favori kontrolü yapılır
                 var fromUserId = thread.FavoriteFromUserId.Value;
                 var toUserId = thread.FavoriteToUserId.Value;
-                
+
                 bool isFavoriteActive = false;
-                
+
                 // Store bazlı thread'ler için StoreId ile favori kontrolü
                 if (thread.StoreId.HasValue)
                 {
@@ -985,7 +985,7 @@ namespace Business.Concrete
                     {
                         isFavoriteActive = true;
                     }
-                    
+
                     // 2. toUserId -> fromUserId yönünde
                     if (!isFavoriteActive)
                     {
@@ -996,7 +996,7 @@ namespace Business.Concrete
                         }
                     }
                 }
-                
+
                 if (!isFavoriteActive)
                     return new ErrorDataResult<List<ChatMessageItemDto>>("Favori aktif değil");
             }
@@ -1012,7 +1012,7 @@ namespace Business.Concrete
         {
             // Mevcut thread'i kontrol et (her iki yönde, StoreId ile birlikte)
             var existingThread = await threadDal.GetFavoriteThreadAsync(fromUserId, toUserId, storeId);
-            
+
             ChatThread thread;
             bool isNewThread = false;
 
@@ -1025,7 +1025,7 @@ namespace Business.Concrete
                 // Yeni thread oluştur
                 var fromUser = await userDal.Get(u => u.Id == fromUserId);
                 var toUser = await userDal.Get(u => u.Id == toUserId);
-                
+
                 if (fromUser == null || toUser == null)
                     return new ErrorDataResult<Guid>("Kullanıcı bulunamadı");
 
@@ -1064,9 +1064,9 @@ namespace Business.Concrete
             // Diğer thread'ler için: User ID bazlı favori kontrolü yapılır
             // ÖNEMLİ: Transaction commit edilmeden önce bu metod çağrılıyor olabilir (FavoriteManager'dan),
             // bu yüzden favori henüz DB'de görünmeyebilir. Bu durumda Store ID kontrolü yapıyoruz.
-            
+
             bool isFavoriteActive = false;
-            
+
             // Store bazlı thread'ler için StoreId ile favori kontrolü
             if (storeId.HasValue)
             {
@@ -1103,7 +1103,7 @@ namespace Business.Concrete
                 {
                     isFavoriteActive = true;
                 }
-                
+
                 // 2. toUserId -> fromUserId yönünde
                 if (!isFavoriteActive)
                 {
@@ -1114,7 +1114,7 @@ namespace Business.Concrete
                     }
                 }
             }
-            
+
             // Eğer hiçbir tarafın favori aktif değilse thread gönderme (DB'de kalabilir ama SignalR ile gönderme)
             if (!isFavoriteActive)
             {
@@ -1126,7 +1126,7 @@ namespace Business.Concrete
             // Her iki kullanıcı için de thread detaylarını al ve SignalR ile gönder
             // GetThreadsAsync mantığını kullanarak thread detaylarını doldur
             var recipients = new[] { fromUserId, toUserId }.Distinct().ToList();
-            
+
             foreach (var recipientUserId in recipients)
             {
                 try
@@ -1147,15 +1147,15 @@ namespace Business.Concrete
                             if (store.BarberStoreOwnerId == recipientUserId)
                             {
                                 // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
-                                var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                                    ? thread.FavoriteToUserId!.Value 
+                                var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                                    ? thread.FavoriteToUserId!.Value
                                     : thread.FavoriteFromUserId!.Value;
-                                
+
                                 var otherUser = await userDal.Get(u => u.Id == otherUserId);
                                 if (otherUser == null) continue;
-                                
+
                                 participantUserId = otherUser.Id;
-                                
+
                                 if (otherUser.UserType == UserType.Customer)
                                 {
                                     displayName = $"{otherUser.FirstName} {otherUser.LastName}";
@@ -1203,8 +1203,8 @@ namespace Business.Concrete
                     else
                     {
                         // Store bazlı değil, User ID bazlı thread
-                        var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                            ? thread.FavoriteToUserId!.Value 
+                        var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                            ? thread.FavoriteToUserId!.Value
                             : thread.FavoriteFromUserId!.Value;
 
                         var otherUser = await userDal.Get(u => u.Id == otherUserId);
@@ -1414,7 +1414,7 @@ namespace Business.Concrete
                         if (store.BarberStoreOwnerId != userId)
                         {
                             // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (thread.StoreOwnerUserId == store.BarberStoreOwnerId || 
+                            if (thread.StoreOwnerUserId == store.BarberStoreOwnerId ||
                                 (thread.StoreOwnerUserId.HasValue && thread.StoreOwnerUserId.Value == store.BarberStoreOwnerId))
                             {
                                 storeImageDict.TryGetValue(store.Id, out var storeImageUrl);
@@ -1436,7 +1436,7 @@ namespace Business.Concrete
                         if (freeBarberDict.TryGetValue(appt.FreeBarberUserId.Value, out var freeBarberEntity))
                         {
                             // Ekstra güvenlik: Thread entity'deki mapping ile de kontrol et
-                            if (thread.FreeBarberUserId == freeBarberEntity.FreeBarberUserId || 
+                            if (thread.FreeBarberUserId == freeBarberEntity.FreeBarberUserId ||
                                 (thread.FreeBarberUserId.HasValue && thread.FreeBarberUserId.Value == freeBarberEntity.FreeBarberUserId))
                             {
                                 freeBarberImageDict.TryGetValue(freeBarberEntity.Id, out var freeBarberImageUrl);
@@ -1529,7 +1529,7 @@ namespace Business.Concrete
 
             // Favori aktif mi kontrol et
             bool isFavoriteActive = false;
-            
+
             // 1. fromUserId -> toUserId yönünde
             var favorite1 = await favoriteDal.GetByUsersAsync(fromUserId, toUserId);
             if (favorite1 != null && favorite1.IsActive)
@@ -1547,7 +1547,7 @@ namespace Business.Concrete
                         isFavoriteActive = true;
                 }
             }
-            
+
             // 2. toUserId -> fromUserId yönünde
             if (!isFavoriteActive)
             {
@@ -1568,7 +1568,7 @@ namespace Business.Concrete
                     }
                 }
             }
-            
+
             // Eğer hiçbir tarafın favori aktif değilse thread gönderme
             if (!isFavoriteActive)
             {
@@ -1577,7 +1577,7 @@ namespace Business.Concrete
 
             // Her iki kullanıcı için de thread detaylarını al ve SignalR ile gönder
             var recipients = new[] { fromUserId, toUserId }.Distinct().ToList();
-            
+
             foreach (var recipientUserId in recipients)
             {
                 try
@@ -1598,15 +1598,15 @@ namespace Business.Concrete
                             if (store.BarberStoreOwnerId == recipientUserId)
                             {
                                 // Store sahibi kendisi - diğer kullanıcıyı bul (FavoriteFromUserId veya FavoriteToUserId)
-                                var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                                    ? thread.FavoriteToUserId!.Value 
+                                var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                                    ? thread.FavoriteToUserId!.Value
                                     : thread.FavoriteFromUserId!.Value;
-                                
+
                                 var otherUser = await userDal.Get(u => u.Id == otherUserId);
                                 if (otherUser == null) continue;
-                                
+
                                 participantUserId = otherUser.Id;
-                                
+
                                 if (otherUser.UserType == UserType.Customer)
                                 {
                                     displayName = $"{otherUser.FirstName} {otherUser.LastName}";
@@ -1654,8 +1654,8 @@ namespace Business.Concrete
                     else
                     {
                         // Store bazlı değil, User ID bazlı thread
-                        var otherUserId = thread.FavoriteFromUserId == recipientUserId 
-                            ? thread.FavoriteToUserId!.Value 
+                        var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                            ? thread.FavoriteToUserId!.Value
                             : thread.FavoriteFromUserId!.Value;
 
                         var otherUser = await userDal.Get(u => u.Id == otherUserId);
@@ -1792,9 +1792,9 @@ namespace Business.Concrete
                 // Randevu thread'i
                 var appt = await appointmentDal.Get(x => x.Id == thread.AppointmentId.Value);
                 if (appt == null) return new ErrorDataResult<bool>(Messages.AppointmentNotFound);
-                
-                isParticipant = thread.CustomerUserId == userId || 
-                               thread.StoreOwnerUserId == userId || 
+
+                isParticipant = thread.CustomerUserId == userId ||
+                               thread.StoreOwnerUserId == userId ||
                                thread.FreeBarberUserId == userId;
             }
             else if (thread.FavoriteFromUserId.HasValue && thread.FavoriteToUserId.HasValue)
@@ -1827,7 +1827,7 @@ namespace Business.Concrete
 
             // Thread'deki diğer katılımcılara typing event'i gönder
             var participants = new List<Guid>();
-            
+
             if (thread.CustomerUserId.HasValue && thread.CustomerUserId != userId)
                 participants.Add(thread.CustomerUserId.Value);
             if (thread.StoreOwnerUserId.HasValue && thread.StoreOwnerUserId != userId)

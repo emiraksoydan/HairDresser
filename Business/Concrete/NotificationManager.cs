@@ -7,6 +7,7 @@ using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -33,10 +34,8 @@ namespace Business.Concrete
                 // Eğer hiç notification yoksa, yeni AppointmentUnanswered oluştur
                 if (type == NotificationType.AppointmentUnanswered)
                 {
-                    // Bu appointment için herhangi bir notification var mı? (type fark etmez)
-                    var existingAny = await notificationDal.Get(x => 
-                        x.UserId == userId && 
-                        x.AppointmentId == appointmentId);
+                    // Bu appointment için herhangi bir notification var mı? (type fark etmez
+                    var existingAny = await notificationDal.Get(x =>x.UserId == userId &&  x.AppointmentId == appointmentId && x.Type == NotificationType.AppointmentUnanswered);
                     
                     if (existingAny != null)
                     {
@@ -248,6 +247,9 @@ namespace Business.Concrete
 
             foreach (var n in notifications)
             {
+                if (n.Type != NotificationType.AppointmentCreated)
+                    continue;
+
                 // Payload'ı parse et
                 if (string.IsNullOrEmpty(n.PayloadJson) || n.PayloadJson.Trim() == "{}")
                     continue;
@@ -256,8 +258,36 @@ namespace Business.Concrete
                 {
                     using var doc = JsonDocument.Parse(n.PayloadJson);
                     var root = doc.RootElement;
-                    
-                    // Yeni bir dictionary oluştur
+
+                    if (pendingExpiresAt.HasValue)
+                    {
+                        if (!root.TryGetProperty("pendingExpiresAt", out var pendingProp))
+                            continue;
+
+                        DateTime? payloadPending = null;
+                        if (pendingProp.ValueKind == JsonValueKind.String)
+                        {
+                            var pendingString = pendingProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(pendingString) &&
+                                DateTime.TryParse(pendingString, CultureInfo.InvariantCulture,
+                                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                                    out var parsedPending))
+                            {
+                                payloadPending = parsedPending;
+                            }
+                        }
+
+                        var targetPending = pendingExpiresAt.Value;
+                        if (targetPending.Kind == DateTimeKind.Unspecified)
+                            targetPending = DateTime.SpecifyKind(targetPending, DateTimeKind.Utc);
+                        else
+                            targetPending = targetPending.ToUniversalTime();
+
+                        if (!payloadPending.HasValue || payloadPending.Value != targetPending)
+                            continue;
+                    }
+
+                    // Build a new payload map
                     var payloadDict = new Dictionary<string, object?>();
                     
                     // Mevcut tüm property'leri kopyala (object ve array'leri de dahil)
