@@ -95,10 +95,15 @@ namespace Api.BackgroundServices
             var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
             var badgeUpdateService = scope.ServiceProvider.GetRequiredService<IBadgeUpdateService>();
 
-            var trackedAppt = await db.Appointments
-                .FirstOrDefaultAsync(a => a.Id == appt.Id, stoppingToken);
-            if (trackedAppt == null || trackedAppt.Status != AppointmentStatus.Pending)
-                return;
+            // Begin transaction to ensure atomicity of all operations
+            await using var transaction = await db.Database.BeginTransactionAsync(stoppingToken);
+
+            try
+            {
+                var trackedAppt = await db.Appointments
+                    .FirstOrDefaultAsync(a => a.Id == appt.Id, stoppingToken);
+                if (trackedAppt == null || trackedAppt.Status != AppointmentStatus.Pending)
+                    return;
 
             var now = DateTime.UtcNow;
             var isStoreSelectionFlow = trackedAppt.StoreSelectionType == StoreSelectionType.StoreSelection &&
@@ -132,8 +137,11 @@ namespace Api.BackgroundServices
                         await db.SaveChangesAsync(stoppingToken);
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
-                        
+
                         await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+
+                        // Commit transaction for store timeout scenario
+                        await transaction.CommitAsync(stoppingToken);
                         return;
                     }
 
@@ -163,8 +171,11 @@ namespace Api.BackgroundServices
                         await db.SaveChangesAsync(stoppingToken);
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
-                        
+
                         await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+
+                        // Commit transaction for customer timeout scenario
+                        await transaction.CommitAsync(stoppingToken);
                         return;
                     }
                 }
@@ -179,9 +190,20 @@ namespace Api.BackgroundServices
                 await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
             }
 
-            await db.SaveChangesAsync(stoppingToken);
-            await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
-            await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+                await db.SaveChangesAsync(stoppingToken);
+                await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
+                await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+
+                // Commit transaction - all operations successful
+                await transaction.CommitAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                // Rollback transaction on any error
+                await transaction.RollbackAsync(stoppingToken);
+                _logger.LogError(ex, "Failed to process expired appointment {AppointmentId}. Transaction rolled back.", appt.Id);
+                throw;
+            }
         }
 
         /// <summary>

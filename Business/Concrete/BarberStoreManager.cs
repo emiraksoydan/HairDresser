@@ -32,6 +32,7 @@ namespace Business.Concrete
             await SaveWorkingHoursAsync(dto, store.Id);
             return new SuccessResult(Messages.StoreCreatedSuccess);
         }
+
         [ValidationAspect(typeof(BarberStoreUpdateDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Update(BarberStoreUpdateDto dto, Guid currentUserId)

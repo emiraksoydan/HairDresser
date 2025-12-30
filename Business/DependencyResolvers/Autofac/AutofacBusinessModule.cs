@@ -8,6 +8,7 @@ using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
 using Core.Utilities.Security.JWT;
 using Core.Utilities.Security.PhoneSetting;
+using Core.Utilities.Storage;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Mapster;
@@ -78,6 +79,9 @@ namespace Business.DependencyResolvers.Autofac
 
             // Register IHttpContextAccessor for SecuredOperation
             builder.RegisterType<HttpContextAccessor>().As<IHttpContextAccessor>().SingleInstance();
+
+            // Register Azure Blob Storage Service
+            builder.RegisterType<BlobStorageService>().As<IBlobStorageService>().SingleInstance();
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);
 
