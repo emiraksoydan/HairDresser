@@ -1,5 +1,6 @@
 using Entities.Abstract;
 using System;
+using Entities.Concrete.Enums;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +14,7 @@ namespace Entities.Concrete.Dto
         public string? DisplayName { get; set; }
         public string? AvatarUrl { get; set; }
         public string RoleHint { get; set; }
+        public BarberType? BarberType { get; set; } // FreeBarber tipi
         public bool? IsInFavorites { get; set; } // Bu kullanıcı favorilerde mi?
     }
 }

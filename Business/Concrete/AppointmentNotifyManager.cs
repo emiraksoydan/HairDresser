@@ -168,6 +168,7 @@ namespace Business.Concrete
                     if (freeBarberInfo != null)
                     {
                         freeBarberInfo.AvatarUrl = freeBarberImageUrl;
+                        freeBarberInfo.BarberType = freeBarberEntity.Type;
                     }
                 }
             }
@@ -230,6 +231,7 @@ namespace Business.Concrete
                             if (manuelBarberImage != null)
                             {
                                 chairInfo.ManuelBarberImageUrl = manuelBarberImage.ImageUrl;
+                                chairInfo.ManuelBarberType = store?.Type;
                             }
                         }
                     }

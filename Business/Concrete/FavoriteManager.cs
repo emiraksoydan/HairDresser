@@ -183,7 +183,8 @@ namespace Business.Concrete
                     // Eğer karşı taraftan da favori yoksa veya pasifse, thread'i kaldır
                     if (!isReverseFavoriteActive)
                     {
-                        // Store bazlı thread'ler için StoreId geçilir
+                        await _context.SaveChangesAsync();
+
                         Guid? storeIdForThread = store != null ? store.Id : null;
                         var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
                         if (thread != null)

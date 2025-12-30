@@ -740,7 +740,7 @@ namespace Business.Concrete
 
             // ├ûNEML─░: Decision ba┼şar─▒l─▒ ise (Approved) notification'lar─▒ read yap
             // Rejected durumunda read yap─▒lmamal─▒ (kullan─▒c─▒ g├Ârmeli)
-            if (appt.Status == AppointmentStatus.Approved)
+            if (appt.Status == AppointmentStatus.Approved || appt.Status == AppointmentStatus.Rejected)
             {
                 var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
                     .Where(x => x.HasValue)
@@ -748,16 +748,20 @@ namespace Business.Concrete
                     .Distinct()
                     .ToList();
 
-                // Actor (karar veren ki┼şi - storeOwnerUserId) hari├ğ di─şer kullan─▒c─▒lar─▒n notification'lar─▒n─▒ read yap
-                foreach (var userId in participantUserIds)
+                if (appt.Status == AppointmentStatus.Approved)
                 {
-                    if (userId != storeOwnerUserId)
+                    // Approved: TÜM kullanıcıların bildirimlerini read yap (actor dahil)
+                    foreach (var userId in participantUserIds)
                     {
                         await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
                     }
                 }
+                else if (appt.Status == AppointmentStatus.Rejected)
+                {
+                    // Rejected: Sadece actor'ın bildirimini read yap
+                    await notificationService.MarkReadByAppointmentIdAsync(storeOwnerUserId, appt.Id);
+                }
             }
-
             if (appt.Status == AppointmentStatus.Rejected)
             {
                 await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
@@ -1026,7 +1030,7 @@ namespace Business.Concrete
 
             // ├ûNEML─░: Decision ba┼şar─▒l─▒ ise (Approved) notification'lar─▒ read yap
             // Rejected durumunda read yap─▒lmamal─▒ (kullan─▒c─▒ g├Ârmeli)
-            if (appt.Status == AppointmentStatus.Approved)
+            if (appt.Status == AppointmentStatus.Approved || appt.Status == AppointmentStatus.Rejected)
             {
                 var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
                     .Where(x => x.HasValue)
@@ -1034,13 +1038,18 @@ namespace Business.Concrete
                     .Distinct()
                     .ToList();
 
-                // Actor (karar veren ki┼şi - freeBarberUserId) hari├ğ di─şer kullan─▒c─▒lar─▒n notification'lar─▒n─▒ read yap
-                foreach (var userId in participantUserIds)
+                if (appt.Status == AppointmentStatus.Approved)
                 {
-                    if (userId != freeBarberUserId)
+                    // Approved: TÜM kullanıcıların bildirimlerini read yap (actor dahil)
+                    foreach (var userId in participantUserIds)
                     {
                         await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
                     }
+                }
+                else if (appt.Status == AppointmentStatus.Rejected)
+                {
+                    // Rejected: Sadece actor'ın bildirimini read yap
+                    await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
                 }
             }
 
@@ -1189,17 +1198,19 @@ namespace Business.Concrete
                     await appointmentDal.Update(appt);
                     await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                     await UpdateThreadOnAppointmentStatusChangeAsync(appt);
-                    
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id, appt.Status, appt.StoreDecision, appt.FreeBarberDecision, 
-                        appt.CustomerDecision, appt.PendingExpiresAt);
-                    
+
+                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(appt.Id, appt.Status, appt.StoreDecision, appt.FreeBarberDecision,appt.CustomerDecision, appt.PendingExpiresAt);
+
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: customerUserId);
+
+                    // Rejected: Sadece actor'ın (müşteri) bildirimini read yap
+                    await notificationService.MarkReadByAppointmentIdAsync(customerUserId, appt.Id);
+
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
-                return new SuccessDataResult<bool>(true);
+                     return new SuccessDataResult<bool>(true);
                 }
                 else
                 {
@@ -1307,15 +1318,7 @@ namespace Business.Concrete
             if (appt.Status is not (AppointmentStatus.Pending or AppointmentStatus.Approved))
                 return new ErrorDataResult<bool>(false, Messages.AppointmentCannotBeCancelled);
 
-            // ─░ptal kurallar─▒:
-            // 1. M├╝┼şteri: Sadece Approved durumunda iptal edebilir (Pending'de edemez - ├ğ├╝nk├╝ talebi o g├Ânderdi)
-            // 2. FreeBarber: Hem Pending hem Approved durumunda iptal edebilir
-            // 3. Store: Hem Pending hem Approved durumunda iptal edebilir
-            
-            if (appt.CustomerUserId == userId && appt.Status == AppointmentStatus.Approved)
-            {
-                return new ErrorDataResult<bool>(false, "Onaylanan randevuyu m├╝┼şteri iptal edemez.");
-            }
+        
 
             appt.Status = AppointmentStatus.Cancelled;
             appt.CancelledByUserId = userId;
@@ -1334,6 +1337,8 @@ namespace Business.Concrete
             // ─░ptal edildi─şinde iptal eden ki┼şi hari├ğ di─şer t├╝m taraflara bildirim g├Ânder
             // notifySvc.NotifyAsync zaten actorUserId hari├ğ t├╝m kat─▒l─▒mc─▒lara bildirim g├Ânderiyor
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCancelled, actorUserId: userId);
+
+            await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
 
             // ─░ptal durumunda chat mesaj─▒ g├Ânder
             try

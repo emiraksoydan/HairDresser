@@ -1,4 +1,5 @@
 using Entities.Abstract;
+using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,5 +15,6 @@ namespace Entities.Concrete.Dto
         public Guid? ManuelBarberId { get; set; }
         public string? ManuelBarberName { get; set; }
         public string? ManuelBarberImageUrl { get; set; }
+        public BarberType? ManuelBarberType { get; set; }
     }
 }
