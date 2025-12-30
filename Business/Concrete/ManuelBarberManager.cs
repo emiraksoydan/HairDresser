@@ -22,7 +22,6 @@ namespace Business.Concrete
         {
             
             var barber = mapper.Map<ManuelBarber>(dto);
-            await imageService.AddAsync(new CreateImageDto { ImageOwnerId = barber.Id, ImageUrl = dto.ProfileImageUrl, OwnerType = ImageOwnerType.ManuelBarber });
             await manuelBarberDal.Add(barber);
 
             return new SuccessResult(Messages.ManuelBarberAddedSuccess);
@@ -42,17 +41,6 @@ namespace Business.Concrete
             var updatedBarber = dto.Adapt(barber);
             await manuelBarberDal.Update(updatedBarber);
 
-            if (!string.IsNullOrWhiteSpace(dto.ProfileImageUrl))
-            {
-                var getBarberImage = await imageService.GetImage(barber.Id);
-
-                if (getBarberImage.Data == null)
-                    await imageService.AddAsync(new CreateImageDto { ImageOwnerId = barber.Id, ImageUrl = dto.ProfileImageUrl, OwnerType = ImageOwnerType.ManuelBarber });
-                else if (getBarberImage?.Data.ImageUrl != dto.ProfileImageUrl)
-                {
-                    await imageService.UpdateAsync(new UpdateImageDto { Id = getBarberImage!.Data.Id, ImageUrl = dto.ProfileImageUrl });
-                }
-            }
             return new SuccessResult(Messages.ManuelBarberUpdatedSuccess);
         }
 
@@ -84,31 +72,16 @@ namespace Business.Concrete
             return new SuccessDataResult<List<ManuelBarberDto>>();
         }
 
-        public async Task<IResult> AddRangeAsync(List<ManuelBarberCreateDto> list,Guid storeId)
+        public async Task<IResult> AddRangeAsync(List<ManuelBarberCreateDto> list, Guid storeId)
         {
             var manuelBarbers = list.Adapt<List<ManuelBarber>>();
-            var imagesToAdd = new List<CreateImageDto>();
-            for (int i = 0; i < manuelBarbers.Count; i++)
-            {
-                var src = list[i];
-                var ent = manuelBarbers[i];
-                ent.StoreId = storeId;
-                if (!string.IsNullOrWhiteSpace(src.ProfileImageUrl))
-                {
-                    imagesToAdd.Add(new CreateImageDto
-                    {
-                        ImageOwnerId = ent.Id, 
-                        OwnerType = ImageOwnerType.ManuelBarber,
-                        ImageUrl = src.ProfileImageUrl,
-                    });
-                }
-            }
-            await manuelBarberDal.AddRange(manuelBarbers);
-            if (imagesToAdd.Any())
-                await imageService.AddRangeAsync(imagesToAdd);
+            foreach (var barber in manuelBarbers)
+                barber.StoreId = storeId;
 
+            await manuelBarberDal.AddRange(manuelBarbers);
             return new SuccessResult();
         }
+
 
         // Helpers Method
         private async Task<IResult> CheckBarberHasNoBlockingAppointments(Guid barberId)

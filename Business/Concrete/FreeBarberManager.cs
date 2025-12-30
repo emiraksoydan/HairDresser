@@ -20,7 +20,7 @@ using System.Transactions;
 
 namespace Business.Concrete
 {
-    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IAppointmentService _appointmentService,IImageService _imageService, IServiceOfferingService _serviceOfferingService) : IFreeBarberService
+    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IAppointmentService _appointmentService, IServiceOfferingService _serviceOfferingService) : IFreeBarberService
     {
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(FreeBarberDtoValidator))]
@@ -36,7 +36,6 @@ namespace Business.Concrete
             var entity = freeBarberCreateDto.Adapt<FreeBarber>();
             entity.FreeBarberUserId = currentUserId;
             await freeBarberDal.Add(entity);
-            await SaveFreeBarberImagesAsync(freeBarberCreateDto, entity.Id);
             await SaveOfferingsAsync(freeBarberCreateDto, entity.Id);
             return new SuccessResult("Serbest berber portalı başarıyla oluşturuldu.");
         }
@@ -53,7 +52,6 @@ namespace Business.Concrete
 
             freeBarberUpdateDto.Adapt(existingEntity);
             await freeBarberDal.Update(existingEntity);
-            await _imageService.UpdateRangeAsync(freeBarberUpdateDto.ImageList);
             await _serviceOfferingService.UpdateRange(freeBarberUpdateDto.Offerings);
             return new SuccessResult("Serbest berber güncellendi.");
         }
@@ -113,19 +111,6 @@ namespace Business.Concrete
         {
             var result = await freeBarberDal.GetFreeBarberForUsers(freeBarberId);
             return new SuccessDataResult<FreeBarberMinePanelDto>(result);
-        }
-
-        private async Task SaveFreeBarberImagesAsync(FreeBarberCreateDto dto, Guid panelId)
-        {
-            if (dto.ImageList?.Count > 0)
-            {
-                foreach (var itemImage in dto.ImageList)
-                {
-                    itemImage.ImageOwnerId = panelId;
-
-                }
-                await _imageService.AddRangeAsync(dto.ImageList);
-            }
         }
 
         private async Task SaveOfferingsAsync(FreeBarberCreateDto dto, Guid panelId)

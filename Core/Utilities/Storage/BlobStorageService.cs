@@ -1,3 +1,4 @@
+
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Http;
@@ -30,6 +31,7 @@ namespace Core.Utilities.Storage
             if (string.IsNullOrEmpty(fileName))
             {
                 var extension = Path.GetExtension(file.FileName);
+                
                 fileName = $"{Guid.NewGuid()}{extension}";
             }
 

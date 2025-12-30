@@ -24,8 +24,6 @@ namespace Business.Concrete
         ITwilioVerifyService twilioVerify,
         IRefreshTokenService refreshTokenService,
         IRefreshTokenDal refreshTokenDal, 
-        IOperationClaimService operationClaimService,
-        IUserOperationClaimService userOperationClaimService,
         IConfiguration configuration) : IAuthService
     {
 
@@ -159,13 +157,11 @@ namespace Business.Concrete
                     user = existing.Data;
 
                     await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
-                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Register mode but user already exists. UserId: {existing.Data.Id}, UserType: {existing.Data.UserType}");
                 }
                 
                 // Login modunda mevcut kullanıcının userType'ını kullan (gönderilen userType'ı ignore et)
                 user = existing.Data;
           
-                Debug.WriteLine($"[AuthManager] LoginWithPassword: Existing user found (Login mode). UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
             }
             else
             {
@@ -173,7 +169,6 @@ namespace Business.Concrete
                 if (!isRegister)
                 {
                     // Login modunda ama kullanıcı yok - hata
-                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Login mode but user not found for name: {firstName} {lastName}");
                     return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı. Lütfen önce kayıt olun.");
                 }
                 
@@ -181,7 +176,6 @@ namespace Business.Concrete
                 // UserType kontrolü: Geçerli bir UserType olmalı (Customer=0, FreeBarber=1, BarberStore=2)
                 if (userForVerifyDto.UserType < UserType.Customer || userForVerifyDto.UserType > UserType.BarberStore)
                 {
-                    Debug.WriteLine($"[AuthManager] LoginWithPassword: Invalid UserType: {userForVerifyDto.UserType}");
                     return new ErrorDataResult<AccessToken>("Geçersiz kullanıcı tipi.");
                 }
                 
@@ -200,46 +194,15 @@ namespace Business.Concrete
                     UpdatedAt = DateTime.UtcNow,
                 };
                 await userService.Add(user);
-                Debug.WriteLine($"[AuthManager] LoginWithPassword: New user created (Register mode). UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
             }
             
-            // Claims atama
-            if (user.UserType == UserType.BarberStore)
-                await AssignClaimsByPrefixAsync(user.Id, "barberstore");
-            else if(user.UserType == UserType.FreeBarber)
-                await AssignClaimsByPrefixAsync(user.Id, "freebarber");
-            else if (user.UserType == UserType.Customer)
-                await AssignClaimsByPrefixAsync(user.Id, "customer");
-
             var result = await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
             
-            // Debug: Token oluşturulduktan sonra userType'ı logla
-            Debug.WriteLine($"[AuthManager] LoginWithPassword: Token created successfully for UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
             
             return result;
         }
 
-        private async Task AssignClaimsByPrefixAsync(Guid userId, string prefix)
-        {
-            var getClaims = await operationClaimService.GetAllOperationClaim();
-            if (!getClaims.Success || getClaims.Data is null || getClaims.Data.Count == 0) return;
-            var targetClaims = getClaims.Data.Where(c => !string.IsNullOrWhiteSpace(c.Name) && c.Name.Contains(prefix, StringComparison.OrdinalIgnoreCase)).Select(c => new { c.Id, c.Name }).Distinct().ToList();
-            if (targetClaims.Count == 0) return;
-            var userClaimsRes = await userOperationClaimService.GetClaimByUserId(userId); 
-            var ownedIds = (userClaimsRes.Data ?? new List<UserOperationClaim>())
-                .Select(uc => uc.OperationClaimId)
-                .ToHashSet();
-            var toAdd = targetClaims
-                .Where(tc => !ownedIds.Contains(tc.Id))
-                .Select(tc => new UserOperationClaim
-                {
-                    UserId = userId,
-                    OperationClaimId = tc.Id
-                })
-                .ToList();
-            if (toAdd.Count > 0)
-                await userOperationClaimService.AddUserOperationsClaim(toAdd);
-        }
+
 
         private async Task<IDataResult<AccessToken>> CreateAccessAndRefreshAsync(User user, string? ip, string? device, Guid? familyId)
         {

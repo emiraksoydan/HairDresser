@@ -14,7 +14,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IImageService _imageService) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService) : IBarberStoreService
     {
         //[SecuredOperation("BarberStore.Add")]
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
@@ -25,7 +25,6 @@ namespace Business.Concrete
             if (result != null)
                 return result;
             var store = await CreateStoreAsync(dto, currentUserId);
-            await SaveStoreImagesAsync(dto, store.Id);
             await SaveManuelBarbersAsync(dto, store.Id);
             await SaveChairsAsync(dto, store.Id);
             await SaveOfferingsAsync(dto, store.Id);
@@ -53,7 +52,6 @@ namespace Business.Concrete
 
             dto.Adapt(getBarber);
             await barberStoreDal.Update(getBarber);
-            await _imageService.UpdateRangeAsync(dto.StoreImageList);
             await _serviceOfferingService.UpdateRange(dto.Offerings);
             await workingHourService.UpdateRangeAsync(dto.WorkingHours);
 
@@ -133,19 +131,6 @@ namespace Business.Concrete
             store.BarberStoreOwnerId = currentUserId;
             await barberStoreDal.Add(store);
             return store;
-        }
-
-        private async Task SaveStoreImagesAsync(BarberStoreCreateDto dto, Guid storeId)
-        {
-            if (dto.StoreImageList?.Count > 0)
-            {
-                foreach (var itemImage in dto.StoreImageList)
-                {
-                    itemImage.ImageOwnerId = storeId;
-
-                }
-                await _imageService.AddRangeAsync(dto.StoreImageList);
-            }
         }
 
         private async Task SaveManuelBarbersAsync(BarberStoreCreateDto dto, Guid storeId)
