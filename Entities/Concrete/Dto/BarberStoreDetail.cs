@@ -21,7 +21,7 @@ namespace Entities.Concrete.Dto
         public double Longitude { get; set; }
         public bool IsOpenNow { get; set; }
 
-        public string TaxDocumentFilePath { get; set; }
+        public Guid? TaxDocumentImageId { get; set; }
         public string AddressDescription { get; set; }
         public List<BarberChairDto> BarberStoreChairs { get; set; }
         public List<ManuelBarberDto> ManuelBarbers { get; set; }

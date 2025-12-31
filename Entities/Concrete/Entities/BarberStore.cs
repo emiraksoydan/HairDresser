@@ -21,7 +21,7 @@ namespace Entities.Concrete.Entities
         public BarberType Type { get; set; }
         public PricingType PricingType { get; set; }
         public double PricingValue { get; set; }
-        public string TaxDocumentFilePath { get; set; }
+        public Guid? TaxDocumentImageId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

@@ -17,9 +17,9 @@ namespace DataAccess.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ChairId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    StartTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    EndTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    AppointmentDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    StartTime = table.Column<TimeSpan>(type: "time", nullable: true),
+                    EndTime = table.Column<TimeSpan>(type: "time", nullable: true),
+                    AppointmentDate = table.Column<DateOnly>(type: "date", nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -28,13 +28,16 @@ namespace DataAccess.Migrations
                     FreeBarberUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     ManuelBarberId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     RequestedBy = table.Column<int>(type: "int", nullable: false),
-                    StoreDecision = table.Column<int>(type: "int", nullable: false),
-                    FreeBarberDecision = table.Column<int>(type: "int", nullable: false),
+                    StoreSelectionType = table.Column<int>(type: "int", nullable: true),
+                    StoreDecision = table.Column<int>(type: "int", nullable: true),
+                    FreeBarberDecision = table.Column<int>(type: "int", nullable: true),
+                    CustomerDecision = table.Column<int>(type: "int", nullable: true),
                     PendingExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CancelledByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: true)
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: true),
+                    Note = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -71,7 +74,7 @@ namespace DataAccess.Migrations
                     Type = table.Column<int>(type: "int", nullable: false),
                     PricingType = table.Column<int>(type: "int", nullable: false),
                     PricingValue = table.Column<double>(type: "float", nullable: false),
-                    TaxDocumentFilePath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TaxDocumentImageId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -167,7 +170,7 @@ namespace DataAccess.Migrations
                     Type = table.Column<int>(type: "int", nullable: false),
                     Latitude = table.Column<double>(type: "float", nullable: false),
                     Longitude = table.Column<double>(type: "float", nullable: false),
-                    BarberCertificate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    BarberCertificateImageId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     IsAvailable = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
@@ -452,6 +455,21 @@ namespace DataAccess.Migrations
                 filter: "[FavoriteFromUserId] IS NOT NULL AND [FavoriteToUserId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Favorites_FavoritedFromId_FavoritedToId_IsActive",
+                table: "Favorites",
+                columns: new[] { "FavoritedFromId", "FavoritedToId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Favorites_FavoritedToId_FavoritedFromId_IsActive",
+                table: "Favorites",
+                columns: new[] { "FavoritedToId", "FavoritedFromId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Favorites_FavoritedToId_IsActive",
+                table: "Favorites",
+                columns: new[] { "FavoritedToId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_FreeBarbers_FreeBarberUserId",
                 table: "FreeBarbers",
                 column: "FreeBarberUserId",
@@ -461,6 +479,16 @@ namespace DataAccess.Migrations
                 name: "IX_FreeBarbers_IsAvailable_Latitude_Longitude",
                 table: "FreeBarbers",
                 columns: new[] { "IsAvailable", "Latitude", "Longitude" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Images_ImageOwnerId",
+                table: "Images",
+                column: "ImageOwnerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Images_OwnerType_ImageOwnerId",
+                table: "Images",
+                columns: new[] { "OwnerType", "ImageOwnerId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Notifications_UserId_IsRead_CreatedAt",

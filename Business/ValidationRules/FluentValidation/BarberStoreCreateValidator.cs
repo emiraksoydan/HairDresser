@@ -27,8 +27,9 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
         RuleFor(x => x.Longitude)
             .InclusiveBetween(-180, 180).WithMessage("Geçerli bir boylam değeri giriniz (-180..180).");
 
-        RuleFor(x => x.TaxDocumentFilePath)
-            .NotEmpty().WithMessage("Vergi levhası zorunludur.");
+        RuleFor(x => x.TaxDocumentImageId)
+            .NotNull().WithMessage("Vergi levhası resmi zorunludur.")
+            .NotEmpty().WithMessage("Vergi levhası resmi zorunludur.");
 
         // PricingValue koşullu
         When(x => x.PricingType == PricingType.Rent, () =>

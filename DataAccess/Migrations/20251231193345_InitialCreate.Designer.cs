@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20251224220220_AddNoteAndCustomerDecisionToAppointment")]
-    partial class AddNoteAndCustomerDecisionToAppointment
+    [Migration("20251231193345_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,7 +31,7 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateOnly>("AppointmentDate")
+                    b.Property<DateOnly?>("AppointmentDate")
                         .HasColumnType("date");
 
                     b.Property<DateTime?>("ApprovedAt")
@@ -52,16 +52,16 @@ namespace DataAccess.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("CustomerDecision")
+                    b.Property<int?>("CustomerDecision")
                         .HasColumnType("int");
 
                     b.Property<Guid?>("CustomerUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<TimeSpan>("EndTime")
+                    b.Property<TimeSpan?>("EndTime")
                         .HasColumnType("time");
 
-                    b.Property<int>("FreeBarberDecision")
+                    b.Property<int?>("FreeBarberDecision")
                         .HasColumnType("int");
 
                     b.Property<Guid?>("FreeBarberUserId")
@@ -84,13 +84,16 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.Property<TimeSpan>("StartTime")
+                    b.Property<TimeSpan?>("StartTime")
                         .HasColumnType("time");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<int>("StoreDecision")
+                    b.Property<int?>("StoreDecision")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StoreSelectionType")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -204,9 +207,8 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("TaxDocumentFilePath")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<Guid?>("TaxDocumentImageId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -355,6 +357,12 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FavoritedToId", "IsActive");
+
+                    b.HasIndex("FavoritedFromId", "FavoritedToId", "IsActive");
+
+                    b.HasIndex("FavoritedToId", "FavoritedFromId", "IsActive");
+
                     b.ToTable("Favorites");
                 });
 
@@ -364,9 +372,8 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("BarberCertificate")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<Guid?>("BarberCertificateImageId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -430,6 +437,10 @@ namespace DataAccess.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ImageOwnerId");
+
+                    b.HasIndex("OwnerType", "ImageOwnerId");
 
                     b.ToTable("Images");
                 });

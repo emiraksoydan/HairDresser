@@ -30,8 +30,9 @@ namespace Business.ValidationRules.FluentValidation
             RuleFor(x => x.Longitude)
                 .InclusiveBetween(-180, 180).WithMessage("Geçerli bir boylam değeri giriniz (-180..180).");
 
-            RuleFor(x => x.BarberCertificate)
-                .NotEmpty().WithMessage("Vergi levhası zorunludur.");
+            RuleFor(x => x.BarberCertificateImageId)
+                .NotNull().WithMessage("Sertifika resmi zorunludur.")
+                .NotEmpty().WithMessage("Sertifika resmi zorunludur.");
 
         }
     }

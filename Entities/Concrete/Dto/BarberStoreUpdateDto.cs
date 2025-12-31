@@ -19,14 +19,11 @@ namespace Entities.Concrete.Dto
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public double PricingValue { get; set; }
-        public string TaxDocumentFilePath { get; set; }
-        public List<UpdateImageDto>? StoreImageList { get; set; }
+        public Guid? TaxDocumentImageId { get; set; }
         public List<BarberChairUpdateDto> Chairs { get; set; }
         public List<ManuelBarberUpdateDto> ManuelBarbers { get; set; }
         public List<ServiceOfferingUpdateDto> Offerings { get; set; }
         public List<WorkingHourUpdateDto> WorkingHours { get; set; }
-
-
     }
 
 }

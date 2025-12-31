@@ -49,7 +49,7 @@ namespace DataAccess.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("CustomerDecision")
+                    b.Property<int?>("CustomerDecision")
                         .HasColumnType("int");
 
                     b.Property<Guid?>("CustomerUserId")
@@ -58,7 +58,7 @@ namespace DataAccess.Migrations
                     b.Property<TimeSpan?>("EndTime")
                         .HasColumnType("time");
 
-                    b.Property<int>("FreeBarberDecision")
+                    b.Property<int?>("FreeBarberDecision")
                         .HasColumnType("int");
 
                     b.Property<Guid?>("FreeBarberUserId")
@@ -87,7 +87,7 @@ namespace DataAccess.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<int>("StoreDecision")
+                    b.Property<int?>("StoreDecision")
                         .HasColumnType("int");
 
                     b.Property<int?>("StoreSelectionType")
@@ -204,9 +204,8 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("TaxDocumentFilePath")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<Guid?>("TaxDocumentImageId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -370,9 +369,8 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("BarberCertificate")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<Guid?>("BarberCertificateImageId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");

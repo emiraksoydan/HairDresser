@@ -31,7 +31,7 @@ namespace DataAccess.Concrete
                   s.Type,
                   s.FirstName,
                   s.LastName,
-                  s.BarberCertificate,
+                  s.BarberCertificateImageId,
                   s.IsAvailable,
               })
               .FirstOrDefaultAsync();
@@ -106,7 +106,7 @@ namespace DataAccess.Concrete
                    s.Type,
                    s.FirstName,
                    s.LastName,
-                   s.BarberCertificate,
+                   s.BarberCertificateImageId,
                    s.IsAvailable,
 
 
@@ -319,7 +319,7 @@ namespace DataAccess.Concrete
                    s.Type,
                    s.FirstName,
                    s.LastName,
-                   s.BarberCertificate,
+                   s.BarberCertificateImageId,
                    s.IsAvailable,
                    s.Latitude,
                    s.Longitude,
@@ -359,7 +359,7 @@ namespace DataAccess.Concrete
                 FirstName = freeBarber.FirstName,
                 LastName = freeBarber.LastName,
                 IsAvailable = freeBarber.IsAvailable,
-                BarberCertificate = freeBarber.BarberCertificate,
+                BarberCertificateImageId = freeBarber.BarberCertificateImageId,
                 ImageList = images,
                 Offerings = offerings,
                 Latitude = freeBarber.Latitude,

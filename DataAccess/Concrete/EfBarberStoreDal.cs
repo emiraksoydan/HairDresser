@@ -212,7 +212,7 @@ namespace DataAccess.Concrete
                 ServiceOfferings = serviceOfferingsDto,
                 ManuelBarbers = manuelBarberDtos,
                 BarberStoreChairs = barberStoreChairsDto,
-                TaxDocumentFilePath = store.TaxDocumentFilePath,
+                TaxDocumentImageId = store.TaxDocumentImageId,
 
             };
             return dto;

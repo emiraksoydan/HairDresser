@@ -12,11 +12,7 @@ namespace Entities.Concrete.Dto
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public bool IsAvailable { get; set; }
-        public List<CreateImageDto> ImageList { get; set; }
         public List<ServiceOfferingCreateDto> Offerings { get; set; }
-        public string BarberCertificate { get; set; }
-
-
-
+        public Guid? BarberCertificateImageId { get; set; }
     }
 }
