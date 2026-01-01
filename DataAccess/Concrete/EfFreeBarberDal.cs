@@ -351,6 +351,24 @@ namespace DataAccess.Concrete
                 })
                 .ToListAsync();
 
+            // Fetch certificate image if exists
+            ImageGetDto certificateImageDto = null;
+            if (freeBarber.BarberCertificateImageId.HasValue)
+            {
+                var certImage = await _context.Images
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(i => i.Id == freeBarber.BarberCertificateImageId.Value);
+
+                if (certImage != null)
+                {
+                    certificateImageDto = new ImageGetDto
+                    {
+                        Id = certImage.Id,
+                        ImageUrl = certImage.ImageUrl,
+                    };
+                }
+            }
+
             return new FreeBarberMinePanelDetailDto
             {
                 Id = freeBarber.Id,
@@ -360,6 +378,7 @@ namespace DataAccess.Concrete
                 LastName = freeBarber.LastName,
                 IsAvailable = freeBarber.IsAvailable,
                 BarberCertificateImageId = freeBarber.BarberCertificateImageId,
+                BarberCertificateImage = certificateImageDto,
                 ImageList = images,
                 Offerings = offerings,
                 Latitude = freeBarber.Latitude,

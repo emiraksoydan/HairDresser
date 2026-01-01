@@ -11,6 +11,7 @@ namespace Entities.Concrete.Dto
         public string PhoneNumber { get; set; }
         public UserType UserType { get; set; }
         public Guid? ImageId { get; set; }
+        public ImageGetDto Image { get; set; }
         public bool IsActive { get; set; }
     }
 }

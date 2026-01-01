@@ -17,7 +17,7 @@ using Entities.Concrete.Entities;
 
 namespace Business.Concrete
 {
-    public class UserManager(IUserDal userDal, IPhoneService phoneService, ITokenHelper tokenHelper) : IUserService
+    public class UserManager(IUserDal userDal, IPhoneService phoneService, ITokenHelper tokenHelper, IImageService imageService) : IUserService
     {
         public async Task<IResult> Add(User user)
         {
@@ -65,6 +65,17 @@ namespace Business.Concrete
 
             var phone = phoneService.Decrypt(user.PhoneEncrypted, user.PhoneEncryptedNonce);
 
+            // Get user image if exists
+            ImageGetDto imageDto = null;
+            if (user.ImageId.HasValue)
+            {
+                var imageResult = await imageService.GetImage(user.ImageId.Value);
+                if (imageResult.Success && imageResult.Data != null)
+                {
+                    imageDto = imageResult.Data;
+                }
+            }
+
             var userProfile = new UserProfileDto
             {
                 Id = user.Id,
@@ -73,6 +84,7 @@ namespace Business.Concrete
                 PhoneNumber = phone,
                 UserType = user.UserType,
                 ImageId = user.ImageId,
+                Image = imageDto,
                 IsActive = user.IsActive
             };
 

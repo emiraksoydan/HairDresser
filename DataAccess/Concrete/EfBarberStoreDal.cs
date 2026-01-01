@@ -195,6 +195,24 @@ namespace DataAccess.Concrete
           })
           .ToList();
 
+            // Tax document image'ı çek
+            ImageGetDto taxDocumentImageDto = null;
+            if (store.TaxDocumentImageId.HasValue)
+            {
+                var taxImage = await _context.Images
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(i => i.Id == store.TaxDocumentImageId.Value);
+
+                if (taxImage != null)
+                {
+                    taxDocumentImageDto = new ImageGetDto
+                    {
+                        Id = taxImage.Id,
+                        ImageUrl = taxImage.ImageUrl,
+                    };
+                }
+            }
+
             // 6) BarberStoreDetail DTO'sunu doldur
             var dto = new BarberStoreDetail
             {
@@ -213,6 +231,7 @@ namespace DataAccess.Concrete
                 ManuelBarbers = manuelBarberDtos,
                 BarberStoreChairs = barberStoreChairsDto,
                 TaxDocumentImageId = store.TaxDocumentImageId,
+                TaxDocumentImage = taxDocumentImageDto,
 
             };
             return dto;

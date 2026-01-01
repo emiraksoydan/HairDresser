@@ -13,7 +13,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService) : IImageService
+    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService, IUserDal _userDal) : IImageService
     {
         public async Task<IResult> AddAsync(CreateImageDto createImageDto)
         {
@@ -48,7 +48,7 @@ namespace Business.Concrete
 
         public async Task<IDataResult<ImageGetDto>> GetImage(Guid id)
         {
-            var image = await _imageDal.Get(x => x.ImageOwnerId == id);
+            var image = await _imageDal.Get(x => x.Id == id);
             if (image == null)
                 return new ErrorDataResult<ImageGetDto>("Resim bulunamadı.");
 
@@ -113,33 +113,35 @@ namespace Business.Concrete
 
         public async Task<IDataResult<string>> UploadImageAsync(Microsoft.AspNetCore.Http.IFormFile file, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
         {
-            // Check image count limit
-            var maxImages = ownerType switch
+            // For User, ManuelBarber types, we replace the existing image instead of checking count
+            // For Store and FreeBarber, we check the count limit
+            if (ownerId != Guid.Empty &&
+                (ownerType == Entities.Concrete.Enums.ImageOwnerType.Store ||
+                 ownerType == Entities.Concrete.Enums.ImageOwnerType.FreeBarber))
             {
-                Entities.Concrete.Enums.ImageOwnerType.User => 1,
-                Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => 1,
-                Entities.Concrete.Enums.ImageOwnerType.Store => 3,
-                Entities.Concrete.Enums.ImageOwnerType.FreeBarber => 3,
-                _ => 1
-            };
-
-            var existingCount = await _imageDal.CountAsync(x =>
-                x.ImageOwnerId == ownerId &&
-                x.OwnerType == ownerType);
-
-            if (existingCount >= maxImages)
-            {
-                var ownerTypeText = ownerType switch
+                var maxImages = ownerType switch
                 {
-                    Entities.Concrete.Enums.ImageOwnerType.User => "Kullanıcı",
-                    Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => "Manuel berber",
-                    Entities.Concrete.Enums.ImageOwnerType.Store => "Dükkan",
-                    Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "Serbest berber",
-                    _ => "Sahip"
+                    Entities.Concrete.Enums.ImageOwnerType.Store => 3,
+                    Entities.Concrete.Enums.ImageOwnerType.FreeBarber => 3,
+                    _ => 1
                 };
 
-                return new ErrorDataResult<string>(
-                    $"{ownerTypeText} için en fazla {maxImages} resim eklenebilir. Mevcut resim sayısı: {existingCount}");
+                var existingCount = await _imageDal.CountAsync(x =>
+                    x.ImageOwnerId == ownerId &&
+                    x.OwnerType == ownerType);
+
+                if (existingCount >= maxImages)
+                {
+                    var ownerTypeText = ownerType switch
+                    {
+                        Entities.Concrete.Enums.ImageOwnerType.Store => "Dükkan",
+                        Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "Serbest berber",
+                        _ => "Sahip"
+                    };
+
+                    return new ErrorDataResult<string>(
+                        $"{ownerTypeText} için en fazla {maxImages} resim eklenebilir. Mevcut resim sayısı: {existingCount}");
+                }
             }
 
             // Get container name based on owner type
@@ -168,7 +170,31 @@ namespace Business.Concrete
 
             await _imageDal.Add(image);
 
-            return new SuccessDataResult<string>(imageUrl, "Resim başarıyla yüklendi.");
+            // Update User's ImageId if ownerType is User
+            if (ownerType == Entities.Concrete.Enums.ImageOwnerType.User && ownerId != Guid.Empty)
+            {
+                var user = await _userDal.Get(u => u.Id == ownerId);
+                if (user != null)
+                {
+                    // Delete old image if exists
+                    if (user.ImageId.HasValue)
+                    {
+                        var oldImage = await _imageDal.Get(i => i.Id == user.ImageId.Value);
+                        if (oldImage != null)
+                        {
+                            await _blobStorageService.DeleteAsync(oldImage.ImageUrl);
+                            await _imageDal.Remove(oldImage);
+                        }
+                    }
+
+                    user.ImageId = image.Id;
+                    user.UpdatedAt = DateTime.UtcNow;
+                    await _userDal.Update(user);
+                }
+            }
+
+            // Return the Image ID, not the URL
+            return new SuccessDataResult<string>(image.Id.ToString(), "Resim başarıyla yüklendi.");
         }
 
         public async Task<IDataResult<List<string>>> UploadImagesAsync(List<Microsoft.AspNetCore.Http.IFormFile> files, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
