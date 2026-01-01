@@ -25,9 +25,6 @@ namespace Business.ValidationRules.FluentValidation
                 RuleFor(x => x.LastName)
                     .NotEmpty().WithMessage("Soyisim gerekli");
 
-                RuleFor(x => x.CertificateFilePath)
-                    .NotEmpty().WithMessage("Sertifika dosyası zorunludur.")
-                    .Unless(x => x.UserType == UserType.Customer);
             });
         }
     }

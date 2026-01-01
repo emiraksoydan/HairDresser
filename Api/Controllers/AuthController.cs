@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Core.Extensions;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -49,7 +50,7 @@ namespace Api.Controllers
         [HttpPost("revoke")]
         public async Task<IActionResult> Revoke([FromBody] RefreshTokenDto req)
         {
-            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userId = User.GetUserIdOrThrow();
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
             var r = await authService.RevokeAsync(userId, req.RefreshToken, ip);
             return r.Success ? Ok(r) : BadRequest(r);

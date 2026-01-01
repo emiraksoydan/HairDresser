@@ -74,7 +74,6 @@ namespace Business.Concrete
                     PhoneEncryptedNonce = nonce,
                     PhoneSearchToken = phoneService.ComputeSearchToken(e164),
                     IsActive = true,
-                    CertificateFilePath = userForVerifyDto.CertificateFilePath,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                 };
@@ -189,7 +188,7 @@ namespace Business.Concrete
                     PhoneEncryptedNonce = nonce,
                     PhoneSearchToken = phoneService.ComputeSearchToken(e164),
                     IsActive = true,
-                    CertificateFilePath = userForVerifyDto.CertificateFilePath ?? string.Empty,
+
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                 };

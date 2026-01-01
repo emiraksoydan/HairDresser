@@ -39,11 +39,6 @@ namespace Business.Concrete
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
         private readonly AppointmentSettings _settings = appointmentSettings.Value;
 
-        // Timeout S├╝releri:
-        // - ─░ste─şime G├Âre: _settings.PendingTimeoutMinutes (5 dakika)
-        // - D├╝kkan Se├ğ (toplam): StoreSelectionTotalMinutes (30 dakika)
-        // - D├╝kkan onay─▒: StoreSelectionStepMinutes (5 dakika, toplam 30 dk'ya dahil)
-        // - M├╝┼şteri onay─▒: Yeni s├╝re yok, toplam 30 dakikaya dahil
         private const int StoreSelectionTotalMinutes = 30;
         private const int StoreSelectionStepMinutes = 5;
 
@@ -71,8 +66,6 @@ namespace Business.Concrete
             var store = await barberStoreDal.Get(x => x.Id == id);
             if (store is null) return new ErrorDataResult<bool>(false, Messages.StoreNotFound);
 
-            // Not: Store'un birden fazla active randevusu OLAB─░L─░R demi┼ştin.
-            // Bu methodu sadece "bilgi" ama├ğl─▒ tutuyorum.
             var has = await appointmentDal.AnyAsync(x =>
                 x.BarberStoreUserId == store.BarberStoreOwnerId &&
                 Active.Contains(x.Status));
@@ -1097,23 +1090,6 @@ namespace Business.Concrete
 
                 await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
 
-                // Decision sonras─▒ chat mesaj─▒ g├Ânder
-                try
-                {
-                    var decisionMessage = approve ? "Randevu talebiniz kabul edildi." : "Randevu talebiniz reddedildi.";
-                    if (appt.CustomerUserId.HasValue)
-                    {
-                        // await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
-                    }
-                    else if (appt.BarberStoreUserId.HasValue)
-                    {
-                        // await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
-                    }
-                }
-                catch
-                {
-                    // Chat mesaj─▒ g├Ânderilemezse devam et, kritik de─şil
-                }
 
                 // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir (aktif tab'da g├Âr├╝nmesi i├ğin)
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -1123,25 +1099,6 @@ namespace Business.Concrete
                 return new SuccessDataResult<bool>(true);
             }
 
-            // AppointmentDecisionUpdated bildirimleri kald─▒r─▒ld─▒ - kullan─▒c─▒ iste─şi
-
-            // Decision g├╝ncellendi─şinde chat mesaj─▒ g├Ânder
-            try
-            {
-                var decisionMessage = approve ? "Randevu talebiniz kabul edildi. Di─şer taraf─▒n onay─▒ bekleniyor." : "Randevu talebiniz reddedildi.";
-                if (appt.CustomerUserId.HasValue)
-                {
-                    // await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
-                }
-                else if (appt.BarberStoreUserId.HasValue)
-                {
-                    // await chatService.SendMessageAsync(freeBarberUserId, appt.Id, decisionMessage);
-                }
-            }
-            catch
-            {
-                // Chat mesaj─▒ g├Ânderilemezse devam et, kritik de─şil
-            }
 
             // Decision g├╝ncellendi─şinde ilgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);

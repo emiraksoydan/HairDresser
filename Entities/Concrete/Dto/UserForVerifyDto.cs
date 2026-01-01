@@ -13,7 +13,6 @@ namespace Entities.Concrete.Dto
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string PhoneNumber { get; set; }
-        public string CertificateFilePath { get; set; }    
         public string Code { get; set; }
         public string? Device {  get; set; }
         public UserType UserType { get; set; }

@@ -16,7 +16,6 @@ namespace Entities.Concrete.Entities
         public byte[] PhoneEncrypted { get; set; } 
         public byte[] PhoneEncryptedNonce { get; set; } 
         public byte[] PhoneSearchToken { get; set; } 
-        public string CertificateFilePath { get; set; }
         public bool IsActive { get; set; }
         public Guid? ImageId { get; set; }
         public Image Image { get; set; }
