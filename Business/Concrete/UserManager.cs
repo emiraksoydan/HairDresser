@@ -14,10 +14,12 @@ using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
+using Microsoft.Extensions.Configuration;
+using Core.Aspect.Autofac.Transaction;
 
 namespace Business.Concrete
 {
-    public class UserManager(IUserDal userDal, IPhoneService phoneService, ITokenHelper tokenHelper, IImageService imageService) : IUserService
+    public class UserManager(IUserDal userDal, IPhoneService phoneService, ITokenHelper tokenHelper, IImageService imageService, IRefreshTokenService refreshTokenService, IRefreshTokenDal refreshTokenDal, IConfiguration configuration) : IUserService
     {
         public async Task<IResult> Add(User user)
         {
@@ -63,7 +65,9 @@ namespace Business.Concrete
             if (user == null)
                 return new ErrorDataResult<UserProfileDto>("Kullanıcı bulunamadı");
 
-            var phone = phoneService.Decrypt(user.PhoneEncrypted, user.PhoneEncryptedNonce);
+            string phone = string.Empty;
+            phone = phoneService.Decrypt(user.PhoneEncrypted, user.PhoneEncryptedNonce);
+   
 
             // Get user image if exists
             ImageGetDto imageDto = null;
@@ -92,6 +96,7 @@ namespace Business.Concrete
         }
 
         [ValidationAspect(typeof(UpdateUserDtoValidator))]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<AccessToken>> UpdateProfile(UpdateUserDto dto, Guid currentUserId)
         {
             // Get current user
@@ -133,11 +138,47 @@ namespace Business.Concrete
                 return new ErrorDataResult<AccessToken>(updateResult.Message);
             }
 
+            // Revoke all active refresh tokens for this user (güvenlik için)
+            var activeTokens = await refreshTokenDal.GetActiveByUser(currentUserId);
+            foreach (var token in activeTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+                token.RevokedByIp = null; // Could be passed from controller if needed
+                await refreshTokenDal.Update(token);
+            }
+
             // Generate new access token with updated claims
             var claims = await GetClaims(currentUser);
             var newAccessToken = tokenHelper.CreateToken(currentUser, claims.Data);
 
-            return new SuccessDataResult<AccessToken>(newAccessToken, "Profil başarıyla güncellendi");
+            // Create new refresh token (like in AuthManager)
+            var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
+            var rt = refreshTokenService.CreateNew(refreshDays);
+            var familyId = Guid.NewGuid();
+
+            var refreshTokenEntity = new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUser.Id,
+                TokenHash = rt.Hash,
+                TokenSalt = rt.Salt,
+                Fingerprint = rt.Fingerprint,
+                FamilyId = familyId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = null, // Could be passed from controller if needed
+                Device = null, // Could be passed from controller if needed
+                ExpiresAt = rt.Expires
+            };
+
+            await refreshTokenDal.Add(refreshTokenEntity);
+
+            return new SuccessDataResult<AccessToken>(new AccessToken
+            {
+                Token = newAccessToken.Token,
+                Expiration = newAccessToken.Expiration,
+                RefreshToken = rt.Plain,
+                RefreshTokenExpires = rt.Expires
+            }, "Profil başarıyla güncellendi");
         }
     }
 }
