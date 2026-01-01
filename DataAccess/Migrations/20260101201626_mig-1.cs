@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class mig1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -329,7 +329,6 @@ namespace DataAccess.Migrations
                     PhoneEncrypted = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
                     PhoneEncryptedNonce = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
                     PhoneSearchToken = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    CertificateFilePath = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     ImageId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     UserType = table.Column<int>(type: "int", nullable: false),

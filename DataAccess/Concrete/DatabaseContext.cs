@@ -63,7 +63,7 @@ namespace DataAccess.Concrete
 
             modelBuilder.Entity<Appointment>().Property(x => x.RowVersion).IsRowVersion();
 
-          
+
 
             // AppointmentId artık nullable (favori thread'ler için null)
             // Unique index sadece AppointmentId null değilse geçerli olmalı
@@ -127,6 +127,13 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<AppointmentServiceOffering>()
                 .Property(x => x.Price)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Appointment>(entity =>
+            {
+                entity.Property(e => e.StoreDecision).IsRequired(false);
+                entity.Property(e => e.FreeBarberDecision).IsRequired(false);
+                entity.Property(e => e.CustomerDecision).IsRequired(false);
+            });
 
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
