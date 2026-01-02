@@ -162,23 +162,48 @@ namespace DataAccess.Concrete
                 ServiceName = s.ServiceName
             }).ToList();
 
-            var manuelBarberDtos = await _context.ManuelBarbers
+            // ✅ N+1 FIX: Manuel barberleri önce çek
+            var manuelBarbers = await _context.ManuelBarbers
           .AsNoTracking()
           .Where(b => b.StoreId == storeId)
-          .Select(b => new ManuelBarberDto
-          {
-              Id = b.Id,
-              FullName = b.FullName,
-              Rating = _context.Ratings
-                  .Where(r => r.TargetId == b.Id)
-                  .Select(r => (double?)r.Score)      // nullable’a çevir
-                  .Average() ?? 0,                    // null ise 0
-              ProfileImageUrl = _context.Images
-                  .Where(i => i.ImageOwnerId == b.Id)
-                  .Select(i => i.ImageUrl)
-                  .FirstOrDefault()
-          })
           .ToListAsync();
+
+            var barberIds = manuelBarbers.Select(b => b.Id).ToList();
+
+            // ✅ N+1 FIX: Tüm rating'leri tek sorguda çek ve grupla
+            var barberRatings = await _context.Ratings
+                .AsNoTracking()
+                .Where(r => barberIds.Contains(r.TargetId))
+                .GroupBy(r => r.TargetId)
+                .Select(g => new
+                {
+                    BarberId = g.Key,
+                    AvgRating = g.Average(x => (double)x.Score)
+                })
+                .ToDictionaryAsync(x => x.BarberId, x => x.AvgRating);
+
+            // ✅ N+1 FIX: Tüm image'ları tek sorguda çek
+            var barberImages = await _context.Images
+                .AsNoTracking()
+                .Where(i => barberIds.Contains(i.ImageOwnerId))
+                .GroupBy(i => i.ImageOwnerId)
+                .Select(g => new
+                {
+                    OwnerId = g.Key,
+                    ImageUrl = g.First().ImageUrl
+                })
+                .ToDictionaryAsync(x => x.OwnerId, x => x.ImageUrl);
+
+            // ✅ Memory'de birleştir (N+1 yok, sadece dictionary lookup!)
+            var manuelBarberDtos = manuelBarbers
+                .Select(b => new ManuelBarberDto
+                {
+                    Id = b.Id,
+                    FullName = b.FullName,
+                    Rating = barberRatings.ContainsKey(b.Id) ? barberRatings[b.Id] : 0,
+                    ProfileImageUrl = barberImages.ContainsKey(b.Id) ? barberImages[b.Id] : null
+                })
+                .ToList();
 
 
             var chairs = await _context.BarberChairs
