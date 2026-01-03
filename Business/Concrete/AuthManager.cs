@@ -195,9 +195,6 @@ namespace Business.Concrete
                 }
 
                 user = existing.Data;
-
-                // Opsiyonel: Giriş sırasında ismin değiştiğini kontrol edip güncelleyebilirsin (senaryona göre)
-                // user.FirstName = firstName; user.LastName = lastName; await userService.Update(user);
             }
 
             // Access ve Refresh Token üretimi

@@ -16,7 +16,6 @@ using System.Threading.Tasks;
 namespace Business.Concrete
 {
     public class NotificationManager(INotificationDal notificationDal,
-        IBadgeService badgeService,
         IRealTimePublisher realtime,
         IBadgeUpdateService badgeUpdateService) : INotificationService
     {

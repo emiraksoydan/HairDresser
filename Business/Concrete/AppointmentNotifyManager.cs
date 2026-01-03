@@ -19,11 +19,8 @@ namespace Business.Concrete
         IUserSummaryService userSummarySvc,
         INotificationService notificationSvc,
         IAppointmentServiceOffering appointmentServiceOfferingDal,
-        IBadgeService badgeService,
-        IRealTimePublisher realtime,
         IFavoriteService favoriteService,
-        IFreeBarberDal freeBarberDal,
-        IBadgeUpdateService badgeUpdateService
+        IFreeBarberDal freeBarberDal
     ) : IAppointmentNotifyService
     {
         // Overload 1: AppointmentId ile (mevcut randevular için - transaction dışında)
@@ -416,14 +413,9 @@ namespace Business.Concrete
                 );
             }
 
-            // ÖNEMLİ: Badge count güncellemesi - tüm recipient'lara schedule et
-            // Transaction commit sonrası badge count doğru hesaplanacak
-            // NotificationManager.CreateAndPushAsync içinde zaten badge schedule ediliyor
-            // Ancak ekstra güvence için tüm recipient'lar için de schedule ediyoruz
-            foreach (var userId in recipients)
-            {
-                badgeUpdateService.ScheduleBadgeUpdate(userId);
-            }
+            // Badge count güncellemesi NotificationManager.CreateAndPushAsync içinde yapılıyor
+            // Her notification oluşturulduğunda otomatik olarak badge schedule ediliyor (NotificationManager satır 163, 204, 227)
+            // Burada tekrar schedule etmeye gerek yok (HashSet duplicate'ları filtreler ama gereksiz)
 
             return new SuccessResult();
         }
