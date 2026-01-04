@@ -28,7 +28,8 @@ public class UserSummaryManager(
                     UserId = u.Id,
                     DisplayName = BuildName(fb.FirstName, fb.LastName, "Serbest Berber"),
                     AvatarUrl = await TryGetFreeBarberAvatarAsync(fb.Id), // Berber fotoları
-                    RoleHint = "freebarber"
+                    RoleHint = "freebarber",
+                    CustomerNumber = u.CustomerNumber
                 });
             }
         }
@@ -38,7 +39,8 @@ public class UserSummaryManager(
             UserId = u.Id,
             DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
             AvatarUrl = await TryGetUserAvatarAsync(u.Id),
-            RoleHint = "user"
+            RoleHint = "user",
+            CustomerNumber = u.CustomerNumber
         });
     }
 
@@ -58,11 +60,12 @@ public class UserSummaryManager(
         {
             freeBarbers = await freeBarberDal.GetAll(fb => freeBarberUserIds.Contains(fb.FreeBarberUserId));
         }
+        // Performance: Dictionary kullanarak O(1) lookup
+        var freeBarberDict = freeBarbers.ToDictionary(f => f.FreeBarberUserId);
         var imageOwnerIds = new HashSet<Guid>();
         foreach (var u in users)
         {
-            var fbDetail = freeBarbers.FirstOrDefault(f => f.FreeBarberUserId == u.Id);
-            if (fbDetail != null)
+            if (freeBarberDict.TryGetValue(u.Id, out var fbDetail))
             {
                 imageOwnerIds.Add(fbDetail.Id); 
             }
@@ -76,14 +79,14 @@ public class UserSummaryManager(
             .GroupBy(img => img.ImageOwnerId) 
             .ToDictionary(
                 g => g.Key, 
-                g => g.OrderByDescending(img => img.CreatedAt).First().ImageUrl // Value = En son resmin URL'i
+                g => g.OrderByDescending(img => img.CreatedAt).First().ImageUrl
             );
 
         string? GetAvatarUrlFromCache(Guid ownerId) =>
             imageLookup.TryGetValue(ownerId, out var url) ? url : null;
         foreach (var u in users)
         {
-            var fbDetail = freeBarbers.FirstOrDefault(f => f.FreeBarberUserId == u.Id);
+            freeBarberDict.TryGetValue(u.Id, out var fbDetail);
 
             if (fbDetail is not null)
             {
@@ -92,7 +95,8 @@ public class UserSummaryManager(
                     UserId = u.Id,
                     DisplayName = BuildName(fbDetail.FirstName, fbDetail.LastName, "Serbest Berber"),
                     AvatarUrl = GetAvatarUrlFromCache(fbDetail.Id),
-                    RoleHint = "freebarber"
+                    RoleHint = "freebarber",
+                    CustomerNumber = u.CustomerNumber
                 };
             }
             else
@@ -102,7 +106,8 @@ public class UserSummaryManager(
                     UserId = u.Id,
                     DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
                     AvatarUrl = GetAvatarUrlFromCache(u.Id),
-                    RoleHint = "user"
+                    RoleHint = "user",
+                    CustomerNumber = u.CustomerNumber
                 };
             }
         }

@@ -11,7 +11,7 @@ namespace DataAccess.Abstract
 {
     public interface IFreeBarberDal : IEntityRepository<FreeBarber>
     {
-        Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1.0);
+        Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1.0, Guid? currentUserId = null);
         
         // Filtreleme ve arama
         Task<List<FreeBarberGetDto>> GetFilteredFreeBarbersAsync(FilterRequestDto filter);

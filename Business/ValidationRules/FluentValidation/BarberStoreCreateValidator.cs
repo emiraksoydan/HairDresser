@@ -69,6 +69,17 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
             .WithMessage("Manuel berber adı zorunludur.");
        });
 
+        // Berberlerin toplamı 30'u geçmemeli
+        RuleFor(x => x.ManuelBarbers)
+            .Must(barbers => (barbers?.Count ?? 0) <= 30)
+            .WithMessage("Berber sayısı 30'u geçemez.");
+
+        // Koltukların toplamı 30'u geçmemeli
+        RuleFor(x => x.Chairs)
+            .Must(chairs => (chairs?.Count ?? 0) <= 30)
+            .WithMessage("Koltuk sayısı 30'u geçemez.")
+            .When(x => x.Chairs != null);
+
         // Offerings
         RuleFor(x => x.Offerings)
             .NotEmpty().WithMessage("En az bir hizmet girilmelidir.");

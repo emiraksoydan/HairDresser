@@ -442,7 +442,7 @@ namespace Business.Concrete
                     "Randevu Tamamlandı",
                 
                 NotificationType.AppointmentDecisionUpdated =>
-                    string.Empty,
+                    "Randevu Durumu Güncellendi",
                 
                 // 3'lü sistem bildirimleri
                 NotificationType.FreeBarberRejectedInitial => 

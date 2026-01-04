@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260101201626_mig-1")]
+    [Migration("20260104210220_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -66,6 +66,15 @@ namespace DataAccess.Migrations
 
                     b.Property<Guid?>("FreeBarberUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeletedByBarberStoreUserId")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeletedByCustomerUserId")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeletedByFreeBarberUserId")
+                        .HasColumnType("bit");
 
                     b.Property<Guid?>("ManuelBarberId")
                         .HasColumnType("uniqueidentifier");
@@ -302,6 +311,15 @@ namespace DataAccess.Migrations
 
                     b.Property<Guid?>("FreeBarberUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeletedByCustomerUserId")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeletedByFreeBarberUserId")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeletedByStoreOwnerUserId")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("LastMessageAt")
                         .HasColumnType("datetime2");
@@ -650,6 +668,32 @@ namespace DataAccess.Migrations
                     b.ToTable("ServiceOfferings");
                 });
 
+            modelBuilder.Entity("Entities.Concrete.Entities.Setting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("ShowImageAnimation")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("Settings");
+                });
+
             modelBuilder.Entity("Entities.Concrete.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -658,6 +702,10 @@ namespace DataAccess.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -673,17 +721,10 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<byte[]>("PhoneEncrypted")
+                    b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("varbinary(max)");
-
-                    b.Property<byte[]>("PhoneEncryptedNonce")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)");
-
-                    b.Property<byte[]>("PhoneSearchToken")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -694,6 +735,9 @@ namespace DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ImageId");
+
+                    b.HasIndex("PhoneNumber")
+                        .HasDatabaseName("IX_User_PhoneNumber");
 
                     b.ToTable("Users");
                 });
@@ -774,6 +818,17 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("RatedFrom");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.Setting", b =>
+                {
+                    b.HasOne("Entities.Concrete.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.User", b =>

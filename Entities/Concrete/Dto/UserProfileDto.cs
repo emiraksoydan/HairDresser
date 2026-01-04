@@ -10,6 +10,7 @@ namespace Entities.Concrete.Dto
         public string LastName { get; set; }
         public string PhoneNumber { get; set; }
         public UserType UserType { get; set; }
+        public string CustomerNumber { get; set; } // Müşteri numarası
         public Guid? ImageId { get; set; }
         public ImageGetDto Image { get; set; }
         public bool IsActive { get; set; }

@@ -29,9 +29,26 @@ namespace Business.Concrete
         public async Task<IDataResult<User>> GetByPhone(string phoneNumber)
         {
             var e164 = phoneService.NormalizeToE164(phoneNumber);
-            var token = phoneService.ComputeSearchToken(e164);
-            var user = await userDal.Get(u => u.PhoneSearchToken == token);
+            var user = await userDal.Get(u => u.PhoneNumber == e164);
             return new SuccessDataResult<User>(user);
+        }
+
+        public async Task<IDataResult<List<User>>> GetByPhoneAll(string phoneNumber)
+        {
+            var users = await userDal.GetByPhoneAll(phoneNumber);
+            return new SuccessDataResult<List<User>>(users);
+        }
+
+        public async Task<IDataResult<User>> GetByCustomerNumber(string customerNumber)
+        {
+            var user = await userDal.GetByCustomerNumber(customerNumber);
+            return new SuccessDataResult<User>(user);
+        }
+
+        public async Task<IDataResult<List<User>>> GetByCustomerNumberAll(string customerNumber)
+        {
+            var users = await userDal.GetByCustomerNumberAll(customerNumber);
+            return new SuccessDataResult<List<User>>(users);
         }
 
         public async Task<IDataResult<List<OperationClaim>>> GetClaims(User user)
@@ -65,9 +82,8 @@ namespace Business.Concrete
             if (user == null)
                 return new ErrorDataResult<UserProfileDto>("Kullanıcı bulunamadı");
 
-            string phone = string.Empty;
-            phone = phoneService.Decrypt(user.PhoneEncrypted, user.PhoneEncryptedNonce);
-   
+            // Telefon numarasını direkt string olarak döndür
+            string phone = user.PhoneNumber ?? string.Empty; // PhoneNumber required olduğu için genelde null olmaz ama güvenlik için
 
             // Get user image if exists
             ImageGetDto imageDto = null;
@@ -87,6 +103,7 @@ namespace Business.Concrete
                 LastName = user.LastName,
                 PhoneNumber = phone,
                 UserType = user.UserType,
+                CustomerNumber = user.CustomerNumber,
                 ImageId = user.ImageId,
                 Image = imageDto,
                 IsActive = user.IsActive
@@ -111,25 +128,73 @@ namespace Business.Concrete
             // Normalize phone number
             var e164 = phoneService.NormalizeToE164(dto.PhoneNumber);
 
-            // Check if phone number is already in use by another user
-            var phoneCheck = await GetByPhone(e164);
-            if (phoneCheck.Data != null && phoneCheck.Data.Id != currentUserId)
+            // Mevcut kullanıcının telefon numarası değişiyor mu kontrol et
+            string currentPhone = currentUser.PhoneNumber ?? string.Empty; // PhoneNumber required olduğu için genelde null olmaz ama güvenlik için
+            var isPhoneChanging = currentPhone != e164;
+
+            if (isPhoneChanging)
             {
-                return new ErrorDataResult<AccessToken>("Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor");
+                // Aynı telefon numarasına sahip tüm kullanıcıları kontrol et
+                var usersWithSamePhone = await GetByPhoneAll(e164);
+                
+                if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
+                {
+                    // Aynı telefon numarasına sahip başka kullanıcı var mı kontrol et (kendisi hariç)
+                    var otherUser = usersWithSamePhone.Data.FirstOrDefault(u => u.Id != currentUserId);
+                    
+                    if (otherUser != null)
+                    {
+                        // Eğer müşteri numaraları aynıysa ve userType farklıysa, telefon numarasını güncelle (hata verme)
+                        if (otherUser.CustomerNumber == currentUser.CustomerNumber && otherUser.UserType != currentUser.UserType)
+                        {
+                            // Aynı müşteri numarasına sahip farklı tür kullanıcı - telefon numarasını güncelle
+                            currentUser.PhoneNumber = e164;
+                        }
+                        else if (otherUser.CustomerNumber != currentUser.CustomerNumber)
+                        {
+                            // Farklı müşteri numarasına sahip kullanıcı - bu numara başka bir kullanıcıya ait
+                            return new ErrorDataResult<AccessToken>("Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor");
+                        }
+                        else if (otherUser.UserType == currentUser.UserType)
+                        {
+                            // Aynı userType - bu numara zaten bu kullanıcıya ait olmalı
+                            return new ErrorDataResult<AccessToken>("Bu telefon numarası zaten sizin tarafınızdan kullanılıyor");
+                        }
+                    }
+                    else
+                    {
+                        // Aynı telefon numarasına sahip başka kullanıcı yok - telefon numarasını güncelle
+                        currentUser.PhoneNumber = e164;
+                    }
+                }
+                else
+                {
+                    // Bu telefon numarası hiç kullanılmamış - telefon numarasını güncelle
+                    currentUser.PhoneNumber = e164;
+                }
+
+                // Aynı müşteri numarasına sahip tüm kullanıcıların telefon numaralarını güncelle
+                if (!string.IsNullOrEmpty(currentUser.CustomerNumber))
+                {
+                    var usersWithSameCustomerNumber = await GetByCustomerNumberAll(currentUser.CustomerNumber);
+                    if (usersWithSameCustomerNumber.Data != null && usersWithSameCustomerNumber.Data.Any())
+                    {
+                        foreach (var user in usersWithSameCustomerNumber.Data)
+                        {
+                            if (user.Id != currentUserId && user.PhoneNumber != e164)
+                            {
+                                user.PhoneNumber = e164;
+                                user.UpdatedAt = DateTime.UtcNow;
+                                await userDal.Update(user);
+                            }
+                        }
+                    }
+                }
             }
 
             // Update user fields
             currentUser.FirstName = dto.FirstName;
             currentUser.LastName = dto.LastName;
-
-            // Update phone if changed
-            if (phoneCheck.Data == null || phoneCheck.Data.Id == currentUserId)
-            {
-                var (cipher, nonce) = phoneService.Encrypt(e164);
-                currentUser.PhoneEncrypted = cipher;
-                currentUser.PhoneEncryptedNonce = nonce;
-                currentUser.PhoneSearchToken = phoneService.ComputeSearchToken(e164);
-            }
 
             // Update user
             var updateResult = await Update(currentUser);

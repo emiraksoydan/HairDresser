@@ -12,8 +12,6 @@ using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.Extensions.Configuration;
-using System.Diagnostics;
-
 
 namespace Business.Concrete
 {
@@ -58,28 +56,81 @@ namespace Business.Concrete
             var e164 = phoneService.NormalizeToE164(userForVerifyDto.PhoneNumber);
             var ok = await twilioVerify.CheckAsync(e164, userForVerifyDto.Code);
             if (!ok.Success) return new ErrorDataResult<AccessToken>(ok.Message);
-            var existing = await userService.GetByPhone(e164);
-            User user;
-            if (existing.Data is not null) user = existing.Data;
+            
+            // Aynı telefon numarasına sahip tüm kullanıcıları kontrol et
+            var usersWithSamePhone = await userService.GetByPhoneAll(e164);
+            
+            // Aynı telefon numarası ve aynı UserType ile kayıtlı kullanıcı var mı kontrol et
+            if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
+            {
+                var userWithSameType = usersWithSamePhone.Data.FirstOrDefault(u => u.UserType == userForVerifyDto.UserType);
+                if (userWithSameType != null)
+                {
+                    // Aynı telefon numarası ve aynı UserType ile kayıtlı kullanıcı var - güncelle
+                    var user = userWithSameType;
+                    
+                    // Mevcut kullanıcının telefon numarası eksikse veya farklıysa güncelle
+                    if (string.IsNullOrWhiteSpace(user.PhoneNumber) || user.PhoneNumber != e164)
+                    {
+                        user.PhoneNumber = e164;
+                        await userService.Update(user);
+                    }
+                    
+                    return await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
+                }
+            }
+            
+            // Yeni kullanıcı oluştur
+            string customerNumber = null;
+            
+            if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
+            {
+                // Aynı telefon numarasına sahip kullanıcı varsa onun müşteri numarasını kullan
+                customerNumber = usersWithSamePhone.Data.First().CustomerNumber;
+            }
             else
             {
-                var (cipher, nonce) = phoneService.Encrypt(e164);
-                user = new User
-                {
-
-                    FirstName = userForVerifyDto.FirstName,
-                    LastName = userForVerifyDto.LastName,
-                    UserType = userForVerifyDto.UserType,
-                    PhoneEncrypted = cipher,
-                    PhoneEncryptedNonce = nonce,
-                    PhoneSearchToken = phoneService.ComputeSearchToken(e164),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                };
-                await userService.Add(user);
+                // Yeni müşteri numarası oluştur (6 haneli rastgele sayı)
+                customerNumber = await GenerateUniqueCustomerNumberAsync();
             }
-            return await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
+
+            var newUser = new User
+            {
+                FirstName = userForVerifyDto.FirstName,
+                LastName = userForVerifyDto.LastName,
+                UserType = userForVerifyDto.UserType,
+                PhoneNumber = e164, // E164 formatında telefon numarası
+                CustomerNumber = customerNumber,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            
+            // Kullanıcıyı kaydet
+            var addResult = await userService.Add(newUser);
+            if (!addResult.Success)
+            {
+                return new ErrorDataResult<AccessToken>(addResult.Message);
+            }
+            
+            // PhoneNumber'ın doğru kaydedildiğinden emin olmak için tekrar oku
+            var savedUserResult = await userService.GetById(newUser.Id);
+            if (savedUserResult.Data != null)
+            {
+                // PhoneNumber boşsa veya farklıysa güncelle
+                if (string.IsNullOrWhiteSpace(savedUserResult.Data.PhoneNumber) || savedUserResult.Data.PhoneNumber != e164)
+                {
+                    savedUserResult.Data.PhoneNumber = e164;
+                    await userService.Update(savedUserResult.Data);
+                    newUser = savedUserResult.Data;
+                }
+                else
+                {
+                    newUser = savedUserResult.Data;
+                }
+            }
+            
+            return await CreateAccessAndRefreshAsync(newUser, ip, device, familyId: null);
 
         }
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -152,10 +203,11 @@ namespace Business.Concrete
             if (isRegister)
             {
                 // --- KAYIT MODU ---
-                if (existing.Data is not null)
+                // Aynı telefon numarası ve userType ile kayıtlı kullanıcı var mı kontrol et
+                if (existing.Data is not null && existing.Data.UserType == userForVerifyDto.UserType)
                 {
-                    // Kullanıcı bu telefonla zaten kayıtlıysa hata dön
-                    return new ErrorDataResult<AccessToken>("Bu telefon numarası zaten sisteme kayıtlı. Lütfen giriş yapın.");
+                    // Kullanıcı bu telefonla ve aynı userType ile zaten kayıtlıysa hata dön
+                    return new ErrorDataResult<AccessToken>("Bu telefon numarası ve kullanıcı tipi zaten sisteme kayıtlı. Lütfen giriş yapın.");
                 }
 
                 // Yeni kullanıcı tipi geçerli mi kontrol et
@@ -164,16 +216,29 @@ namespace Business.Concrete
                     return new ErrorDataResult<AccessToken>("Geçersiz kullanıcı tipi.");
                 }
 
+                // Aynı telefon numarasına sahip kullanıcılar var mı kontrol et
+                var usersWithSamePhone = await userService.GetByPhoneAll(e164);
+                string customerNumber = null;
+                
+                if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
+                {
+                    // Aynı telefon numarasına sahip kullanıcı varsa onun müşteri numarasını kullan
+                    customerNumber = usersWithSamePhone.Data.First().CustomerNumber;
+                }
+                else
+                {
+                    // Yeni müşteri numarası oluştur (6 haneli rastgele sayı)
+                    customerNumber = await GenerateUniqueCustomerNumberAsync();
+                }
+
                 // Yeni kullanıcı oluşturma süreci
-                var (cipher, nonce) = phoneService.Encrypt(e164);
                 user = new User
                 {
                     FirstName = firstName,
                     LastName = lastName,
                     UserType = userForVerifyDto.UserType,
-                    PhoneEncrypted = cipher,
-                    PhoneEncryptedNonce = nonce,
-                    PhoneSearchToken = phoneService.ComputeSearchToken(e164),
+                    PhoneNumber = e164, // E164 formatında telefon numarası
+                    CustomerNumber = customerNumber,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
@@ -182,6 +247,23 @@ namespace Business.Concrete
                 // Kullanıcıyı kaydet
                 var addResult = await userService.Add(user);
                 if (!addResult.Success) return new ErrorDataResult<AccessToken>(addResult.Message);
+                
+                // PhoneNumber'ın doğru kaydedildiğinden emin olmak için tekrar oku
+                var savedUserResult = await userService.GetById(user.Id);
+                if (savedUserResult.Data != null)
+                {
+                    // PhoneNumber boşsa veya farklıysa güncelle
+                    if (string.IsNullOrWhiteSpace(savedUserResult.Data.PhoneNumber) || savedUserResult.Data.PhoneNumber != e164)
+                    {
+                        savedUserResult.Data.PhoneNumber = e164;
+                        await userService.Update(savedUserResult.Data);
+                        user = savedUserResult.Data;
+                    }
+                    else
+                    {
+                        user = savedUserResult.Data;
+                    }
+                }
 
                
             }
@@ -194,7 +276,20 @@ namespace Business.Concrete
                     return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı. Lütfen önce kayıt olun.");
                 }
 
+                // UserType kontrolü - giriş yaparken userType eşleşmeli
+                if (existing.Data.UserType != userForVerifyDto.UserType)
+                {
+                    return new ErrorDataResult<AccessToken>($"Bu telefon numarası için {existing.Data.UserType} kullanıcı tipi ile giriş yapmalısınız.");
+                }
+
                 user = existing.Data;
+
+                // Giriş modunda: Mevcut kullanıcının telefon numarası eksikse veya farklıysa güncelle
+                if (string.IsNullOrWhiteSpace(user.PhoneNumber) || user.PhoneNumber != e164)
+                {
+                    user.PhoneNumber = e164;
+                    await userService.Update(user);
+                }
             }
 
             // Access ve Refresh Token üretimi
@@ -204,14 +299,8 @@ namespace Business.Concrete
 
         private async Task<IDataResult<AccessToken>> CreateAccessAndRefreshAsync(User user, string? ip, string? device, Guid? familyId)
         {
-            // Debug: Token oluşturulmadan önce user bilgilerini logla
-            Debug.WriteLine($"[AuthManager] CreateAccessAndRefreshAsync: Creating token for UserId: {user.Id}, UserType: {user.UserType} (ToString: {user.UserType.ToString()})");
-            
             var claims = await userService.GetClaims(user);
             var access = tokenHelper.CreateToken(user, claims.Data);
-            
-            // Debug: Token oluşturulduktan sonra logla
-            Debug.WriteLine($"[AuthManager] CreateAccessAndRefreshAsync: Token created successfully for UserId: {user.Id}, UserType: {user.UserType}");
             
             // Get refresh token expiration from configuration (default: 30 days)
             var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
@@ -266,6 +355,36 @@ namespace Business.Concrete
             if (token.RevokedAt is not null || token.ExpiresAt <= DateTime.UtcNow)
                 return new ErrorDataResult<AccessToken>("Süresi dolmuş veya iptal edilmiş token.");
             return new SuccessDataResult<AccessToken>();
+        }
+
+        /// <summary>
+        /// Benzersiz müşteri numarası oluşturur (6 haneli rastgele sayı)
+        /// </summary>
+        private async Task<string> GenerateUniqueCustomerNumberAsync()
+        {
+            var random = new Random();
+            string customerNumber;
+            bool isUnique;
+            int maxAttempts = 100; // Sonsuz döngüyü önlemek için
+            int attempts = 0;
+
+            do
+            {
+                // 6 haneli rastgele sayı oluştur (100000-999999)
+                customerNumber = random.Next(100000, 999999).ToString();
+                
+                // Bu numaranın kullanılıp kullanılmadığını kontrol et
+                var existingUser = await userService.GetByCustomerNumber(customerNumber);
+                isUnique = existingUser.Data == null;
+                attempts++;
+            } while (!isUnique && attempts < maxAttempts);
+
+            if (attempts >= maxAttempts)
+            {
+                throw new Exception("Müşteri numarası oluşturulamadı. Lütfen tekrar deneyin.");
+            }
+
+            return customerNumber;
         }
 
 

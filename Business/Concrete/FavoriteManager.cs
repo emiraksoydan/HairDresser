@@ -137,6 +137,7 @@ namespace Business.Concrete
                 // ÖNEMLİ: Transaction commit edilmeden önce EnsureFavoriteThreadAsync çağrılıyor,
                 // bu yüzden favori henüz DB'de görünmeyebilir. EnsureFavoriteThreadAsync içinde
                 // Store ID kontrolü yapılıyor, bu yüzden sorun olmamalı.
+                // REVIZE: Store bazlı thread'ler için StoreId null geçilir - User ID bazlı tek thread olmalı
                 if (existingFavorite.IsActive && !isSelfFavorite && targetUserIdForThread != Guid.Empty)
                 {
                     // Transaction commit et (favori DB'de görünür olsun)
@@ -144,9 +145,8 @@ namespace Business.Concrete
                     
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
                     // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
-                    // Store bazlı thread'ler için StoreId geçilir
-                    Guid? storeIdForThread = store != null ? store.Id : null;
-                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
+                    // REVIZE: StoreId null geçilir - User ID bazlı tek thread (birden fazla dükkan favorilense bile)
+                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeId: null);
                 }
                 // Favori pasif edildiyse thread görünürlüğünü kontrol et
                 else if (!existingFavorite.IsActive && !isSelfFavorite && targetUserIdForThread != Guid.Empty)
@@ -185,8 +185,8 @@ namespace Business.Concrete
                     {
                         await _context.SaveChangesAsync();
 
-                        Guid? storeIdForThread = store != null ? store.Id : null;
-                        var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
+                        // REVIZE: StoreId null geçilir - User ID bazlı thread kontrolü
+                        var thread = await _threadDal.GetFavoriteThreadAsync(userId, targetUserIdForThread, storeId: null);
                         if (thread != null)
                         {
                             // Her iki tarafa da threadRemoved gönder
@@ -202,9 +202,8 @@ namespace Business.Concrete
                         
                         // Thread'i güncelle (EnsureFavoriteThreadAsync thread güncellemesini yapar)
                         // Bu metod her iki kullanıcıya da thread update push eder
-                        // Store bazlı thread'ler için StoreId geçilir
-                        Guid? storeIdForThread = store != null ? store.Id : null;
-                        await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
+                        // REVIZE: StoreId null geçilir - User ID bazlı tek thread
+                        await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeId: null);
                     }
                 }
                 
@@ -262,6 +261,7 @@ namespace Business.Concrete
                 // ÖNEMLİ: Transaction commit edilmeden önce EnsureFavoriteThreadAsync çağrılıyor,
                 // bu yüzden favori henüz DB'de görünmeyebilir. EnsureFavoriteThreadAsync içinde
                 // Store ID kontrolü yapılıyor, bu yüzden sorun olmamalı.
+                // REVIZE: Store bazlı thread'ler için StoreId null geçilir - User ID bazlı tek thread olmalı
                 if (!isSelfFavorite && targetUserIdForThread != Guid.Empty)
                 {
                     // Transaction commit et (favori DB'de görünür olsun)
@@ -269,9 +269,8 @@ namespace Business.Concrete
                     
                     // Thread oluştur veya kontrol et (EnsureFavoriteThreadAsync zaten mevcut thread'i döndürür)
                     // Bu metod her iki kullanıcıya da thread update push eder (SignalR ile)
-                    // Store bazlı thread'ler için StoreId geçilir
-                    Guid? storeIdForThread = store != null ? store.Id : null;
-                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeIdForThread);
+                    // REVIZE: StoreId null geçilir - User ID bazlı tek thread (birden fazla dükkan favorilense bile)
+                    await _chatService.EnsureFavoriteThreadAsync(userId, targetUserIdForThread, storeId: null);
                 }
                 
                 // FavoriteCount hesapla (aktif favoriler)
@@ -353,12 +352,12 @@ namespace Business.Concrete
 
             var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
 
-            // FavoritedToId'leri ayır: Store ID'ler ve User ID'ler
-            var favoriteToIds = favorites.Select(f => f.FavoritedToId).Distinct().ToList();
+            // Performance: HashSet kullanarak daha hızlı Contains kontrolü
+            var favoriteToIds = favorites.Select(f => f.FavoritedToId).Distinct().ToHashSet();
             
             // Store ID'leri bul (BarberStores tablosunda var mı?)
             var storeEntities = await _barberStoreDal.GetAll(x => favoriteToIds.Contains(x.Id));
-            var storeIds = storeEntities.Select(s => s.Id).ToList();
+            var storeIds = storeEntities.Select(s => s.Id).ToHashSet();
             
             // User ID'leri bul (Store ID'leri hariç - FreeBarber ve Customer User ID'leri)
             var targetUserIds = favoriteToIds.Where(id => !storeIds.Contains(id)).ToList();
@@ -372,12 +371,13 @@ namespace Business.Concrete
                     .Select(s => new { s.Id, s.StoreName, s.Type, s.AddressDescription, s.PricingValue, s.PricingType, s.Latitude, s.Longitude, s.BarberStoreOwnerId })
                     .ToListAsync();
 
-                var storeIdsList = stores.Select(s => s.Id).ToList();
+                // Performance: HashSet kullanarak daha hızlı Contains kontrolü
+                var storeIdsSet = stores.Select(s => s.Id).ToHashSet();
 
                 // Rating & ReviewCount - Artık TargetId Store ID (her dükkanın kendi rating'i)
                 var ratingStats = await _context.Ratings
                     .AsNoTracking()
-                    .Where(r => storeIdsList.Contains(r.TargetId))
+                    .Where(r => storeIdsSet.Contains(r.TargetId))
                     .GroupBy(r => r.TargetId)
                     .Select(g => new { StoreId = g.Key, AvgRating = g.Average(x => (double)x.Score), ReviewCount = g.Count() })
                     .ToListAsync();
@@ -386,7 +386,7 @@ namespace Business.Concrete
                 // Favorite count (sadece aktif favoriler) - Artık Store ID'ye göre (her dükkanın kendi favori sayısı)
                 var favoriteStats = await _context.Favorites
                     .AsNoTracking()
-                    .Where(f => storeIdsList.Contains(f.FavoritedToId) && f.IsActive)
+                    .Where(f => storeIdsSet.Contains(f.FavoritedToId) && f.IsActive)
                     .GroupBy(f => f.FavoritedToId)
                     .Select(g => new { StoreId = g.Key, FavoriteCount = g.Count() })
                     .ToListAsync();
@@ -395,7 +395,7 @@ namespace Business.Concrete
                 // Service Offerings
                 var offeringGroups = await _context.ServiceOfferings
                     .AsNoTracking()
-                    .Where(o => storeIdsList.Contains(o.OwnerId))
+                    .Where(o => storeIdsSet.Contains(o.OwnerId))
                     .GroupBy(o => o.OwnerId)
                     .Select(g => new { OwnerId = g.Key, Offerings = g.Select(o => new ServiceOfferingGetDto { Id = o.Id, ServiceName = o.ServiceName, Price = o.Price }).ToList() })
                     .ToListAsync();
@@ -404,7 +404,7 @@ namespace Business.Concrete
                 // Working Hours
                 var hourGroups = await _context.WorkingHours
                     .AsNoTracking()
-                    .Where(w => storeIdsList.Contains(w.OwnerId))
+                    .Where(w => storeIdsSet.Contains(w.OwnerId))
                     .GroupBy(w => w.OwnerId)
                     .Select(g => new { OwnerId = g.Key, Hours = g.ToList() })
                     .ToListAsync();
@@ -413,7 +413,7 @@ namespace Business.Concrete
                 // Images
                 var imageGroups = await _context.Images
                     .AsNoTracking()
-                    .Where(i => i.OwnerType == ImageOwnerType.Store && storeIdsList.Contains(i.ImageOwnerId))
+                    .Where(i => i.OwnerType == ImageOwnerType.Store && storeIdsSet.Contains(i.ImageOwnerId))
                     .GroupBy(i => i.ImageOwnerId)
                     .Select(g => new { OwnerId = g.Key, Images = g.Select(i => new ImageGetDto { Id = i.Id, ImageUrl = i.ImageUrl }).ToList() })
                     .ToListAsync();
@@ -438,6 +438,7 @@ namespace Business.Concrete
                         Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2), // Her store'un kendi rating'i
                         ReviewCount = ratingInfo?.ReviewCount ?? 0, // Her store'un kendi review count'u
                         FavoriteCount = favCount, // Her store'un kendi favori sayısı
+                        IsFavorited = true, // Favoriler listesinden geldiği için true
                         IsOpenNow = isOpenNow,
                         ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
                         ImageList = images ?? new List<ImageGetDto>(), // Her store'un kendi fotoğrafları
@@ -519,6 +520,7 @@ namespace Business.Concrete
                         Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2),
                         ReviewCount = ratingInfo?.ReviewCount ?? 0,
                         FavoriteCount = favCount,
+                        IsFavorited = true, // Favoriler listesinden geldiği için true
                         IsAvailable = fb.IsAvailable,
                         Offerings = offerings ?? new List<ServiceOfferingGetDto>(),
                         ImageList = images ?? new List<ImageGetDto>(), // Her freeBarber'ın kendi fotoğrafları

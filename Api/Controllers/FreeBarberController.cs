@@ -45,7 +45,8 @@ namespace Api.Controllers
         [HttpGet("nearby")]
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
-            var result = await _freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance);
+            var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
+            var result = await _freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId);
             return result.Success ? Ok(result.Data) : BadRequest(result);
         }
 
@@ -73,8 +74,7 @@ namespace Api.Controllers
         [HttpPost("update-location")]
         public async Task<IActionResult> UpdateLocation([FromBody] UpdateLocationDto req)
         {
-            // Sadece Latitude ve Longitude günceller
-            var result = await _freeBarberService.UpdateLocationAsync(req.Id, req.Latitude, req.Longitude);
+            var result = await _freeBarberService.UpdateLocationAsync(req);
             return result.Success ? Ok(result) : BadRequest(result);
         }
     }

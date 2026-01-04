@@ -53,6 +53,7 @@ namespace Entities.Concrete.Dto
         public Guid? CustomerUserId { get; set; }
         public string? CustomerName { get; set; }
         public string? CustomerImage { get; set; }
+        public string? CustomerNumber { get; set; } // Müşteri numarası
         public bool IsCustomerFavorite { get; set; }
         public double? MyRatingForCustomer { get; set; }
         public string? MyCommentForCustomer { get; set; }

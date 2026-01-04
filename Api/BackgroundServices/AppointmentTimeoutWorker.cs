@@ -90,6 +90,7 @@ namespace Api.BackgroundServices
             var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
             var notifySvc = scope.ServiceProvider.GetRequiredService<IAppointmentNotifyService>();
             var realtime = scope.ServiceProvider.GetRequiredService<IRealTimePublisher>();
+            var appointmentDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IAppointmentDal>();
             var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
             var threadDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IChatThreadDal>();
             var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
@@ -183,15 +184,59 @@ namespace Api.BackgroundServices
 
             UpdateAppointmentStatus(trackedAppt);
 
-            if (isStoreSelectionFlow && trackedAppt.BarberStoreUserId.HasValue)
+            // Katılımcılar (thread removal + appointment.updated + badge update için)
+            var participantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            // Cevapsız olduğunda slot kilidini kaldır (availability + unique index için)
+            // ÖNEMLİ: Store bilgisini silme (BarberStoreUserId iptal tabında görünmeli).
+            if (trackedAppt.ChairId.HasValue)
             {
-                ClearStoreSelectionSlot(trackedAppt);
-                await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
-                await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
+                trackedAppt.ChairId = null;
+                trackedAppt.ManuelBarberId = null;
             }
 
                 await db.SaveChangesAsync(stoppingToken);
                 await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
+
+                // Thread'i kaldır + unread count'ları sıfırla + badge update schedule et
+                var thread = await threadDal.Get(t => t.AppointmentId == trackedAppt.Id);
+                if (thread != null)
+                {
+                    thread.CustomerUnreadCount = 0;
+                    thread.StoreUnreadCount = 0;
+                    thread.FreeBarberUnreadCount = 0;
+                    thread.UpdatedAt = DateTime.UtcNow;
+                    await threadDal.Update(thread);
+
+                    foreach (var userId in participantUserIds)
+                    {
+                        try { await realtime.PushChatThreadRemovedAsync(userId, thread.Id); } catch { /* non-critical */ }
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+                    }
+                }
+
+                // Appointment listesini anlık güncelle (appointment.updated)
+                foreach (var userId in participantUserIds)
+                {
+                    try
+                    {
+                        var cancelled = await appointmentDal.GetAllAppointmentByFilter(userId, AppointmentFilter.Cancelled);
+                        var dto = cancelled.FirstOrDefault(a => a.Id == trackedAppt.Id);
+                        if (dto != null)
+                        {
+                            await realtime.PushAppointmentUpdatedAsync(userId, dto);
+                        }
+                    }
+                    catch
+                    {
+                        // Hata durumunda devam et, kritik değil
+                    }
+                }
+
                 await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
 
                 // Commit transaction - all operations successful
@@ -367,9 +412,9 @@ namespace Api.BackgroundServices
 
                 // Update status and decisions
                 payloadDict["status"] = (int)trackedAppt.Status;
-                payloadDict["storeDecision"] = (int)trackedAppt.StoreDecision;
-                payloadDict["freeBarberDecision"] = (int)trackedAppt.FreeBarberDecision;
-                payloadDict["customerDecision"] = (int)trackedAppt.CustomerDecision;
+                payloadDict["storeDecision"] = trackedAppt.StoreDecision.HasValue ? (int)trackedAppt.StoreDecision.Value : null;
+                payloadDict["freeBarberDecision"] = trackedAppt.FreeBarberDecision.HasValue ? (int)trackedAppt.FreeBarberDecision.Value : null;
+                payloadDict["customerDecision"] = trackedAppt.CustomerDecision.HasValue ? (int)trackedAppt.CustomerDecision.Value : null;
                 payloadDict["pendingExpiresAt"] = trackedAppt.PendingExpiresAt;
 
                 // Geri JSON string'e çevir

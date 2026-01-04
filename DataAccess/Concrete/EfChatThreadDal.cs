@@ -22,7 +22,10 @@ namespace DataAccess.Concrete
             var appointmentThreads = await Context.ChatThreads.AsNoTracking()
                 .Where(t => t.AppointmentId.HasValue &&
                            (t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId))
-                .Join(Context.Appointments.AsNoTracking(),
+                .Join(Context.Appointments.AsNoTracking()
+                      .Where(a => (a.CustomerUserId == userId && !a.IsDeletedByCustomerUserId) ||
+                                  (a.BarberStoreUserId == userId && !a.IsDeletedByBarberStoreUserId) ||
+                                  (a.FreeBarberUserId == userId && !a.IsDeletedByFreeBarberUserId)),
                       t => t.AppointmentId!.Value,
                       a => a.Id,
                       (t, a) => new { t, a })
@@ -85,13 +88,14 @@ namespace DataAccess.Concrete
 
         public async Task<ChatThread?> GetFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null)
         {
+            // REVIZE: StoreId parametresi artık kullanılmıyor - User ID bazlı tek thread olmalı
             // Her iki yönü de kontrol et (from->to veya to->from)
-            // Store bazlı thread'ler için StoreId de eşleşmeli
+            // StoreId null olmalı (User ID bazlı thread)
             var thread = await Context.ChatThreads
                 .FirstOrDefaultAsync(t => !t.AppointmentId.HasValue &&
                                          ((t.FavoriteFromUserId == fromUserId && t.FavoriteToUserId == toUserId) ||
                                           (t.FavoriteFromUserId == toUserId && t.FavoriteToUserId == fromUserId)) &&
-                                         (storeId == null ? t.StoreId == null : t.StoreId == storeId));
+                                         t.StoreId == null);
             return thread;
         }
 
@@ -104,7 +108,9 @@ namespace DataAccess.Concrete
             // Randevu thread'leri için
             var appointmentThreadsCount = await Context.ChatThreads
                 .Where(t => t.AppointmentId.HasValue &&
-                           (t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId))
+                           ((t.CustomerUserId == userId && !t.IsDeletedByCustomerUserId) ||
+                            (t.StoreOwnerUserId == userId && !t.IsDeletedByStoreOwnerUserId) ||
+                            (t.FreeBarberUserId == userId && !t.IsDeletedByFreeBarberUserId)))
                 .SumAsync(t =>
                     t.CustomerUserId == userId ? t.CustomerUnreadCount :
                     t.StoreOwnerUserId == userId ? t.StoreUnreadCount :

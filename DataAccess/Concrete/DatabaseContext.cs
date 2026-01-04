@@ -15,19 +15,12 @@ namespace DataAccess.Concrete
         {
             modelBuilder.Entity<User>(b =>
             {
-
-
-                //b.Property(u => u.PhoneEncrypted)
-                //    .IsRequired();                               
-                //b.Property(u => u.PhoneEncryptedNonce)
-                //    .HasMaxLength(12)                           
-                //    .IsRequired();                              
-                //b.Property(u => u.PhoneSearchToken)
-                //    .HasMaxLength(32)                            
-                //    .IsRequired();                               
-                //b.HasIndex(u => u.PhoneSearchToken)
-                // .IsUnique()
-                // .HasDatabaseName("UX_User_PhoneSearchToken");
+                b.Property(u => u.PhoneNumber)
+                    .HasMaxLength(20)
+                    .IsRequired();
+                
+                b.HasIndex(u => u.PhoneNumber)
+                    .HasDatabaseName("IX_User_PhoneNumber");
             });
             modelBuilder.Entity<RefreshToken>(e =>
             {
@@ -108,6 +101,11 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<Favorite>()
                 .HasIndex(x => new { x.FavoritedToId, x.IsActive });
 
+            // Setting index - her kullanıcı için bir settings kaydı olmalı
+            modelBuilder.Entity<Setting>()
+                .HasIndex(x => x.UserId)
+                .IsUnique();
+
             // Image indexes for efficient owner-based lookups
             modelBuilder.Entity<Image>()
                 .HasIndex(x => new { x.OwnerType, x.ImageOwnerId });
@@ -164,6 +162,7 @@ namespace DataAccess.Concrete
 
         public DbSet<ChatThread> ChatThreads { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<Setting> Settings { get; set; }
 
     }
 }

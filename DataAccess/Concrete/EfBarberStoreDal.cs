@@ -411,7 +411,7 @@ namespace DataAccess.Concrete
             return result;
         }
 
-        public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1)
+        public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1, Guid? currentUserId = null)
         {
             var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(lat, lon, radiusKm);
@@ -466,6 +466,20 @@ namespace DataAccess.Concrete
 
             var favoriteDict = favoriteStats
                 .ToDictionary(x => x.StoreId, x => x.FavoriteCount);
+
+            // User IsFavorited bilgisi
+            var isFavoritedDict = new Dictionary<Guid, bool>();
+            if (currentUserId.HasValue)
+            {
+                var userFavs = await _context.Favorites
+                    .AsNoTracking()
+                    .Where(f => f.FavoritedFromId == currentUserId.Value && storeIds.Contains(f.FavoritedToId) && f.IsActive)
+                    .Select(f => f.FavoritedToId)
+                    .ToListAsync();
+                
+                isFavoritedDict = userFavs.ToDictionary(x => x, x => true);
+            }
+
             var offeringGroups = await _context.ServiceOfferings
                 .AsNoTracking()
                 .Where(o => storeIds.Contains(o.OwnerId))
@@ -529,6 +543,7 @@ namespace DataAccess.Concrete
                     var avgRating = ratingInfo?.AvgRating ?? 0;
                     var reviewCount = ratingInfo?.ReviewCount ?? 0;
                     var favoriteCount = favCount;
+                    var isFavorited = isFavoritedDict.GetValueOrDefault(s.Id, false);
 
                     var isOpenNow = hours != null
                         ? OpenControl.IsOpenNow(hours, nowLocal)
@@ -550,7 +565,8 @@ namespace DataAccess.Concrete
                         ReviewCount = reviewCount,
                         Rating = Math.Round(avgRating, 2),
                         ServiceOfferings = offerings ?? new List<ServiceOfferingGetDto>(),
-                        DistanceKm = Math.Round(distance, 3)
+                        DistanceKm = Math.Round(distance, 3),
+                        IsFavorited = isFavorited
                     };
                 })
                 .Where(dto => dto != null)

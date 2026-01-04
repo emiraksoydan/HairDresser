@@ -1,11 +1,8 @@
 using Core.Utilities.Results;
 using Entities.Concrete.Dto;
-using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Business.Abstract
@@ -36,6 +33,16 @@ namespace Business.Abstract
             DecisionStatus? freeBarberDecision = null,
             DecisionStatus? customerDecision = null,
             DateTime? pendingExpiresAt = null);
+
+        /// <summary>
+        /// Deletes a notification if its appointment status is not Pending or Approved. Marks as read if unread before deletion.
+        /// </summary>
+        Task<IDataResult<bool>> DeleteAsync(Guid userId, Guid notificationId);
+
+        /// <summary>
+        /// Deletes all notifications that can be deleted (appointment status is not Pending or Approved). Marks unread notifications as read before deletion.
+        /// </summary>
+        Task<IDataResult<bool>> DeleteAllAsync(Guid userId);
 
     }
 }

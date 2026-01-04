@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Core.Exceptions;
 
 namespace Core.Extensions
 {
@@ -39,6 +40,36 @@ namespace Core.Extensions
                     success = false,
                     message = "Doğrulama hatası",
                     errors = errors
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+            }
+            catch (BusinessRuleException ex)
+            {
+                // Business rule violation exception
+
+                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                context.Response.ContentType = "application/json";
+
+                var payload = new
+                {
+                    success = false,
+                    message = ex.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+            }
+            catch (EntityNotFoundException ex)
+            {
+                // Entity not found exception
+
+                context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                context.Response.ContentType = "application/json";
+
+                var payload = new
+                {
+                    success = false,
+                    message = ex.Message
                 };
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(payload));

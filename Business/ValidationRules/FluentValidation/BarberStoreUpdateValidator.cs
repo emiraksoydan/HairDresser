@@ -74,6 +74,17 @@ namespace Business.ValidationRules.FluentValidation
                  .WithMessage("Manuel berber adı zorunludur.");
             });
 
+            // Berberlerin toplamı 30'u geçmemeli
+            RuleFor(x => x.ManuelBarbers)
+                .Must(barbers => (barbers?.Count ?? 0) <= 30)
+                .WithMessage("Berber sayısı 30'u geçemez.");
+
+            // Koltukların toplamı 30'u geçmemeli
+            RuleFor(x => x.Chairs)
+                .Must(chairs => (chairs?.Count ?? 0) <= 30)
+                .WithMessage("Koltuk sayısı 30'u geçemez.")
+                .When(x => x.Chairs != null);
+
             // Offerings
             RuleFor(x => x.Offerings)
                 .NotEmpty().WithMessage("En az bir hizmet girilmelidir.");
@@ -128,6 +139,18 @@ namespace Business.ValidationRules.FluentValidation
                                    s < e)
                         .WithMessage("Başlangıç saati bitiş saatinden küçük olmalı.")
                         .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
+
+                    c.RuleFor(w => w)
+              .Must(w =>
+              {
+                  if (!TryParseHHmm(w.StartTime, out var s)) return false;
+                  if (!TryParseHHmm(w.EndTime, out var e)) return false;
+
+                  var minutes = (e - s).TotalMinutes;
+                  return minutes > 0 && minutes % 60 == 0;
+              })
+              .WithMessage("Çalışma aralığı 1 saatlik aralıklarla seçilmeli.")
+              .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
 
                     // 6–18 saat aralığı
                     c.RuleFor(w => w)

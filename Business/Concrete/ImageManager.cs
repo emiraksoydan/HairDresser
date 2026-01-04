@@ -57,6 +57,7 @@ namespace Business.Concrete
             return new SuccessDataResult<ImageGetDto>(dto);
         }
 
+        [ValidationAspect(typeof(UpdateImageDtoValidator))]
         public async Task<IResult> UpdateAsync(UpdateImageDto updateImageDto)
         {
             var entity = await _imageDal.Get(i => i.Id == updateImageDto.Id);

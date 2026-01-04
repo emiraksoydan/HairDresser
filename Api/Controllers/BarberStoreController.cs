@@ -47,7 +47,8 @@ namespace Api.Controllers
         [HttpGet("nearby")]
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
-            var result = await _storeService.GetNearbyStoresAsync(lat, lon, distance);
+            var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
+            var result = await _storeService.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
             return result.Success ? Ok(result.Data) : NotFound(result);
         }
 

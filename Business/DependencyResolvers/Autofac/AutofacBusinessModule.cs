@@ -48,6 +48,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
             builder.RegisterType<FavoriteManager>().As<IFavoriteService>().InstancePerLifetimeScope();
+            builder.RegisterType<SettingManager>().As<ISettingService>().InstancePerLifetimeScope();
 
             // Helper classes (N+1 query optimization)
             builder.RegisterType<FavoriteHelper>().InstancePerLifetimeScope();
@@ -76,6 +77,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfSettingDal>().As<ISettingDal>().InstancePerLifetimeScope();
 
             // Register IHttpContextAccessor for SecuredOperation
             builder.RegisterType<HttpContextAccessor>().As<IHttpContextAccessor>().SingleInstance();

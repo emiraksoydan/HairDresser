@@ -62,15 +62,16 @@ namespace Business.Concrete
             return new SuccessResult("Serbest berber silindi.");
         }
 
+        [ValidationAspect(typeof(UpdateLocationDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IResult> UpdateLocationAsync(Guid id, double lat, double lon)
+        public async Task<IResult> UpdateLocationAsync(UpdateLocationDto dto)
         {
-            var getBarber = await freeBarberDal.Get(x=>x.Id == id);
+            var getBarber = await freeBarberDal.Get(x=>x.Id == dto.Id);
             if (getBarber == null)
                 return new ErrorResult("Berber bulunamadı");
 
-            getBarber.Latitude = lat;
-            getBarber.Longitude = lon;
+            getBarber.Latitude = dto.Latitude;
+            getBarber.Longitude = dto.Longitude;
 
             await freeBarberDal.Update(getBarber);
 
@@ -86,9 +87,9 @@ namespace Business.Concrete
             return new SuccessDataResult<FreeBarberMinePanelDto>(result);
         }
 
-        public async Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance)
+        public async Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance, Guid? currentUserId = null)
         {
-            var getFreeBarberResult = await freeBarberDal.GetNearbyFreeBarberAsync(lat, lon, distance);
+            var getFreeBarberResult = await freeBarberDal.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId);
             return new SuccessDataResult<List<FreeBarberGetDto>>(getFreeBarberResult);
         }
 

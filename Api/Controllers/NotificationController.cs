@@ -29,5 +29,21 @@ namespace Api.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.DeleteAsync(userId, id);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpDelete("all")]
+        public async Task<IActionResult> DeleteAll()
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.DeleteAllAsync(userId);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
     }
 }

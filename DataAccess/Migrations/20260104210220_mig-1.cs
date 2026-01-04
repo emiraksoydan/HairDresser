@@ -37,7 +37,10 @@ namespace DataAccess.Migrations
                     ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: true),
-                    Note = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Note = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeletedByCustomerUserId = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeletedByBarberStoreUserId = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeletedByFreeBarberUserId = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -136,7 +139,10 @@ namespace DataAccess.Migrations
                     LastMessageAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     LastMessagePreview = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsDeletedByCustomerUserId = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeletedByStoreOwnerUserId = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeletedByFreeBarberUserId = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -326,12 +332,11 @@ namespace DataAccess.Migrations
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     LastName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PhoneEncrypted = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    PhoneEncryptedNonce = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
-                    PhoneSearchToken = table.Column<byte[]>(type: "varbinary(max)", nullable: false),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     ImageId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     UserType = table.Column<int>(type: "int", nullable: false),
+                    CustomerNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -364,6 +369,27 @@ namespace DataAccess.Migrations
                     table.ForeignKey(
                         name: "FK_Ratings_Users_RatedFromId",
                         column: x => x.RatedFromId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Settings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ShowImageAnimation = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Settings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Settings_Users_UserId",
+                        column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -521,6 +547,12 @@ namespace DataAccess.Migrations
                 columns: new[] { "UserId", "RevokedAt", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Settings_UserId",
+                table: "Settings",
+                column: "UserId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserOperationClaims_OperationClaimId",
                 table: "UserOperationClaims",
                 column: "OperationClaimId");
@@ -529,6 +561,11 @@ namespace DataAccess.Migrations
                 name: "IX_UserOperationClaims_UserId",
                 table: "UserOperationClaims",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_User_PhoneNumber",
+                table: "Users",
+                column: "PhoneNumber");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_ImageId",
@@ -577,6 +614,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "ServiceOfferings");
+
+            migrationBuilder.DropTable(
+                name: "Settings");
 
             migrationBuilder.DropTable(
                 name: "UserOperationClaims");

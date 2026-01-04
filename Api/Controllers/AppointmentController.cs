@@ -48,7 +48,7 @@ namespace Api.Controllers
         public async Task<IActionResult> CreateCustomer([FromBody] CreateAppointmentRequestDto req)
         {
             var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateCustomerToStoreAndFreeBarberControlAsync(userId, req);
+            var result = await _svc.CreateCustomerToStoreControlAsync(userId, req);
             return result.Success ? Ok(result) : BadRequest(result);
         }
         
@@ -127,6 +127,22 @@ namespace Api.Controllers
         {
             var userId = User.GetUserIdOrThrow();
             var result = await _svc.CompleteAsync(userId, id);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.DeleteAsync(userId, id);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpDelete("all")]
+        public async Task<IActionResult> DeleteAll()
+        {
+            var userId = User.GetUserIdOrThrow();
+            var result = await _svc.DeleteAllAsync(userId);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 

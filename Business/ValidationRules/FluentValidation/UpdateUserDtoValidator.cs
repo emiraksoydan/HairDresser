@@ -20,7 +20,8 @@ namespace Business.ValidationRules.FluentValidation
                 .Matches("^[^\\s]+$").WithMessage("Soyisim boşluk içeremez");
 
             RuleFor(x => x.PhoneNumber)
-                     .NotEmpty().WithMessage("Telefon numarası zorunludur")
+                     .NotNull().WithMessage("Telefon numarası zorunludur")
+                     .NotEmpty().WithMessage("Telefon numarası boş olamaz")
                      .Matches(@"^\+90[0-9]{10}$").WithMessage("Telefon numarası +90 ile başlamalı ve 13 haneli olmalıdır");
         }
     }

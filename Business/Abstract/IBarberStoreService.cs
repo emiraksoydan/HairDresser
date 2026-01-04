@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Core.Utilities.Results;
 using Entities.Concrete.Dto;
@@ -16,7 +14,7 @@ namespace Business.Abstract
         Task<IResult> DeleteAsync(Guid storeId, Guid currentUserId);
         Task<IDataResult<BarberStoreDetail>> GetByIdAsync(Guid id);
         Task<IDataResult<List<BarberStoreMineDto>>> GetByCurrentUserAsync(Guid currentUserId);
-        Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance);
+        Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance, Guid? currentUserId = null);
         
         // Filtreleme ve arama
         Task<IDataResult<List<BarberStoreGetDto>>> GetFilteredStoresAsync(FilterRequestDto filter);

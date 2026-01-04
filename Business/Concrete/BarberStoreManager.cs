@@ -76,9 +76,9 @@ namespace Business.Concrete
             return new SuccessDataResult<List<BarberStoreMineDto>>(result);
         }
 
-        public async Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance)
+        public async Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance, Guid? currentUserId = null)
         {
-            var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance);
+            var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
         }
 

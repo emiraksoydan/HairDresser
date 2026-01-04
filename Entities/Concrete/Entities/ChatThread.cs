@@ -37,5 +37,10 @@ namespace Entities.Concrete.Entities
 
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        
+        // Soft Delete: Her kullanıcı tipi için ayrı soft delete alanı
+        public bool IsDeletedByCustomerUserId { get; set; } = false;
+        public bool IsDeletedByStoreOwnerUserId { get; set; } = false;
+        public bool IsDeletedByFreeBarberUserId { get; set; } = false;
     }
 }

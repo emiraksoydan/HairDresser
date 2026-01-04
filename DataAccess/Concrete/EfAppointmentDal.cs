@@ -176,9 +176,9 @@ namespace DataAccess.Concrete
             // 1. ADIM: Randevuları Çek
             // ---------------------------------------------------------------------------
             var query = _context.Appointments.AsNoTracking()
-                .Where(x => x.CustomerUserId == currentUserId ||
-                            x.BarberStoreUserId == currentUserId ||
-                            x.FreeBarberUserId == currentUserId);
+                .Where(x => (x.CustomerUserId == currentUserId && !x.IsDeletedByCustomerUserId) ||
+                            (x.BarberStoreUserId == currentUserId && !x.IsDeletedByBarberStoreUserId) ||
+                            (x.FreeBarberUserId == currentUserId && !x.IsDeletedByFreeBarberUserId));
 
             // Filtreleme
             switch (appointmentFilter)
@@ -280,9 +280,12 @@ namespace DataAccess.Concrete
                 .ToDictionaryAsync(m => m.Id, m => m.FullName);
 
             // D) CUSTOMER
-            var customerDict = await _context.Users.AsNoTracking()
+            var customerList = await _context.Users.AsNoTracking()
                 .Where(u => customerIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName);
+                .Select(u => new { u.Id, Name = u.FirstName + " " + u.LastName, u.CustomerNumber })
+                .ToListAsync();
+            var customerDict = customerList.ToDictionary(u => u.Id, u => u.Name);
+            var customerNumberDict = customerList.ToDictionary(u => u.Id, u => u.CustomerNumber);
 
             // E) YENİ: CHAIR (Koltuk İsimleri)
             var chairsDict = await _context.BarberChairs.AsNoTracking()
@@ -525,6 +528,7 @@ namespace DataAccess.Concrete
 
                     // Düzeltildi: cName -> customerNameVal
                     if (customerDict.TryGetValue(cId, out var customerNameVal)) dto.CustomerName = customerNameVal;
+                    if (customerNumberDict.TryGetValue(cId, out var customerNumberVal)) dto.CustomerNumber = customerNumberVal;
 
                     if (imagesDict.TryGetValue(cId, out var img)) dto.CustomerImage = img;
 

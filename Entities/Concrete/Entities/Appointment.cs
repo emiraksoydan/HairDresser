@@ -32,6 +32,12 @@ namespace Entities.Concrete.Entities
         /// Randevu notu - Müşteri tarafından yazılır (Customer -> FreeBarber randevusunda)
         /// </summary>
         public string? Note { get; set; }
+        
+        // Soft Delete: Her kullanıcı tipi için ayrı soft delete alanı
+        public bool IsDeletedByCustomerUserId { get; set; } = false;
+        public bool IsDeletedByBarberStoreUserId { get; set; } = false;
+        public bool IsDeletedByFreeBarberUserId { get; set; } = false;
+        
         public ICollection<AppointmentServiceOffering> ServiceOfferings { get; set; } = new List<AppointmentServiceOffering>();
     }
 }

@@ -17,7 +17,8 @@ namespace Business.Concrete
 {
     public class NotificationManager(INotificationDal notificationDal,
         IRealTimePublisher realtime,
-        IBadgeUpdateService badgeUpdateService) : INotificationService
+        IBadgeService badgeService,
+        IAppointmentDal appointmentDal) : INotificationService
     {
         // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
         // (AppointmentManager içindeki TransactionScopeAspect içinde)
@@ -65,8 +66,12 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+                        // Badge count'u direkt hesaplayıp push et
+                        var badgesuns = await badgeService.GetCountsAsync(userId);
+                        if (badgesuns.Success)
+                        {
+                            await realtime.PushBadgeAsync(userId, badgesuns.Data);
+                        }
                         
                         return new SuccessDataResult<Guid>(existingAny.Id);
                     }
@@ -115,8 +120,12 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
-                        // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+                        // Badge count'u direkt hesaplayıp push et
+                        var badgesex = await badgeService.GetCountsAsync(userId);
+                        if (badgesex.Success)
+                        {
+                            await realtime.PushBadgeAsync(userId, badgesex.Data);
+                        }
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -157,9 +166,12 @@ namespace Business.Concrete
             // Real-time push - Global exception middleware hataları yakalayacak
             await realtime.PushNotificationAsync(userId, notificationDto);
 
-            // Badge update'i transaction commit sonrası yapılacak şekilde schedule et
-            // Bu sayede notification DB'ye yazıldıktan sonra badge count doğru hesaplanacak
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
+            // Badge count'u direkt hesaplayıp push et
+            var badges = await badgeService.GetCountsAsync(userId);
+            if (badges.Success)
+            {
+                await realtime.PushBadgeAsync(userId, badges.Data);
+            }
 
             return new SuccessDataResult<Guid>(n.Id);
         }
@@ -199,8 +211,12 @@ namespace Business.Concrete
 
             await notificationDal.Update(n);
 
-            // Badge update'i schedule et (transaction commit sonrası çalışacak)
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
+            // Badge count'u direkt hesaplayıp push et
+            var badges = await badgeService.GetCountsAsync(userId);
+            if (badges.Success)
+            {
+                await realtime.PushBadgeAsync(userId, badges.Data);
+            }
 
             return new SuccessDataResult<bool>(true);
         }
@@ -222,8 +238,12 @@ namespace Business.Concrete
             
             await notificationDal.UpdateRange(notifications);
 
-            // Badge update'i schedule et (transaction commit sonrası çalışacak)
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
+            // Badge count'u direkt hesaplayıp push et
+            var badges = await badgeService.GetCountsAsync(userId);
+            if (badges.Success)
+            {
+                await realtime.PushBadgeAsync(userId, badges.Data);
+            }
 
             return new SuccessDataResult<bool>(true);
         }
@@ -246,7 +266,16 @@ namespace Business.Concrete
 
             foreach (var n in notifications)
             {
-                if (n.Type != NotificationType.AppointmentCreated)
+                // Action notification payload'larını güncelle:
+                // - AppointmentCreated: Store/FreeBarber karar butonları için
+                // - StoreApprovedSelection: 3'lü sistemde Customer final karar butonları için
+                // ÖNEMLİ: Rejected status'ünde eski bildirimleri güncelleme (mantık hatası)
+                // Cancelled durumunda güncelleme yapılmalı (FreeBarber'ın reddet butonu kalkmalı)
+                if (status == AppointmentStatus.Rejected)
+                    continue;
+                
+                if (n.Type != NotificationType.AppointmentCreated &&
+                    n.Type != NotificationType.StoreApprovedSelection)
                     continue;
 
                 // Payload'ı parse et
@@ -378,6 +407,124 @@ namespace Business.Concrete
                         // SignalR push başarısız olursa devam et
                     }
                 }
+            }
+
+            return new SuccessDataResult<bool>(true);
+        }
+
+        public async Task<IDataResult<bool>> DeleteAsync(Guid userId, Guid notificationId)
+        {
+            var n = await notificationDal.Get(x => x.Id == notificationId && x.UserId == userId);
+            if (n is null)
+                return new ErrorDataResult<bool>(false, "Bildirim bulunamadı");
+
+            // Randevu status'ünü kontrol et (appointmentId üzerinden)
+            if (n.AppointmentId.HasValue)
+            {
+                var appointment = await appointmentDal.Get(x => x.Id == n.AppointmentId.Value);
+                if (appointment != null && 
+                    (appointment.Status == AppointmentStatus.Pending || appointment.Status == AppointmentStatus.Approved))
+                {
+                    return new ErrorDataResult<bool>(false, "Pending veya Approved durumundaki randevuların bildirimleri silinemez");
+                }
+            }
+
+            // Okunmamışsa okunmuş yap
+            if (!n.IsRead)
+            {
+                n.IsRead = true;
+                n.ReadAt = DateTime.UtcNow;
+                await notificationDal.Update(n);
+                
+                // Badge count'u güncelle
+                var badges = await badgeService.GetCountsAsync(userId);
+                if (badges.Success)
+                {
+                    await realtime.PushBadgeAsync(userId, badges.Data);
+                }
+            }
+
+            // Bildirimi sil
+            await notificationDal.Remove(n);
+
+            // Badge count'u tekrar güncelle (silme sonrası)
+            var badgesAfter = await badgeService.GetCountsAsync(userId);
+            if (badgesAfter.Success)
+            {
+                await realtime.PushBadgeAsync(userId, badgesAfter.Data);
+            }
+
+            return new SuccessDataResult<bool>(true);
+        }
+
+        public async Task<IDataResult<bool>> DeleteAllAsync(Guid userId)
+        {
+            var notifications = await notificationDal.GetAll(x => x.UserId == userId);
+
+            if (notifications == null || !notifications.Any())
+                return new ErrorDataResult<bool>(false, "Silinecek bildirim bulunamadı.");
+
+            // Appointment ID'leri topla
+            var appointmentIds = notifications
+                .Where(n => n.AppointmentId.HasValue)
+                .Select(n => n.AppointmentId.Value)
+                .Distinct()
+                .ToList();
+
+            // Tüm appointment'ları bir seferde çek
+            var appointments = appointmentIds.Any() 
+                ? await appointmentDal.GetAll(x => appointmentIds.Contains(x.Id))
+                : new List<Appointment>();
+            
+            var appointmentStatusDict = appointments.ToDictionary(a => a.Id, a => a.Status);
+
+            var notificationsToDelete = new List<Notification>();
+            var notificationsToMarkRead = new List<Notification>();
+
+            foreach (var n in notifications)
+            {
+                // Randevu status'ünü kontrol et (appointmentId üzerinden)
+                if (n.AppointmentId.HasValue && appointmentStatusDict.TryGetValue(n.AppointmentId.Value, out var status))
+                {
+                    if (status == AppointmentStatus.Pending || status == AppointmentStatus.Approved)
+                    {
+                        continue; // Bu bildirimi atla
+                    }
+                }
+
+                // Okunmamışsa okunmuş yap
+                if (!n.IsRead)
+                {
+                    n.IsRead = true;
+                    n.ReadAt = DateTime.UtcNow;
+                    notificationsToMarkRead.Add(n);
+                }
+
+                notificationsToDelete.Add(n);
+            }
+
+            // Önce okunmamış bildirimleri okunmuş yap
+            if (notificationsToMarkRead.Any())
+            {
+                await notificationDal.UpdateRange(notificationsToMarkRead);
+            }
+
+            // Sonra silinebilir bildirimleri sil (tek tek)
+            if (!notificationsToDelete.Any())
+            {
+                return new ErrorDataResult<bool>(false, "Silinecek bildirim bulunamadı. Tüm bildirimler Pending veya Approved durumundaki randevulara ait.");
+            }
+
+            foreach (var n in notificationsToDelete)
+            {
+                await notificationDal.Remove(n);
+            }
+
+            // Badge count'u güncelle
+            var badges = await badgeService.GetCountsAsync(userId);
+            if (badges.Success)
+            {
+                await realtime.PushBadgeAsync(userId, badges.Data);
             }
 
             return new SuccessDataResult<bool>(true);

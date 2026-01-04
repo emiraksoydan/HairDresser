@@ -16,5 +16,6 @@ namespace Entities.Concrete.Dto
         public string RoleHint { get; set; }
         public BarberType? BarberType { get; set; } // FreeBarber tipi
         public bool? IsInFavorites { get; set; } // Bu kullanıcı favorilerde mi?
+        public string CustomerNumber { get; set; } // Müşteri numarası
     }
 }
