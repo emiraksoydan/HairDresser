@@ -18,7 +18,8 @@ namespace Business.Concrete
     public class NotificationManager(INotificationDal notificationDal,
         IRealTimePublisher realtime,
         IBadgeService badgeService,
-        IAppointmentDal appointmentDal) : INotificationService
+        IAppointmentDal appointmentDal,
+        IPushNotificationService? pushNotificationService = null) : INotificationService
     {
         // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
         // (AppointmentManager içindeki TransactionScopeAspect içinde)
@@ -65,6 +66,19 @@ namespace Business.Concrete
                         
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
+                        
+                        // Push notification via FCM (app is closed/background)
+                        if (pushNotificationService != null)
+                        {
+                            try
+                            {
+                                await pushNotificationService.SendPushNotificationAsync(userId, dto);
+                            }
+                            catch
+                            {
+                                // FCM push failure should not break the notification update
+                            }
+                        }
                         
                         // Badge count'u direkt hesaplayıp push et
                         var badgesuns = await badgeService.GetCountsAsync(userId);
@@ -120,6 +134,19 @@ namespace Business.Concrete
                         // Güncellenmiş notification'ı SignalR ile push et
                         await realtime.PushNotificationAsync(userId, dto);
                         
+                        // Push notification via FCM (app is closed/background)
+                        if (pushNotificationService != null)
+                        {
+                            try
+                            {
+                                await pushNotificationService.SendPushNotificationAsync(userId, dto);
+                            }
+                            catch
+                            {
+                                // FCM push failure should not break the notification update
+                            }
+                        }
+                        
                         // Badge count'u direkt hesaplayıp push et
                         var badgesex = await badgeService.GetCountsAsync(userId);
                         if (badgesex.Success)
@@ -163,8 +190,22 @@ namespace Business.Concrete
                 IsRead = n.IsRead
             };
 
-            // Real-time push - Global exception middleware hataları yakalayacak
+            // Real-time push via SignalR (app is open)
             await realtime.PushNotificationAsync(userId, notificationDto);
+
+            // Push notification via FCM (app is closed/background)
+            if (pushNotificationService != null)
+            {
+                try
+                {
+                    await pushNotificationService.SendPushNotificationAsync(userId, notificationDto);
+                }
+                catch
+                {
+                    // FCM push failure should not break the notification creation
+                    // Log error but continue
+                }
+            }
 
             // Badge count'u direkt hesaplayıp push et
             var badges = await badgeService.GetCountsAsync(userId);
@@ -400,7 +441,21 @@ namespace Business.Concrete
                 {
                     try
                     {
+                        // SignalR ile push et (app is open)
                         await realtime.PushNotificationAsync(userId, dto);
+                        
+                        // FCM ile push et (app is closed/background)
+                        if (pushNotificationService != null)
+                        {
+                            try
+                            {
+                                await pushNotificationService.SendPushNotificationAsync(userId, dto);
+                            }
+                            catch
+                            {
+                                // FCM push failure should not break the notification update
+                            }
+                        }
                     }
                     catch
                     {

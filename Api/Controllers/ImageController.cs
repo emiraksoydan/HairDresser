@@ -15,6 +15,12 @@ namespace Api.Controllers
         [HttpPost("upload")]
         public async Task<IActionResult> UploadImage([FromForm] IFormFile file, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId)
         {
+            // Validate ownerId is not empty
+            if (ownerId == Guid.Empty)
+            {
+                return BadRequest(new { success = false, message = "Resim sahibi ID'si boş olamaz" });
+            }
+            
             var result = await imageService.UploadImageAsync(file, ownerType, ownerId);
             return result.Success ? Ok(result) : BadRequest(result);
         }
@@ -25,6 +31,12 @@ namespace Api.Controllers
         [HttpPost("upload-multiple")]
         public async Task<IActionResult> UploadImages([FromForm] List<IFormFile> files, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId)
         {
+            // Validate ownerId is not empty
+            if (ownerId == Guid.Empty)
+            {
+                return BadRequest(new { success = false, message = "Resim sahibi ID'si boş olamaz" });
+            }
+            
             var result = await imageService.UploadImagesAsync(files, ownerType, ownerId);
             return result.Success ? Ok(result) : BadRequest(result);
         }

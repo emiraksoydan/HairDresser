@@ -32,6 +32,7 @@
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
     <PackageReference Include="Twilio" Version="7.13.3" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +40,11 @@
     <ProjectReference Include="..\Core\Core.csproj" />
     <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
     <ProjectReference Include="..\Entities\Entities.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- wwwroot klasörü otomatik olarak Content olarak dahil edilir (Web SDK) -->
+    <!-- Sadece publish için CopyToPublishDirectory ayarı -->
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@react-native-firebase/app": "^23.7.0",
+    "@react-native-firebase/messaging": "^23.7.0",
+    "expo-dev-client": "~6.0.20",
+    "expo-notifications": "^0.32.15"
+  }
+}

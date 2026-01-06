@@ -1,0 +1,40 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=YOUR_SERVER;Database=HairDresser;Trusted_Connection=true;TrustServerCertificate=true;"
+  },
+  "TokenOptions": {
+    "Audience": "HairDresser",
+    "Issuer": "HairDresser",
+    "AccessTokenExpiration": 60,
+    "SecurityKey": "YOUR_SECRET_KEY_HERE_MIN_32_CHARACTERS"
+  },
+  "Firebase": {
+    "ServerKey": "YOUR_FIREBASE_SERVER_KEY_HERE"
+  },
+  "SecurityOptions": {
+    "PhoneNumber": {
+      "CountryCode": "+90",
+      "MaxLength": 10,
+      "MinLength": 10
+    }
+  },
+  "AppointmentSettings": {
+    "PendingTimeoutMinutes": 15,
+    "MaxDistanceKm": 1.0
+  },
+  "BackgroundServices": {
+    "AppointmentTimeoutCheckIntervalMinutes": 1
+  },
+  "AllowedOrigins": [
+    "http://localhost:3000",
+    "http://localhost:8081"
+  ],
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+

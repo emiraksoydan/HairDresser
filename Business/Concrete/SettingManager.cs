@@ -30,6 +30,7 @@ namespace Business.Concrete
                 Id = setting.Id,
                 UserId = setting.UserId,
                 ShowImageAnimation = setting.ShowImageAnimation
+                // NotificationSoundUrl kaldırıldı - artık backend'deki varsayılan ses dosyası kullanılıyor
             };
 
             return new SuccessDataResult<SettingGetDto>(dto);
@@ -46,6 +47,7 @@ namespace Business.Concrete
             }
 
             setting.ShowImageAnimation = dto.ShowImageAnimation;
+            // NotificationSoundUrl güncellenmez - kullanıcı ayarlardan seçemez, backend'deki varsayılan ses kullanılır
             setting.UpdatedAt = DateTime.UtcNow;
 
             await _settingDal.Update(setting);

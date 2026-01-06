@@ -139,6 +139,17 @@ builder.Host.ConfigureContainer<ContainerBuilder>(options =>
     options.RegisterModule(new AutofacBusinessModule());
 });
 builder.Services.AddSingleton<IRealTimePublisher,SignalRRealtimePublisher>();
+
+// HttpClient for FCM (v1 API)
+builder.Services.AddHttpClient("FCM", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.BaseAddress = new Uri("https://fcm.googleapis.com/");
+});
+
+// Register IPushNotificationService (will be resolved by Autofac, but we need to register it in DI container too for optional injection)
+builder.Services.AddScoped<Business.Abstract.IPushNotificationService, Business.Concrete.FirebasePushNotificationService>();
+
 builder.Services.AddHostedService<AppointmentTimeoutWorker>();
 
 // SignalR için JSON serialization ayarları - camelCase kullan
@@ -171,6 +182,9 @@ app.ConfigureCustomExceptionMiddleware();
 app.UseResponseCompression();
 
 app.UseCors();
+
+// Static files (wwwroot klasöründeki dosyalar için)
+app.UseStaticFiles();
 
 if (!app.Environment.IsDevelopment())
 {

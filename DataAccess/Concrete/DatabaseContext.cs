@@ -133,6 +133,14 @@ namespace DataAccess.Concrete
                 entity.Property(e => e.CustomerDecision).IsRequired(false);
             });
 
+            // UserFcmToken indexes for efficient lookups
+            modelBuilder.Entity<UserFcmToken>()
+                .HasIndex(x => new { x.UserId, x.IsActive });
+            
+            modelBuilder.Entity<UserFcmToken>()
+                .HasIndex(x => x.FcmToken)
+                .IsUnique();
+
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -163,6 +171,7 @@ namespace DataAccess.Concrete
         public DbSet<ChatThread> ChatThreads { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<Setting> Settings { get; set; }
+        public DbSet<UserFcmToken> UserFcmTokens { get; set; }
 
     }
 }

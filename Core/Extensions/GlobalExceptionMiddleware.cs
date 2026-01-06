@@ -74,6 +74,21 @@ namespace Core.Extensions
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
             }
+            catch (UnauthorizedOperationException ex)
+            {
+                // Unauthorized operation exception
+
+                context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                context.Response.ContentType = "application/json";
+
+                var payload = new
+                {
+                    success = false,
+                    message = ex.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+            }
             catch (Exception ex)
             {
                 // Diğer tüm beklenmeyen hatalar
