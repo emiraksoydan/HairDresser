@@ -365,3 +365,8 @@ FodyWeavers.xsd
 # Windows reserved device names
 nul
 NUL
+
+# Firebase credentials and secrets
+**/*firebase-adminsdk*.json
+**/*-firebase-adminsdk-*.json
+**/firebase-adminsdk-*.json
