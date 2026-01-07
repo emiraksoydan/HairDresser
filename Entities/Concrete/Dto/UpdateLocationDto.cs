@@ -9,7 +9,7 @@ namespace Entities.Concrete.Dto
 {
     public class UpdateLocationDto : IDto
     {
-        public Guid Id { get; set; }
+        // Id artık kullanılmıyor - CurrentUserId ile bulunuyor
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 

@@ -127,5 +127,52 @@ namespace Core.Utilities.Storage
                 return false;
             }
         }
+
+        /// <summary>
+        /// Updates an existing blob with new file content without creating a new blob
+        /// </summary>
+        public async Task<string> UpdateAsync(IFormFile file, string existingFileUrl)
+        {
+            if (file == null || file.Length == 0)
+                throw new ArgumentException("File is empty", nameof(file));
+
+            if (string.IsNullOrEmpty(existingFileUrl))
+                throw new ArgumentException("Existing file URL is required", nameof(existingFileUrl));
+
+            try
+            {
+                // URL'den container ve blob adını ayıkla
+                var uri = new Uri(existingFileUrl);
+                var segments = uri.Segments;
+
+                if (segments.Length < 2)
+                    throw new ArgumentException("Invalid file URL", nameof(existingFileUrl));
+
+                var containerName = segments[1].TrimEnd('/');
+                var blobName = string.Join("", segments.Skip(2));
+
+                // Container'ı al (oluşturma gerekmez çünkü zaten var olmalı)
+                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+                
+                // Mevcut blob'u al
+                var blobClient = containerClient.GetBlobClient(blobName);
+
+                // Dosyayı mevcut blob üzerine yaz (overwrite)
+                using (var stream = file.OpenReadStream())
+                {
+                    await blobClient.UploadAsync(stream, overwrite: true, new BlobHttpHeaders
+                    {
+                        ContentType = file.ContentType
+                    });
+                }
+
+                // Aynı URL'i döndür (blob name değişmediği için)
+                return blobClient.Uri.ToString();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to update blob: {ex.Message}", ex);
+            }
+        }
     }
 }

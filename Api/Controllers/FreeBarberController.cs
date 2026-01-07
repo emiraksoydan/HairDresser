@@ -74,7 +74,7 @@ namespace Api.Controllers
         [HttpPost("update-location")]
         public async Task<IActionResult> UpdateLocation([FromBody] UpdateLocationDto req)
         {
-            var result = await _freeBarberService.UpdateLocationAsync(req);
+            var result = await _freeBarberService.UpdateLocationAsync(req, CurrentUserId);
             return result.Success ? Ok(result) : BadRequest(result);
         }
     }

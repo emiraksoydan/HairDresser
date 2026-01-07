@@ -33,5 +33,13 @@ namespace Core.Utilities.Storage
         /// Checks if a file exists in Azure Blob Storage
         /// </summary>
         Task<bool> ExistsAsync(string fileUrl);
+
+        /// <summary>
+        /// Updates an existing blob with new file content without creating a new blob
+        /// </summary>
+        /// <param name="file">The new file content</param>
+        /// <param name="existingFileUrl">The URL of the existing blob to update</param>
+        /// <returns>The URL of the updated file (same as existingFileUrl)</returns>
+        Task<string> UpdateAsync(IFormFile file, string existingFileUrl);
     }
 }

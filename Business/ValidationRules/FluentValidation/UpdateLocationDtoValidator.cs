@@ -7,9 +7,8 @@ namespace Business.ValidationRules.FluentValidation
     {
         public UpdateLocationDtoValidator()
         {
-            // Id zorunlu
-            RuleFor(x => x.Id)
-                .NotEmpty().WithMessage("ID zorunludur.");
+            // Id artık zorunlu değil - CurrentUserId kullanılıyor
+            // RuleFor(x => x.Id) kaldırıldı
 
             // Latitude zorunlu ve geçerli aralıkta
             RuleFor(x => x.Latitude)

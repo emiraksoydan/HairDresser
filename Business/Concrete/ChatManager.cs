@@ -333,8 +333,12 @@ namespace Business.Concrete
                 var userImageDict = userImages
                     .GroupBy(i => i.Id)
                     .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).First());
-                var storeImageDict = storeImages.GroupBy(i => i.ImageOwnerId).ToDictionary(g => g.Key, g => g.First().ImageUrl);
-                var freeBarberImageDict = freeBarberImages.GroupBy(i => i.ImageOwnerId).ToDictionary(g => g.Key, g => g.First().ImageUrl);
+                var storeImageDict = storeImages
+                    .GroupBy(i => i.ImageOwnerId)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).First().ImageUrl);
+                var freeBarberImageDict = freeBarberImages
+                    .GroupBy(i => i.ImageOwnerId)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).First().ImageUrl);
 
                 // Her randevu thread'i için işlem
                 foreach (var threadDto in appointmentThreads)
@@ -647,7 +651,8 @@ namespace Business.Concrete
 
                     // Participant bilgilerini ayarla
                     // ÖNEMLİ: participantUserId kendi userId'miz değil, diğer kullanıcının userId'si olmalı
-                    if (participantUserId == userId || participantUserId == Guid.Empty)
+                    // participantUserType set edilmemişse veya participantUserId geçersizse atla
+                    if (participantUserId == recipientUserId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
                     {
                         // Kendi bilgilerimiz participant olarak eklenmiş veya geçersiz - bu yanlış, atla
                         continue;
@@ -1534,6 +1539,7 @@ namespace Business.Concrete
                     if (otherUser == null) continue;
 
                     participantUserId = otherUser.Id;
+                    participantUserType = otherUser.UserType; // ÖNEMLİ: participantUserType'ı burada set et
 
                     if (otherUser.UserType == UserType.Customer)
                     {
@@ -1544,7 +1550,6 @@ namespace Business.Concrete
                             imageUrl = img?.ImageUrl;
                         }
                         barberType = null;
-                        participantUserType = UserType.Customer;
                     }
                     else if (otherUser.UserType == UserType.BarberStore)
                     {
@@ -1575,7 +1580,6 @@ namespace Business.Concrete
                                 imageUrl = img?.ImageUrl;
                             }
                         }
-                        participantUserType = UserType.BarberStore;
                     }
                     else if (otherUser.UserType == UserType.FreeBarber)
                     {
@@ -1588,11 +1592,16 @@ namespace Business.Concrete
                             var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
                             imageUrl = img?.ImageUrl;
                         }
-                        participantUserType = UserType.FreeBarber;
                     }
                     else
                     {
                         continue; // Beklenmeyen durum
+                    }
+
+                    // Participant bilgilerini kontrol et - geçerli değilse atla
+                    if (participantUserId == recipientUserId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
+                    {
+                        continue; // Geçersiz participant bilgisi
                     }
 
                     // UnreadCount'u thread entity'den al

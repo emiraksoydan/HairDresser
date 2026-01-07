@@ -64,9 +64,10 @@ namespace Business.Concrete
 
         [ValidationAspect(typeof(UpdateLocationDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IResult> UpdateLocationAsync(UpdateLocationDto dto)
+        public async Task<IResult> UpdateLocationAsync(UpdateLocationDto dto, Guid currentUserId)
         {
-            var getBarber = await freeBarberDal.Get(x=>x.Id == dto.Id);
+            // FreeBarber'ı CurrentUserId ile bul (Id yerine)
+            var getBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
             if (getBarber == null)
                 return new ErrorResult("Berber bulunamadı");
 

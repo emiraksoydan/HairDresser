@@ -62,28 +62,31 @@ public class UserSummaryManager(
         }
         // Performance: Dictionary kullanarak O(1) lookup
         var freeBarberDict = freeBarbers.ToDictionary(f => f.FreeBarberUserId);
-        var imageOwnerIds = new HashSet<Guid>();
+        
+        // Her owner için en son eklenen image'i al (GetLatestImageAsync kullanarak)
+        var imageLookup = new Dictionary<Guid, string?>();
         foreach (var u in users)
         {
             if (freeBarberDict.TryGetValue(u.Id, out var fbDetail))
             {
-                imageOwnerIds.Add(fbDetail.Id); 
+                // FreeBarber panel image'ı
+                var image = await imageDal.GetLatestImageAsync(fbDetail.Id, ImageOwnerType.FreeBarber);
+                if (image != null)
+                {
+                    imageLookup[fbDetail.Id] = image.ImageUrl;
+                }
             }
             else
             {
-                imageOwnerIds.Add(u.Id);
+                // User image'ı
+                var image = await imageDal.GetLatestImageAsync(u.Id, ImageOwnerType.User);
+                if (image != null)
+                {
+                    imageLookup[u.Id] = image.ImageUrl;
+                }
             }
         }
-        var allImages = await imageDal.GetAll(img => imageOwnerIds.Contains(img.ImageOwnerId));
-        var imageLookup = allImages
-            .GroupBy(img => img.ImageOwnerId) 
-            .ToDictionary(
-                g => g.Key, 
-                g => g.OrderByDescending(img => img.CreatedAt).First().ImageUrl
-            );
 
-        string? GetAvatarUrlFromCache(Guid ownerId) =>
-            imageLookup.TryGetValue(ownerId, out var url) ? url : null;
         foreach (var u in users)
         {
             freeBarberDict.TryGetValue(u.Id, out var fbDetail);
@@ -94,7 +97,7 @@ public class UserSummaryManager(
                 {
                     UserId = u.Id,
                     DisplayName = BuildName(fbDetail.FirstName, fbDetail.LastName, "Serbest Berber"),
-                    AvatarUrl = GetAvatarUrlFromCache(fbDetail.Id),
+                    AvatarUrl = imageLookup.TryGetValue(fbDetail.Id, out var fbImgUrl) ? fbImgUrl : null,
                     RoleHint = "freebarber",
                     CustomerNumber = u.CustomerNumber
                 };
@@ -105,7 +108,7 @@ public class UserSummaryManager(
                 {
                     UserId = u.Id,
                     DisplayName = BuildName(u.FirstName, u.LastName, "Kullanıcı"),
-                    AvatarUrl = GetAvatarUrlFromCache(u.Id),
+                    AvatarUrl = imageLookup.TryGetValue(u.Id, out var userImgUrl) ? userImgUrl : null,
                     RoleHint = "user",
                     CustomerNumber = u.CustomerNumber
                 };
@@ -123,13 +126,13 @@ public class UserSummaryManager(
 
     private async Task<string?> TryGetUserAvatarAsync(Guid userId)
     {
-        var imgs = await imageDal.GetAll(x => x.ImageOwnerId == userId);
-        return imgs.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl;
+        var image = await imageDal.GetLatestImageAsync(userId, ImageOwnerType.User);
+        return image?.ImageUrl;
     }
 
     private async Task<string?> TryGetFreeBarberAvatarAsync(Guid freeBarberPanelId)
     {
-        var imgs = await imageDal.GetAll(x => x.ImageOwnerId == freeBarberPanelId);
-        return imgs.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl;
+        var image = await imageDal.GetLatestImageAsync(freeBarberPanelId, ImageOwnerType.FreeBarber);
+        return image?.ImageUrl;
     }
 }

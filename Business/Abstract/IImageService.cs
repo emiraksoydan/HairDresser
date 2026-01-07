@@ -30,5 +30,10 @@ namespace Business.Abstract
         /// Get all images by owner
         /// </summary>
         Task<IDataResult<List<ImageGetDto>>> GetImagesByOwnerAsync(Guid ownerId, ImageOwnerType ownerType);
+
+        /// <summary>
+        /// Updates an existing image blob without creating a new one
+        /// </summary>
+        Task<IResult> UpdateImageBlobAsync(Guid imageId, IFormFile file);
     }
 }

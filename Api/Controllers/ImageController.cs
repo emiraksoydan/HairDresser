@@ -70,5 +70,20 @@ namespace Api.Controllers
             var result = await imageService.GetImage(id);
             return result.Success ? Ok(result) : BadRequest(result);
         }
+
+        /// <summary>
+        /// Update existing image blob without creating a new one
+        /// </summary>
+        [HttpPut("update-blob/{imageId}")]
+        public async Task<IActionResult> UpdateImageBlob(Guid imageId, [FromForm] IFormFile file)
+        {
+            if (imageId == Guid.Empty)
+            {
+                return BadRequest(new { success = false, message = "Resim ID'si boş olamaz" });
+            }
+
+            var result = await imageService.UpdateImageBlobAsync(imageId, file);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
     }
 }

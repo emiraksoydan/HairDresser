@@ -64,7 +64,27 @@ namespace Business.Concrete
             if (entity == null)
                 return new ErrorResult("Resim bulunamadı.");
 
-            updateImageDto.Adapt(entity);
+            // ÖNEMLİ: UpdateImageDto sadece metadata güncellemesi için kullanılır
+            // ImageUrl değişmişse, bu yeni blob'un URL'i değil, mevcut blob'un URL'i korunmalı
+            // Mevcut blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+            // Burada sadece ImageOwnerId ve OwnerType güncelle (ImageUrl'i koru)
+            var oldImageUrl = entity.ImageUrl;
+            
+            // ImageUrl'i koru, sadece diğer alanları güncelle
+            entity.ImageOwnerId = updateImageDto.ImageOwnerId;
+            entity.OwnerType = updateImageDto.OwnerType;
+            entity.UpdatedAt = DateTime.UtcNow;
+            
+            // ImageUrl değişmişse uyar (ama değiştirme - mevcut blob korunmalı)
+            if (!string.IsNullOrEmpty(oldImageUrl) && 
+                !string.IsNullOrEmpty(updateImageDto.ImageUrl) && 
+                oldImageUrl != updateImageDto.ImageUrl)
+            {
+                // ÖNEMLİ: ImageUrl değişmişse, yeni blob oluşturulmamalı
+                // Mevcut blob korunmalı, blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+                // Burada ImageUrl'i değiştirmiyoruz, mevcut blob'u koruyoruz
+            }
+
             await _imageDal.Update(entity);
             return new SuccessResult();
         }
@@ -92,7 +112,22 @@ namespace Business.Concrete
                 if (!imageDict.TryGetValue(dto.Id, out var entity))
                     continue;
 
-                dto.Adapt(entity);
+                // ÖNEMLİ: ImageUrl değişmişse, mevcut blob'u koru (yeni blob oluşturulmamalı)
+                // Sadece ImageOwnerId ve OwnerType güncelle
+                entity.ImageOwnerId = dto.ImageOwnerId;
+                entity.OwnerType = dto.OwnerType;
+                entity.UpdatedAt = DateTime.UtcNow;
+                
+                // ImageUrl'i koru - mevcut blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+                // ImageUrl değişmişse uyar ama değiştirme
+                if (!string.IsNullOrEmpty(entity.ImageUrl) && 
+                    !string.IsNullOrEmpty(dto.ImageUrl) && 
+                    entity.ImageUrl != dto.ImageUrl)
+                {
+                    // ÖNEMLİ: ImageUrl değişmişse, yeni blob oluşturulmamalı
+                    // Mevcut blob korunmalı, blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+                    // Burada ImageUrl'i değiştirmiyoruz, mevcut blob'u koruyoruz
+                }
             }
             if (existingImages.Any())
             {
@@ -266,9 +301,36 @@ namespace Business.Concrete
                 x.ImageOwnerId == ownerId &&
                 x.OwnerType == ownerType);
 
-            var dtos = images.Adapt<List<ImageGetDto>>();
+            // En son eklenen image ilk sırada olsun (CreatedAt DESC)
+            var orderedImages = images.OrderByDescending(i => i.CreatedAt).ToList();
+
+            var dtos = orderedImages.Adapt<List<ImageGetDto>>();
 
             return new SuccessDataResult<List<ImageGetDto>>(dtos);
+        }
+
+        /// <summary>
+        /// Updates an existing image blob without creating a new one
+        /// Mevcut blob'un içeriğini günceller, yeni blob oluşturmaz
+        /// </summary>
+        public async Task<IResult> UpdateImageBlobAsync(Guid imageId, Microsoft.AspNetCore.Http.IFormFile file)
+        {
+            var entity = await _imageDal.Get(i => i.Id == imageId);
+            if (entity == null)
+                return new ErrorResult("Resim bulunamadı.");
+
+            if (string.IsNullOrEmpty(entity.ImageUrl))
+                return new ErrorResult("Resim URL'i bulunamadı.");
+
+            // Mevcut blob'u güncelle (yeni blob oluşturma)
+            var updatedUrl = await _blobStorageService.UpdateAsync(file, entity.ImageUrl);
+            
+            // ImageUrl aynı kalmalı (aynı blob name kullanıldığı için)
+            // UpdatedAt'i güncelle
+            entity.UpdatedAt = DateTime.UtcNow;
+            await _imageDal.Update(entity);
+
+            return new SuccessResult("Resim başarıyla güncellendi.");
         }
     }
 }

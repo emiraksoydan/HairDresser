@@ -19,7 +19,7 @@ namespace Business.Abstract
         Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId);
         Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId);
         Task<IDataResult<FreeBarberMinePanelDto>> GetFreeBarberForUsers(Guid freeBarberId);
-        Task<IResult> UpdateLocationAsync(UpdateLocationDto dto);
+        Task<IResult> UpdateLocationAsync(UpdateLocationDto dto, Guid currentUserId);
 
 
     }
