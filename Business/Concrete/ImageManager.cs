@@ -72,7 +72,7 @@ namespace Business.Concrete
             
             // ImageUrl'i koru, sadece diğer alanları güncelle
             entity.ImageOwnerId = updateImageDto.ImageOwnerId;
-            entity.OwnerType = updateImageDto.OwnerType;
+            entity.OwnerType = updateImageDto.OwnerType ?? entity.OwnerType;
             entity.UpdatedAt = DateTime.UtcNow;
             
             // ImageUrl değişmişse uyar (ama değiştirme - mevcut blob korunmalı)
@@ -115,7 +115,7 @@ namespace Business.Concrete
                 // ÖNEMLİ: ImageUrl değişmişse, mevcut blob'u koru (yeni blob oluşturulmamalı)
                 // Sadece ImageOwnerId ve OwnerType güncelle
                 entity.ImageOwnerId = dto.ImageOwnerId;
-                entity.OwnerType = dto.OwnerType;
+                entity.OwnerType = dto.OwnerType ?? entity.OwnerType;
                 entity.UpdatedAt = DateTime.UtcNow;
                 
                 // ImageUrl'i koru - mevcut blob güncellemesi için UpdateImageBlobAsync kullanılmalı

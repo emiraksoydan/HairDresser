@@ -652,7 +652,7 @@ namespace Business.Concrete
                     // Participant bilgilerini ayarla
                     // ÖNEMLİ: participantUserId kendi userId'miz değil, diğer kullanıcının userId'si olmalı
                     // participantUserType set edilmemişse veya participantUserId geçersizse atla
-                    if (participantUserId == recipientUserId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
+                    if (participantUserId == userId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
                     {
                         // Kendi bilgilerimiz participant olarak eklenmiş veya geçersiz - bu yanlış, atla
                         continue;

@@ -41,10 +41,14 @@ namespace Core.Utilities.Storage
             // Dosyayı yükle
             using (var stream = file.OpenReadStream())
             {
-                await blobClient.UploadAsync(stream, new BlobHttpHeaders
+                var uploadOptions = new BlobUploadOptions
                 {
-                    ContentType = file.ContentType
-                });
+                    HttpHeaders = new BlobHttpHeaders
+                    {
+                        ContentType = file.ContentType
+                    }
+                };
+                await blobClient.UploadAsync(stream, uploadOptions);
             }
 
             // URL'i döndür
@@ -160,10 +164,14 @@ namespace Core.Utilities.Storage
                 // Dosyayı mevcut blob üzerine yaz (overwrite)
                 using (var stream = file.OpenReadStream())
                 {
-                    await blobClient.UploadAsync(stream, overwrite: true, new BlobHttpHeaders
+                    var uploadOptions = new BlobUploadOptions
                     {
-                        ContentType = file.ContentType
-                    });
+                        HttpHeaders = new BlobHttpHeaders
+                        {
+                            ContentType = file.ContentType
+                        }
+                    };
+                    await blobClient.UploadAsync(stream, uploadOptions);
                 }
 
                 // Aynı URL'i döndür (blob name değişmediği için)
