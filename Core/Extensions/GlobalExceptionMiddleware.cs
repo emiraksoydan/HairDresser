@@ -1,9 +1,11 @@
-﻿using System.Net;
+using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Core.Exceptions;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Core.Extensions
 {
@@ -85,6 +87,43 @@ namespace Core.Extensions
                 {
                     success = false,
                     message = ex.Message
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx)
+            {
+                // PostgreSQL database exception handling
+                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                context.Response.ContentType = "application/json";
+
+                string userMessage;
+                switch (pgEx.SqlState)
+                {
+                    case "23505": // unique_violation
+                        userMessage = "Bu işlem için zaten bir kayıt mevcut. Lütfen farklı bir değer deneyin.";
+                        break;
+                    case "23503": // foreign_key_violation
+                        userMessage = "İlgili kayıt bulunamadı. Lütfen geçerli bir değer seçin.";
+                        break;
+                    case "23502": // not_null_violation
+                        userMessage = "Zorunlu alanlar eksik. Lütfen tüm gerekli bilgileri doldurun.";
+                        break;
+                    case "23514": // check_violation
+                        userMessage = "Girilen değer geçersiz. Lütfen kontrol edin.";
+                        break;
+                    case "23506": // exclusion_violation
+                        userMessage = "Bu işlem için çakışan bir kayıt mevcut.";
+                        break;
+                    default:
+                        userMessage = "Veritabanı hatası oluştu. Lütfen tekrar deneyin.";
+                        break;
+                }
+
+                var payload = new
+                {
+                    success = false,
+                    message = userMessage
                 };
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(payload));

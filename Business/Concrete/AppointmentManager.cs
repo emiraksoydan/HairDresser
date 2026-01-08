@@ -14,6 +14,7 @@ using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Business.Concrete
 {
@@ -175,7 +176,7 @@ namespace Business.Concrete
             {
                 await appointmentDal.Add(appt);
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
             {
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
@@ -247,7 +248,7 @@ namespace Business.Concrete
             {
                 await appointmentDal.Add(appt);
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
             {
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
@@ -325,7 +326,7 @@ namespace Business.Concrete
             {
                 await appointmentDal.Add(appt);
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
             {
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
@@ -400,7 +401,7 @@ namespace Business.Concrete
             {
                 await appointmentDal.Add(appt);
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && sqlEx.Number == 2627)
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
             {
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
@@ -1351,6 +1352,7 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [TransactionScopeAspect]
         public async Task<IDataResult<bool>> DeleteAsync(Guid userId, Guid appointmentId)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
@@ -1464,6 +1466,7 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [TransactionScopeAspect]
         public async Task<IDataResult<bool>> DeleteAllAsync(Guid userId)
         {
             // Kullanıcının tüm appointment'larını bul (soft delete edilmemiş olanlar)

@@ -1,4 +1,4 @@
-﻿using Business.Abstract;
+using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
@@ -30,6 +30,7 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> DeleteAsync(Guid id)
         {
             var getImage = await _imageDal.Get(i=>i.Id == id);

@@ -1,4 +1,5 @@
 using Business.Abstract;
+using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
@@ -467,6 +468,7 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> DeleteAsync(Guid userId, Guid notificationId)
         {
             var n = await notificationDal.Get(x => x.Id == notificationId && x.UserId == userId);
@@ -512,6 +514,7 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> DeleteAllAsync(Guid userId)
         {
             var notifications = await notificationDal.GetAll(x => x.UserId == userId);

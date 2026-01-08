@@ -22,6 +22,8 @@ namespace DataAccess.Concrete
                 b.HasIndex(u => u.PhoneNumber)
                     .HasDatabaseName("IX_User_PhoneNumber");
             });
+            modelBuilder.Entity<User>().HasOne(u => u.Image).WithMany() .HasForeignKey(u => u.ImageId).OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<RefreshToken>(e =>
             {
                 e.ToTable("RefreshTokens");
