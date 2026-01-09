@@ -49,6 +49,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
             builder.RegisterType<FavoriteManager>().As<IFavoriteService>().InstancePerLifetimeScope();
             builder.RegisterType<SettingManager>().As<ISettingService>().InstancePerLifetimeScope();
+            builder.RegisterType<HelpGuideManager>().As<IHelpGuideService>().InstancePerLifetimeScope();
             builder.RegisterType<FirebasePushNotificationService>().As<IPushNotificationService>().InstancePerLifetimeScope();
 
             // Helper classes (N+1 query optimization)
@@ -79,6 +80,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfSettingDal>().As<ISettingDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfHelpGuideDal>().As<IHelpGuideDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfUserFcmTokenDal>().As<IUserFcmTokenDal>().InstancePerLifetimeScope();
 
             // Register IHttpContextAccessor for SecuredOperation

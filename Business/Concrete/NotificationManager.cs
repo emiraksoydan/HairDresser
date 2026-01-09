@@ -20,6 +20,7 @@ namespace Business.Concrete
         IRealTimePublisher realtime,
         IBadgeService badgeService,
         IAppointmentDal appointmentDal,
+        IBadgeUpdateService badgeUpdateService,
         IPushNotificationService? pushNotificationService = null) : INotificationService
     {
         // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
@@ -81,12 +82,8 @@ namespace Business.Concrete
                             }
                         }
                         
-                        // Badge count'u direkt hesaplayıp push et
-                        var badgesuns = await badgeService.GetCountsAsync(userId);
-                        if (badgesuns.Success)
-                        {
-                            await realtime.PushBadgeAsync(userId, badgesuns.Data);
-                        }
+                        // Badge count'u transaction commit sonrası güncellemek için schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existingAny.Id);
                     }
@@ -148,12 +145,8 @@ namespace Business.Concrete
                             }
                         }
                         
-                        // Badge count'u direkt hesaplayıp push et
-                        var badgesex = await badgeService.GetCountsAsync(userId);
-                        if (badgesex.Success)
-                        {
-                            await realtime.PushBadgeAsync(userId, badgesex.Data);
-                        }
+                        // Badge count'u transaction commit sonrası güncellemek için schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -208,12 +201,8 @@ namespace Business.Concrete
                 }
             }
 
-            // Badge count'u direkt hesaplayıp push et
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badges.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<Guid>(n.Id);
         }
@@ -253,12 +242,8 @@ namespace Business.Concrete
 
             await notificationDal.Update(n);
 
-            // Badge count'u direkt hesaplayıp push et
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badges.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -280,12 +265,8 @@ namespace Business.Concrete
             
             await notificationDal.UpdateRange(notifications);
 
-            // Badge count'u direkt hesaplayıp push et
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badges.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -493,23 +474,15 @@ namespace Business.Concrete
                 n.ReadAt = DateTime.UtcNow;
                 await notificationDal.Update(n);
                 
-                // Badge count'u güncelle
-                var badges = await badgeService.GetCountsAsync(userId);
-                if (badges.Success)
-                {
-                    await realtime.PushBadgeAsync(userId, badges.Data);
-                }
+                // Badge count'u transaction commit sonrası güncellemek için schedule et
+                badgeUpdateService.ScheduleBadgeUpdate(userId);
             }
 
             // Bildirimi sil
             await notificationDal.Remove(n);
 
-            // Badge count'u tekrar güncelle (silme sonrası)
-            var badgesAfter = await badgeService.GetCountsAsync(userId);
-            if (badgesAfter.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badgesAfter.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et (silme sonrası)
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -578,12 +551,8 @@ namespace Business.Concrete
                 await notificationDal.Remove(n);
             }
 
-            // Badge count'u güncelle
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badges.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }

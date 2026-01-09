@@ -21,7 +21,8 @@ namespace Business.Concrete
              IImageDal imageDal,
              IFavoriteDal favoriteDal,
              IRealTimePublisher realtime,
-             FavoriteHelper favoriteHelper
+             FavoriteHelper favoriteHelper,
+             IBadgeUpdateService badgeUpdateService
      ) : IChatService
     {
 
@@ -150,13 +151,15 @@ namespace Business.Concrete
             foreach (var u in recipients)
             {
                 await realtime.PushChatMessageAsync(u, dto);
-                // Badge count güncellemesi - tüm katılımcılar için (sender dahil)
-                var badges = await badgeSvc.GetCountsAsync(u);
-                if (badges.Success) await realtime.PushBadgeAsync(u, badges.Data);
+                // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
+                badgeUpdateService.ScheduleBadgeUpdate(u);
             }
 
             // Thread güncellemesini tüm katılımcılara push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
             await PushAppointmentThreadUpdatedAsync(appointmentId);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
@@ -847,14 +850,16 @@ namespace Business.Concrete
             foreach (var recipientId in favoriteRecipients.Distinct())
             {
                 await realtime.PushChatMessageAsync(recipientId, dto);
-                // Badge count güncellemesi - tüm katılımcılar için
-                var badges = await badgeSvc.GetCountsAsync(recipientId);
-                if (badges.Success) await realtime.PushBadgeAsync(recipientId, badges.Data);
+                // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
+                badgeUpdateService.ScheduleBadgeUpdate(recipientId);
             }
 
             // Thread güncellemesini her iki kullanıcıya da push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
             // EnsureFavoriteThreadAsync mantığını kullanarak thread detaylarını oluştur ve push et
             await PushFavoriteThreadUpdatedAsync(fromUserId, toUserId, thread.Id);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
@@ -893,9 +898,11 @@ namespace Business.Concrete
 
             await threadDal.Update(thread);
 
-            // Badge count güncellemesi - okundu işaretleyen kullanıcı için
-            var badges = await badgeSvc.GetCountsAsync(userId);
-            if (badges.Success) await realtime.PushBadgeAsync(userId, badges.Data);
+            // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
+
+            // Transaction commit sonrası badge update'leri çalıştır
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }

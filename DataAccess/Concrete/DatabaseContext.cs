@@ -143,6 +143,10 @@ namespace DataAccess.Concrete
                 .HasIndex(x => x.FcmToken)
                 .IsUnique();
 
+            // HelpGuide indexes for efficient lookups
+            modelBuilder.Entity<HelpGuide>()
+                .HasIndex(x => new { x.UserType, x.IsActive, x.Order });
+
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -174,6 +178,7 @@ namespace DataAccess.Concrete
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<Setting> Settings { get; set; }
         public DbSet<UserFcmToken> UserFcmTokens { get; set; }
+        public DbSet<HelpGuide> HelpGuides { get; set; }
 
     }
 }
