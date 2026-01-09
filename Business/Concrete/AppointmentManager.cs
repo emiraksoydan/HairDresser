@@ -33,7 +33,8 @@ namespace Business.Concrete
         IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings,
         IUserDal userDal,
-        AppointmentBusinessRules businessRules
+        AppointmentBusinessRules businessRules,
+        IBadgeUpdateService badgeUpdateService
     ) : IAppointmentService
     {
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
@@ -186,6 +187,9 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
 
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
 
@@ -254,6 +258,10 @@ namespace Business.Concrete
             }
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
         // ---------------- CREATE: FREEBARBER -> STORE ----------------
@@ -336,6 +344,9 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, freeBarberUserId);
 
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
 
@@ -410,6 +421,9 @@ namespace Business.Concrete
             if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
 
             await FinalizeAppointmentCreationAsync(appt, serviceOfferingIds: null, storeOwnerUserId);
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -521,6 +535,8 @@ namespace Business.Concrete
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -628,6 +644,9 @@ namespace Business.Concrete
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -721,6 +740,9 @@ namespace Business.Concrete
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -746,6 +768,9 @@ namespace Business.Concrete
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -754,6 +779,9 @@ namespace Business.Concrete
             // Decision g├╝ncellendi─şinde ilgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -864,6 +892,9 @@ namespace Business.Concrete
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+                    // Transaction commit sonrası badge update'leri işle
+                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                     return new SuccessDataResult<bool>(true);
                 }
 
@@ -902,6 +933,9 @@ namespace Business.Concrete
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+
+                    // Transaction commit sonrası badge update'leri işle
+                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
                     return new SuccessDataResult<bool>(true);
                 }
@@ -976,6 +1010,9 @@ namespace Business.Concrete
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -999,6 +1036,9 @@ namespace Business.Concrete
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
             }
 
@@ -1007,6 +1047,9 @@ namespace Business.Concrete
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             // Transaction commit sonras─▒ badge update'leri ├ğal─▒┼şt─▒r
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1066,6 +1109,9 @@ namespace Business.Concrete
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
+                    // Transaction commit sonrası badge update'leri işle
+                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                     return new SuccessDataResult<bool>(true);
                 }
                 else
@@ -1088,6 +1134,9 @@ namespace Business.Concrete
 
                     await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
+
+                    // Transaction commit sonrası badge update'leri işle
+                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
                     return new SuccessDataResult<bool>(true);
                 }
@@ -1176,6 +1225,9 @@ namespace Business.Concrete
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
 
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
             return new SuccessDataResult<bool>(true);
         }
 
@@ -1246,6 +1298,9 @@ namespace Business.Concrete
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             // Transaction commit sonras─▒ badge update'leri ├ğal─▒┼şt─▒r
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1348,6 +1403,9 @@ namespace Business.Concrete
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             // Transaction commit sonras─▒ badge update'leri ├ğal─▒┼şt─▒r
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1462,6 +1520,9 @@ namespace Business.Concrete
 
             // Appointment güncellemesini bildir (kullanıcı için)
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1631,6 +1692,9 @@ namespace Business.Concrete
             {
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
             }
+
+            // Transaction commit sonrası badge update'leri işle
+            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1917,6 +1981,9 @@ namespace Business.Concrete
         private async Task<IDataResult<bool>> EnsurePendingNotExpiredAndHandleAsync(Appointment appt)
         {
             if (!appt.PendingExpiresAt.HasValue || appt.PendingExpiresAt.Value > DateTime.UtcNow)
+                // Transaction commit sonrası badge update'leri işle
+                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+
                 return new SuccessDataResult<bool>(true);
 
             if (appt.StoreSelectionType == StoreSelectionType.StoreSelection)

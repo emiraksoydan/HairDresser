@@ -19,6 +19,7 @@ namespace Business.Concrete
     public class NotificationManager(INotificationDal notificationDal,
         IRealTimePublisher realtime,
         IBadgeService badgeService,
+        IBadgeUpdateService badgeUpdateService,
         IAppointmentDal appointmentDal,
         IPushNotificationService? pushNotificationService = null) : INotificationService
     {
@@ -80,14 +81,10 @@ namespace Business.Concrete
                                 // FCM push failure should not break the notification update
                             }
                         }
-                        
-                        // Badge count'u direkt hesaplayıp push et
-                        var badgesuns = await badgeService.GetCountsAsync(userId);
-                        if (badgesuns.Success)
-                        {
-                            await realtime.PushBadgeAsync(userId, badgesuns.Data);
-                        }
-                        
+
+                        // Badge count'u transaction commit sonrası güncellemek için schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+
                         return new SuccessDataResult<Guid>(existingAny.Id);
                     }
                     // Eğer hiç notification yoksa, aşağıda yeni oluşturulacak
@@ -147,14 +144,10 @@ namespace Business.Concrete
                                 // FCM push failure should not break the notification update
                             }
                         }
-                        
-                        // Badge count'u direkt hesaplayıp push et
-                        var badgesex = await badgeService.GetCountsAsync(userId);
-                        if (badgesex.Success)
-                        {
-                            await realtime.PushBadgeAsync(userId, badgesex.Data);
-                        }
-                        
+
+                        // Badge count'u transaction commit sonrası güncellemek için schedule et
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
                 }
@@ -208,12 +201,10 @@ namespace Business.Concrete
                 }
             }
 
-            // Badge count'u direkt hesaplayıp push et
-            var badges = await badgeService.GetCountsAsync(userId);
-            if (badges.Success)
-            {
-                await realtime.PushBadgeAsync(userId, badges.Data);
-            }
+            // Badge count'u transaction commit sonrası güncellemek için schedule et
+            // ÖNEMLİ: Transaction içinde olduğumuz için badge count henüz doğru hesaplanamaz
+            // Transaction commit edildikten sonra ProcessScheduledBadgeUpdatesAsync ile güncellenir
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<Guid>(n.Id);
         }
