@@ -1,7 +1,9 @@
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
@@ -90,6 +92,8 @@ namespace Business.Concrete
         }
 
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         public async Task<IDataResult<List<AppointmentGetDto>>> GetAllAppointmentByFilter(Guid currentUserId, AppointmentFilter appointmentFilter)
         {
             var result = await appointmentDal.GetAllAppointmentByFilter(currentUserId, appointmentFilter);
@@ -98,6 +102,8 @@ namespace Business.Concrete
 
         // ---------------- CREATE: CUSTOMER -> FREEBARBER (NEW) ----------------
 
+        [SecuredOperation("Customer")]
+        [LogAspect]
         [ValidationAspect(typeof(CreateCustomerToFreeBarberRequestDtoValidator))]
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateCustomerToFreeBarberAsync(Guid customerUserId, CreateAppointmentRequestDto req)
@@ -195,6 +201,8 @@ namespace Business.Concrete
 
         // ---------------- CREATE: CUSTOMER -> STORE ----------------
 
+        [SecuredOperation("Customer")]
+        [LogAspect]
         [ValidationAspect(typeof(CreateCustomerToStoreRequestDtoValidator))]
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateCustomerToStoreControlAsync(Guid customerUserId, CreateAppointmentRequestDto req)
@@ -266,6 +274,8 @@ namespace Business.Concrete
         }
         // ---------------- CREATE: FREEBARBER -> STORE ----------------
 
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [ValidationAspect(typeof(CreateFreeBarberToStoreRequestDtoValidator))]
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateFreeBarberToStoreAsync(Guid freeBarberUserId, CreateAppointmentRequestDto req)
@@ -351,6 +361,8 @@ namespace Business.Concrete
         }
 
 
+        [SecuredOperation("BarberStore")]
+        [LogAspect]
         [ValidationAspect(typeof(CreateStoreToFreeBarberRequestDtoValidator))]
         [TransactionScopeAspect]
         public async Task<IDataResult<Guid>> CreateStoreToFreeBarberAsync(Guid storeOwnerUserId, CreateStoreToFreeBarberRequestDto req)
@@ -433,6 +445,8 @@ namespace Business.Concrete
         /// <summary>
         /// Free barber, müşteri randevusuna dükkan ekler (Dükkan Seç senaryosu)
         /// </summary>
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [TransactionScopeAspect]
         public async Task<IDataResult<bool>> AddStoreToExistingAppointmentAsync(Guid freeBarberUserId, Guid appointmentId, Guid storeId, Guid chairId, DateOnly appointmentDate, TimeSpan startTime, TimeSpan endTime, List<Guid> serviceOfferingIds)
         {
@@ -542,8 +556,9 @@ namespace Business.Concrete
         }
 
         // ---------------- DECISIONS (STORE / FREEBARBER) ----------------
+        [SecuredOperation("BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
-
         public async Task<IDataResult<bool>> StoreDecisionAsync(Guid storeOwnerUserId, Guid appointmentId, bool approve)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
@@ -780,8 +795,9 @@ namespace Business.Concrete
 
             return new SuccessDataResult<bool>(true);
         }
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [TransactionScopeAspect]
-
         public async Task<IDataResult<bool>> FreeBarberDecisionAsync(Guid freeBarberUserId, Guid appointmentId, bool approve)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
@@ -1048,6 +1064,8 @@ namespace Business.Concrete
         /// <summary>
         /// M├╝┼şteri karar─▒ - Customer -> FreeBarber + Store senaryosunda m├╝┼şteri onay─▒
         /// </summary>
+        [SecuredOperation("Customer")]
+        [LogAspect]
         [TransactionScopeAspect]
         public async Task<IDataResult<bool>> CustomerDecisionAsync(Guid customerUserId, Guid appointmentId, bool approve)
         {
@@ -1220,8 +1238,9 @@ namespace Business.Concrete
         }
 
         // ---------------- CANCEL / COMPLETE ----------------
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
-
         public async Task<IDataResult<bool>> CancelAsync(Guid userId, Guid appointmentId)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
@@ -1290,8 +1309,9 @@ namespace Business.Concrete
 
             return new SuccessDataResult<bool>(true);
         }
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
-
         public async Task<IDataResult<bool>> CompleteAsync(Guid userId, Guid appointmentId)
         {
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
@@ -1394,6 +1414,8 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
         public async Task<IDataResult<bool>> DeleteAsync(Guid userId, Guid appointmentId)
         {
@@ -1511,6 +1533,8 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
         public async Task<IDataResult<bool>> DeleteAllAsync(Guid userId)
         {

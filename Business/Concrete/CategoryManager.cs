@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
@@ -15,12 +17,16 @@ namespace Business.Concrete
 {
     public class CategoryManager(ICategoriesDal categoriesDal) : ICategoryService
     {
+        [SecuredOperation("Admin")]
+        [LogAspect]
         public async Task<IResult> AddCategory(Category category)
         {
             await categoriesDal.Add(category);
             return new SuccessResult("Kategori Eklendi");
         }
 
+        [SecuredOperation("Admin")]
+        [LogAspect]
         public async Task<IResult> DeleteCategory(Guid id)
         {
             var getCat = await categoriesDal.Get(x => x.Id == id);

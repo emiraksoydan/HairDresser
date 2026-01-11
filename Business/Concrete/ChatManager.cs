@@ -1,6 +1,8 @@
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Helpers;
 using Business.Resources;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
@@ -26,8 +28,9 @@ namespace Business.Concrete
      ) : IChatService
     {
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-
         public async Task<IDataResult<ChatMessageDto>> SendMessageAsync(Guid senderUserId, Guid appointmentId, string text)
         {
             text = (text ?? "").Trim();
@@ -164,8 +167,9 @@ namespace Business.Concrete
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-
         public async Task<IDataResult<int>> GetUnreadTotalAsync(Guid userId)
         {
             var threads = await threadDal.GetAll(t =>
@@ -179,6 +183,8 @@ namespace Business.Concrete
             return new SuccessDataResult<int>(total);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkThreadReadByAppointmentAsync(Guid userId, Guid appointmentId)
         {
@@ -201,8 +207,9 @@ namespace Business.Concrete
         }
 
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-
         public async Task<IDataResult<List<ChatThreadListItemDto>>> GetThreadsAsync(Guid userId)
         {
             // sadece Pending + Approved randevular için
@@ -700,8 +707,9 @@ namespace Business.Concrete
             return string.IsNullOrWhiteSpace(storeName) ? Messages.ChatThreadTitleBarberStore : storeName!;
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-
         public async Task<IDataResult<List<ChatMessageItemDto>>> GetMessagesAsync(
             Guid userId, Guid appointmentId, DateTime? beforeUtc)
         {
@@ -729,6 +737,8 @@ namespace Business.Concrete
             return new SuccessDataResult<List<ChatMessageItemDto>>(msgs);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<ChatMessageDto>> SendFavoriteMessageAsync(Guid senderUserId, Guid threadId, string text)
         {
@@ -864,6 +874,8 @@ namespace Business.Concrete
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkThreadReadAsync(Guid userId, Guid threadId)
         {
@@ -907,6 +919,8 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<List<ChatMessageItemDto>>> GetMessagesByThreadAsync(Guid userId, Guid threadId, DateTime? beforeUtc)
         {
@@ -992,6 +1006,8 @@ namespace Business.Concrete
             return new SuccessDataResult<List<ChatMessageItemDto>>(msgs);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<Guid>> EnsureFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null)
         {
@@ -1684,6 +1700,8 @@ namespace Business.Concrete
             }
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         public async Task<IDataResult<bool>> NotifyTypingAsync(Guid userId, Guid threadId, bool isTyping)
         {
             // Thread'i kontrol et

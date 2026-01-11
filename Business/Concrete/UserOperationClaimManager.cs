@@ -1,5 +1,7 @@
-﻿using Business.Abstract;
+using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Resources;
+using Core.Aspect.Autofac.Logging;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete.Entities;
@@ -13,6 +15,8 @@ namespace Business.Concrete
 {
     public class UserOperationClaimManager(IUserOperationClaimDal userOperationClaimDal) : IUserOperationClaimService
     {
+        [SecuredOperation("Admin")]
+        [LogAspect]
         public async Task<IDataResult<List<UserOperationClaim>>> AddUserOperationsClaim(List<UserOperationClaim> userOperationClaims)
         {
             await userOperationClaimDal.AddRange(userOperationClaims);

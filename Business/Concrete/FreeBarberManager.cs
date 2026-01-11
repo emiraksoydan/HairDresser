@@ -1,6 +1,8 @@
-﻿using Business.Abstract;
+using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
@@ -22,6 +24,8 @@ namespace Business.Concrete
 {
     public class FreeBarberManager(IFreeBarberDal freeBarberDal,IAppointmentService _appointmentService, IServiceOfferingService _serviceOfferingService) : IFreeBarberService
     {
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(FreeBarberDtoValidator))]
         public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
@@ -39,6 +43,8 @@ namespace Business.Concrete
             await SaveOfferingsAsync(freeBarberCreateDto, entity.Id);
             return new SuccessResult("Serbest berber portalı başarıyla oluşturuldu.");
         }
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(FreeBarberDtoValidator))]
         public async Task<IResult> Update(FreeBarberUpdateDto freeBarberUpdateDto,Guid currentUserId)
@@ -56,12 +62,16 @@ namespace Business.Concrete
             return new SuccessResult("Serbest berber güncellendi.");
         }
 
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         public async Task<IResult> DeleteAsync(Guid storeId)
         {
 
             return new SuccessResult("Serbest berber silindi.");
         }
 
+        [SecuredOperation("FreeBarber")]
+        [LogAspect]
         [ValidationAspect(typeof(UpdateLocationDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateLocationAsync(UpdateLocationDto dto, Guid currentUserId)
@@ -79,6 +89,7 @@ namespace Business.Concrete
             return new SuccessResult("Konum başarıyla güncellendi");
 
         }
+        [SecuredOperation("FreeBarber")]
         public async Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId)
         {
             var result = await freeBarberDal.GetMyPanel(currentUserId);
@@ -100,6 +111,7 @@ namespace Business.Concrete
             return new SuccessDataResult<List<FreeBarberGetDto>>(result, "Filtrelenmiş serbest berberler getirildi");
         }
 
+        [SecuredOperation("FreeBarber")]
         public async Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId)
         {
             var result = await freeBarberDal.GetPanelDetailById(panelId);

@@ -1,6 +1,7 @@
-﻿using Business.Abstract;
+using Business.Abstract;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
@@ -16,6 +17,7 @@ namespace Business.Concrete
 {
     public class ManuelBarberManager(IManuelBarberDal manuelBarberDal, IAppointmentService appointmentService, IMapper mapper, IImageService imageService, IBarberStoreChairService barberStoreChairService) : IManuelBarberService
     {
+        [LogAspect]
         [ValidationAspect(typeof(ManuelBarberCreateValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> AddAsync(ManuelBarberCreateDto dto)
@@ -26,6 +28,7 @@ namespace Business.Concrete
 
             return new SuccessResult(Messages.ManuelBarberAddedSuccess);
         }
+        [LogAspect]
         [ValidationAspect(typeof(ManuelBarberUpdateValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateAsync(ManuelBarberUpdateDto dto)
@@ -44,6 +47,7 @@ namespace Business.Concrete
             return new SuccessResult(Messages.ManuelBarberUpdatedSuccess);
         }
 
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> DeleteAsync(Guid id)
         {

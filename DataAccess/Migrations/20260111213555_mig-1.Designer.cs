@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260108192418_mig-1")]
+    [Migration("20260111213555_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -430,6 +430,42 @@ namespace DataAccess.Migrations
                     b.HasIndex("IsAvailable", "Latitude", "Longitude");
 
                     b.ToTable("FreeBarbers");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.HelpGuide", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserType", "IsActive", "Order");
+
+                    b.ToTable("HelpGuides");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Image", b =>

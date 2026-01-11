@@ -1,6 +1,7 @@
-﻿
+
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
@@ -25,6 +26,7 @@ namespace Business.Concrete
         IConfiguration configuration) : IAuthService
     {
 
+        [LogAspect(logParameters: false)] // OTP kodu hassas veri olduğu için parametreleri loglamıyoruz
         [ValidationAspect(typeof(SendOtpValidator))]
         public async Task<IResult> SendOtpAsync(string phoneNumber, UserType? userType, OtpPurpose otpPurpose)
         {
@@ -49,6 +51,7 @@ namespace Business.Concrete
             return send.Success ? send : new ErrorResult(send.Message);
         }
 
+        [LogAspect(logParameters: false)] // OTP kodu hassas veri olduğu için parametreleri loglamıyoruz
         [ValidationAspect(typeof(VerifyOtpValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<AccessToken>> VerifyOtpAsync(UserForVerifyDto userForVerifyDto, string? ip, string? device)

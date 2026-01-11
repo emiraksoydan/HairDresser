@@ -1,7 +1,9 @@
-﻿
+
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
@@ -16,7 +18,8 @@ namespace Business.Concrete
 {
     public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService) : IBarberStoreService
     {
-        //[SecuredOperation("BarberStore.Add")]
+        [SecuredOperation("BarberStore")]
+        [LogAspect]
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Add(BarberStoreCreateDto dto, Guid currentUserId)
@@ -32,6 +35,8 @@ namespace Business.Concrete
             return new SuccessResult(Messages.StoreCreatedSuccess);
         }
 
+        [SecuredOperation("BarberStore")]
+        [LogAspect]
         [ValidationAspect(typeof(BarberStoreUpdateDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Update(BarberStoreUpdateDto dto, Guid currentUserId)
@@ -58,6 +63,8 @@ namespace Business.Concrete
             return new SuccessResult("Berber dükkanı başarıyla güncellendi.");
         }
 
+        [SecuredOperation("BarberStore")]
+        [LogAspect]
         public async Task<IResult> DeleteAsync(Guid storeId, Guid currentUserId)
         {
 
@@ -70,6 +77,7 @@ namespace Business.Concrete
             return new SuccessDataResult<BarberStoreDetail>(result);
         }
 
+        [SecuredOperation("BarberStore")]
         public async Task<IDataResult<List<BarberStoreMineDto>>> GetByCurrentUserAsync(Guid currentUserId)
         {
             var result = await barberStoreDal.GetMineStores(currentUserId);

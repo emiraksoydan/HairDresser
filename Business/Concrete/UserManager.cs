@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
 using Core.Utilities.Security.Hashing;
@@ -14,17 +15,89 @@ using DataAccess.Abstract;
 using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
+using Entities.Concrete.Enums;
 using Microsoft.Extensions.Configuration;
 using Core.Aspect.Autofac.Transaction;
 
 namespace Business.Concrete
 {
-    public class UserManager(IUserDal userDal, IPhoneService phoneService, ITokenHelper tokenHelper, IImageService imageService, IRefreshTokenService refreshTokenService, IRefreshTokenDal refreshTokenDal, IConfiguration configuration) : IUserService
+    public class UserManager(
+        IUserDal userDal, 
+        IPhoneService phoneService, 
+        ITokenHelper tokenHelper, 
+        IImageService imageService, 
+        IRefreshTokenService refreshTokenService, 
+        IRefreshTokenDal refreshTokenDal, 
+        IConfiguration configuration,
+        IOperationClaimDal operationClaimDal,
+        IUserOperationClaimService userOperationClaimService) : IUserService
     {
+        [LogAspect]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> Add(User user)
         {
             await userDal.Add(user);
+            
+            // Kullanıcıya UserType'a göre rol ata
+            await AssignRoleToUserAsync(user);
+            
             return new SuccessResult("Kullanıcı Eklendi");
+        }
+        
+        private async Task AssignRoleToUserAsync(User user)
+        {
+            var rolesToAssign = new List<string>();
+            
+            // Tüm kullanıcılara User rolü ver
+            rolesToAssign.Add("User");
+            
+            // UserType'a göre spesifik rol ver
+            switch (user.UserType)
+            {
+                case UserType.Customer:
+                    rolesToAssign.Add("Customer");
+                    break;
+                case UserType.FreeBarber:
+                    rolesToAssign.Add("FreeBarber");
+                    break;
+                case UserType.BarberStore:
+                    rolesToAssign.Add("BarberStore");
+                    break;
+            }
+            
+            // Kullanıcının mevcut rollerini kontrol et
+            var existingClaimsResult = await userOperationClaimService.GetClaimByUserId(user.Id);
+            var existingClaimIds = new HashSet<Guid>();
+            
+            if (existingClaimsResult.Success && existingClaimsResult.Data != null)
+            {
+                existingClaimIds = existingClaimsResult.Data.Select(uoc => uoc.OperationClaimId).ToHashSet();
+            }
+            
+            // Rolleri veritabanından bul ve ata
+            var userOperationClaims = new List<UserOperationClaim>();
+            
+            foreach (var roleName in rolesToAssign)
+            {
+                // Rolü veritabanından bul
+                var operationClaim = await operationClaimDal.Get(oc => oc.Name == roleName);
+                
+                if (operationClaim != null && !existingClaimIds.Contains(operationClaim.Id))
+                {
+                    userOperationClaims.Add(new UserOperationClaim
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        OperationClaimId = operationClaim.Id
+                    });
+                }
+            }
+            
+            // Rolleri ata (varsa)
+            if (userOperationClaims.Any())
+            {
+                await userOperationClaimService.AddUserOperationsClaim(userOperationClaims);
+            }
         }
         public async Task<IDataResult<User>> GetByPhone(string phoneNumber)
         {
@@ -69,6 +142,7 @@ namespace Business.Concrete
             return new SuccessDataResult<User>(user);
         }
 
+        [LogAspect]
         public async Task<IResult> Update(User user)
         {
             user.UpdatedAt = DateTime.UtcNow;
@@ -112,6 +186,7 @@ namespace Business.Concrete
             return new SuccessDataResult<UserProfileDto>(userProfile, "Kullanıcı bilgileri getirildi");
         }
 
+        [LogAspect]
         [ValidationAspect(typeof(UpdateUserDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<AccessToken>> UpdateProfile(UpdateUserDto dto, Guid currentUserId)

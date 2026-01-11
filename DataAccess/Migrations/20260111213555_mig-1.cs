@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialPostgreSQL : Migration
+    public partial class mig1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -187,6 +187,24 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "HelpGuides",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserType = table.Column<int>(type: "integer", nullable: false),
+                    Title = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: false),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HelpGuides", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Images",
                 columns: table => new
                 {
@@ -347,7 +365,8 @@ namespace DataAccess.Migrations
                         name: "FK_Users_Images_ImageId",
                         column: x => x.ImageId,
                         principalTable: "Images",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -530,6 +549,11 @@ namespace DataAccess.Migrations
                 columns: new[] { "IsAvailable", "Latitude", "Longitude" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_HelpGuides_UserType_IsActive_Order",
+                table: "HelpGuides",
+                columns: new[] { "UserType", "IsActive", "Order" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Images_ImageOwnerId",
                 table: "Images",
                 column: "ImageOwnerId");
@@ -634,6 +658,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "FreeBarbers");
+
+            migrationBuilder.DropTable(
+                name: "HelpGuides");
 
             migrationBuilder.DropTable(
                 name: "ManuelBarbers");

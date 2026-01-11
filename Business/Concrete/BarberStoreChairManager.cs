@@ -1,6 +1,7 @@
 
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Business;
@@ -18,6 +19,7 @@ namespace Business.Concrete
     public class BarberStoreChairManager(IBarberStoreChairDal barberStoreChairDal,IAppointmentService appointmentService, IMapper mapper) : IBarberStoreChairService
     {
 
+        [LogAspect]
         [ValidationAspect(typeof(BarberStoreChairCreateValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> AddAsync(BarberChairCreateDto dto)
@@ -49,6 +51,7 @@ namespace Business.Concrete
             await barberStoreChairDal.AddRange(list);
             return new SuccessResult();
         }
+        [LogAspect]
         [ValidationAspect(typeof(BarberStoreChairUpdateValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> UpdateAsync(BarberChairUpdateDto dto)
@@ -77,6 +80,7 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(hasAttempt);
         }
 
+        [LogAspect]
         public async Task<IResult> DeleteAsync(Guid id)
         {
             var chair = await barberStoreChairDal.Get(b => b.Id == id);

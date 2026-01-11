@@ -1,5 +1,7 @@
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Resources;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
@@ -42,6 +44,9 @@ namespace Business.Concrete
             _imageDal = imageDal;
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
+        [TransactionScopeAspect]
         public async Task<IDataResult<RatingGetDto>> CreateRatingAsync(Guid userId, CreateRatingDto dto)
         {
             // Appointment kontrolü - sadece Completed, Cancelled veya Unanswered appointment'ler için rating yapılabilir
@@ -210,6 +215,9 @@ namespace Business.Concrete
             return new SuccessDataResult<RatingGetDto>(dtoResult, Messages.RatingCreatedSuccess);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
+        [TransactionScopeAspect]
         public async Task<IDataResult<bool>> DeleteRatingAsync(Guid userId, Guid ratingId)
         {
             var rating = await _ratingDal.Get(x => x.Id == ratingId);
@@ -430,6 +438,8 @@ namespace Business.Concrete
             return new SuccessDataResult<List<RatingGetDto>>(dtos);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         public async Task<IDataResult<RatingGetDto>> GetMyRatingForAppointmentAsync(Guid userId, Guid appointmentId, Guid targetId)
         {
             // targetId Store ID, FreeBarber ID, Customer UserId veya ManuelBarber ID olabilir

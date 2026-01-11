@@ -1,5 +1,7 @@
 using Business.Abstract;
+using Business.BusinessAspect.Autofac;
 using Business.Resources;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Helpers;
 using Core.Utilities.Results;
@@ -53,6 +55,8 @@ namespace Business.Concrete
             _context = context;
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         [TransactionScopeAspect]
         public async Task<IDataResult<ToggleFavoriteResponseDto>> ToggleFavoriteAsync(Guid userId, ToggleFavoriteDto dto)
         {
@@ -304,6 +308,8 @@ namespace Business.Concrete
             }
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         public async Task<IDataResult<bool>> IsFavoriteAsync(Guid userId, Guid targetId)
         {
             // targetId Store ID, FreeBarber ID, Customer User ID veya ManuelBarber ID olabilir
@@ -341,6 +347,8 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(favorite != null);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
         public async Task<IDataResult<List<FavoriteGetDto>>> GetMyFavoritesAsync(Guid userId)
         {
             // Sadece aktif favorileri getir
@@ -639,6 +647,9 @@ namespace Business.Concrete
             return new SuccessDataResult<List<FavoriteGetDto>>(dtos);
         }
 
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
+        [LogAspect]
+        [TransactionScopeAspect]
         public async Task<IDataResult<bool>> RemoveFavoriteAsync(Guid userId, Guid targetId)
         {
             // targetId Store ID, FreeBarber ID, Customer User ID veya ManuelBarber ID olabilir

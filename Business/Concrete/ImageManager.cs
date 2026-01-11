@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
@@ -30,6 +31,7 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IResult> DeleteAsync(Guid id)
         {
@@ -148,6 +150,7 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        [LogAspect]
         public async Task<IDataResult<string>> UploadImageAsync(Microsoft.AspNetCore.Http.IFormFile file, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
         {
             // For User, ManuelBarber types, we replace the existing image instead of checking count
@@ -234,6 +237,7 @@ namespace Business.Concrete
             return new SuccessDataResult<string>(image.Id.ToString(), "Resim başarıyla yüklendi.");
         }
 
+        [LogAspect]
         public async Task<IDataResult<List<string>>> UploadImagesAsync(List<Microsoft.AspNetCore.Http.IFormFile> files, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
         {
             // Check image count limit

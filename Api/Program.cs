@@ -8,6 +8,7 @@ using Business.Abstract;
 using Business.DependencyResolvers.Autofac;
 using Core.DependencyResolvers;
 using Core.Extensions;
+using Core.Utilities.IoC;
 using Core.Utilities.Security.Encryption;
 using Core.Utilities.Security.JWT;
 using Core.Utilities.Security.PhoneSetting;
@@ -133,6 +134,8 @@ builder.Services.AddDependencyResolvers(new Core.Utilities.IoC.ICoreModule[]
     new CoreModule(),
 });
 
+// IHttpContextAccessor CoreModule'de zaten kayıtlı, burada eklemeye gerek yok
+
 builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory());
 builder.Host.ConfigureContainer<ContainerBuilder>(options =>
 {
@@ -166,6 +169,9 @@ builder.Services.AddSignalR(options =>
 
 
 var app = builder.Build();
+
+// Set ServiceTool.ServiceProvider for aspect classes (SecuredOperation, LogAspect)
+ServiceTool.ServiceProvider = app.Services;
 
 // Seed Categories
 // Configure the HTTP request pipeline.

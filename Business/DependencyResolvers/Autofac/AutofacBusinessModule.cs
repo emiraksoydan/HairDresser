@@ -83,8 +83,9 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfHelpGuideDal>().As<IHelpGuideDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfUserFcmTokenDal>().As<IUserFcmTokenDal>().InstancePerLifetimeScope();
 
-            // Register IHttpContextAccessor for SecuredOperation
-            builder.RegisterType<HttpContextAccessor>().As<IHttpContextAccessor>().SingleInstance();
+            // IHttpContextAccessor CoreModule'de ServiceCollection'a kayıtlı
+            // Autofac.Extensions.DependencyInjection ile otomatik olarak Autofac'e aktarılıyor
+            // Burada tekrar kaydetmeye gerek yok
 
             // Register Azure Blob Storage Service
             builder.RegisterType<BlobStorageService>().As<IBlobStorageService>().SingleInstance();

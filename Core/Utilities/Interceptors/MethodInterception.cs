@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Castle.DynamicProxy;
+using Microsoft.AspNetCore.Http;
+using Autofac;
 
 namespace Core.Utilities.Interceptors
 {
@@ -13,6 +10,21 @@ namespace Core.Utilities.Interceptors
         protected virtual void OnAfter(IInvocation invocation) { }
         protected virtual void OnException(IInvocation invocation, System.Exception e) { }
         protected virtual void OnSuccess(IInvocation invocation) { }
+        
+        /// <summary>
+        /// Resolves IHttpContextAccessor from Autofac container via AspectInterceptorSelector
+        /// This avoids static properties by using the container directly
+        /// </summary>
+        protected IHttpContextAccessor? GetHttpContextAccessor()
+        {
+            var lifetimeScope = AspectInterceptorSelector.LifetimeScope;
+            if (lifetimeScope != null && lifetimeScope.TryResolve<IHttpContextAccessor>(out var httpContextAccessor))
+            {
+                return httpContextAccessor;
+            }
+            return null;
+        }
+        
         public override void Intercept(IInvocation invocation)
         {
             var isSuccess = true;
