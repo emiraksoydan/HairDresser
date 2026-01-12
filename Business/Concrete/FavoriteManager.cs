@@ -80,7 +80,7 @@ namespace Business.Concrete
 
                 // Randevu sayfasından geliyorsa, sadece Completed veya Cancelled olmalı
                 if (appointment.Status != AppointmentStatus.Completed && appointment.Status != AppointmentStatus.Cancelled && appointment.Status != AppointmentStatus.Rejected && appointment.Status != AppointmentStatus.Unanswered)
-                    return new ErrorDataResult<ToggleFavoriteResponseDto>("Randevu sayfasından favorileme için randevunuzun sonuçlanması gerekir.");
+                    return new ErrorDataResult<ToggleFavoriteResponseDto>(Messages.AppointmentMustBeCompletedForFavorite);
             }
 
             // FavoritedToId belirleme:
@@ -678,15 +678,15 @@ namespace Business.Concrete
             }
             
             if (favoritedToId == Guid.Empty)
-                return new ErrorDataResult<bool>("Favori bulunamadı.");
+                return new ErrorDataResult<bool>(Messages.FavoriteNotFound);
             
             // FavoritedToId'ye göre kontrol et (Store ID veya User ID)
             var favorite = await _favoriteDal.Get(x => x.FavoritedFromId == userId && x.FavoritedToId == favoritedToId);
             if (favorite == null)
-                return new ErrorDataResult<bool>("Favori bulunamadı.");
+                return new ErrorDataResult<bool>(Messages.FavoriteNotFound);
 
             await _favoriteDal.Remove(favorite);
-            return new SuccessDataResult<bool>(true, "Favoriden çıkarıldı.");
+            return new SuccessDataResult<bool>(true, Messages.FavoriteRemovedSuccess);
         }
     }
 }

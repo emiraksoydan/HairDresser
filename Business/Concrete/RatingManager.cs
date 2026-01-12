@@ -130,7 +130,7 @@ namespace Business.Concrete
             // ManuelBarber için: TargetId = ManuelBarber ID
             var existingRating = await _ratingDal.Get(x => x.AppointmentId == dto.AppointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (existingRating != null)
-                return new ErrorDataResult<RatingGetDto>("Bu randevu için bu hedefe zaten değerlendirme yaptınız. Değerlendirme güncellenemez.");
+                return new ErrorDataResult<RatingGetDto>(Messages.RatingAlreadyExists);
 
             // RatedFromId artık her zaman userId
             // RatedFrom bilgilerini kullanıcı tipine göre belirle
@@ -222,20 +222,20 @@ namespace Business.Concrete
         {
             var rating = await _ratingDal.Get(x => x.Id == ratingId);
             if (rating == null)
-                return new ErrorDataResult<bool>("Değerlendirme bulunamadı.");
+                return new ErrorDataResult<bool>(Messages.RatingNotFound);
 
             if (rating.RatedFromId != userId)
                 return new ErrorDataResult<bool>(Messages.Unauthorized);
 
             await _ratingDal.Remove(rating);
-            return new SuccessDataResult<bool>(true, "Değerlendirme silindi.");
+            return new SuccessDataResult<bool>(true, Messages.RatingDeletedSuccess);
         }
 
         public async Task<IDataResult<RatingGetDto>> GetRatingByIdAsync(Guid ratingId)
         {
             var rating = await _ratingDal.Get(x => x.Id == ratingId);
             if (rating == null)
-                return new ErrorDataResult<RatingGetDto>("Değerlendirme bulunamadı.");
+                return new ErrorDataResult<RatingGetDto>(Messages.RatingNotFound);
 
             var ratedFromUser = await _userDal.Get(x => x.Id == rating.RatedFromId);
             var dto = new RatingGetDto
@@ -468,7 +468,7 @@ namespace Business.Concrete
             }
             
             if (targetIdForRating == Guid.Empty)
-                return new ErrorDataResult<RatingGetDto>(null, "Hedef bulunamadı.");
+                return new ErrorDataResult<RatingGetDto>(null, Messages.TargetNotFound);
             
             // Rating'i getir
             // Store için: TargetId = Store ID
@@ -476,7 +476,7 @@ namespace Business.Concrete
             // ManuelBarber için: TargetId = ManuelBarber ID
             var rating = await _ratingDal.Get(x => x.AppointmentId == appointmentId && x.TargetId == targetIdForRating && x.RatedFromId == userId);
             if (rating == null)
-                return new ErrorDataResult<RatingGetDto>(null, "Değerlendirme bulunamadı.");
+                return new ErrorDataResult<RatingGetDto>(null, Messages.RatingNotFound);
 
             // RatedFromId artık her zaman User ID
             var ratedFromUser = await _userDal.Get(x => x.Id == userId);

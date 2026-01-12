@@ -1,4 +1,5 @@
 using Business.Abstract;
+using Business.Resources;
 using Core.Extensions;
 using Entities.Concrete.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -24,7 +25,7 @@ namespace Api.Controllers
             // UserType enum değerini kontrol et
             if (!Enum.IsDefined(typeof(UserType), userType))
             {
-                return BadRequest(new { success = false, message = "Geçersiz kullanıcı tipi." });
+                return BadRequest(new { success = false, message = Messages.InvalidUserType });
             }
 
             var result = await _helpGuideService.GetActiveByUserTypeAsync(userType);

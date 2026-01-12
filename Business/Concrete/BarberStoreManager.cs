@@ -60,7 +60,7 @@ namespace Business.Concrete
             await _serviceOfferingService.UpdateRange(dto.Offerings);
             await workingHourService.UpdateRangeAsync(dto.WorkingHours);
 
-            return new SuccessResult("Berber dükkanı başarıyla güncellendi.");
+            return new SuccessResult(Messages.BarberStoreUpdatedSuccess);
         }
 
         [SecuredOperation("BarberStore")]
@@ -87,13 +87,13 @@ namespace Business.Concrete
         public async Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance, Guid? currentUserId = null)
         {
             var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
-            return new SuccessDataResult<List<BarberStoreGetDto>>(result, "1 Kilometreye sınırdaki berberler getirildi");
+            return new SuccessDataResult<List<BarberStoreGetDto>>(result, Messages.NearbyBarbersRetrieved);
         }
 
         public async Task<IDataResult<List<BarberStoreGetDto>>> GetFilteredStoresAsync(FilterRequestDto filter)
         {
             var result = await barberStoreDal.GetFilteredStoresAsync(filter);
-            return new SuccessDataResult<List<BarberStoreGetDto>>(result, "Filtrelenmiş berber dükkanları getirildi");
+            return new SuccessDataResult<List<BarberStoreGetDto>>(result, Messages.FilteredBarberStoresRetrieved);
         }
 
         public async Task<IDataResult<BarberStoreMineDto>> GetBarberStoreForUsers(Guid storeId)

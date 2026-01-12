@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
+using Core.Abstract;
 using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
@@ -44,6 +45,9 @@ namespace Business.Concrete
 
         private const int StoreSelectionTotalMinutes = 30;
         private const int StoreSelectionStepMinutes = 5;
+
+        // NOT: ProcessBadgeUpdatesAfterCommit() kaldırıldı
+        // TransactionScopeAspect artık transaction commit sonrası otomatik olarak badge update'leri çalıştırıyor
 
         // ---------------- QUICK CHECKS ----------------
 
@@ -193,8 +197,7 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -267,8 +270,7 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
             
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
             
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -354,8 +356,7 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, freeBarberUserId);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -434,8 +435,7 @@ namespace Business.Concrete
 
             await FinalizeAppointmentCreationAsync(appt, serviceOfferingIds: null, storeOwnerUserId);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<Guid>(appt.Id);
         }
@@ -463,10 +463,10 @@ namespace Business.Concrete
 
             // Sadece Customer -> FreeBarber randevusu olmalı (StoreSelectionType.StoreSelection)
             if (appt.StoreSelectionType != StoreSelectionType.StoreSelection)
-                return new ErrorDataResult<bool>(false, "Bu randevuya dükkan eklenemez.");
+                return new ErrorDataResult<bool>(false, Messages.AppointmentCannotAddStore);
 
             if (appt.CustomerUserId == null || appt.BarberStoreUserId != null)
-                return new ErrorDataResult<bool>(false, "Bu randevuya d├╝kkan eklenemez.");
+                return new ErrorDataResult<bool>(false, Messages.AppointmentCannotAddStore);
 
             // Randevu hala pending olmal─▒
             if (appt.Status != AppointmentStatus.Pending)
@@ -549,8 +549,7 @@ namespace Business.Concrete
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -752,8 +751,7 @@ namespace Business.Concrete
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                // Transaction commit sonrası badge update'leri çalıştır
-                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                 return new SuccessDataResult<bool>(true);
             }
@@ -779,8 +777,7 @@ namespace Business.Concrete
                 // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                // Transaction commit sonrası badge update'leri çalıştır
-                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                 return new SuccessDataResult<bool>(true);
             }
@@ -790,8 +787,7 @@ namespace Business.Concrete
             // Decision g├╝ncellendi─şinde ilgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -818,27 +814,27 @@ namespace Business.Concrete
                 var now = DateTime.UtcNow;
                 var overallExpiresAt = appt.CreatedAt.AddMinutes(StoreSelectionTotalMinutes);
                 if (approve)
-                    return new ErrorDataResult<bool>(false, "Bu randevuda serbest berber onay ad─▒m─▒ yok. D├╝kkan se├ğimi bekleniyor.");
+                    return new ErrorDataResult<bool>(false, Messages.FreeBarberApprovalStepNotAvailable);
 
-                // M├╝┼şteri onay verdiyse art─▒k free barber reddedemez
+                // Müşteri onay verdiyse artık free barber reddedemez
                 if (appt.CustomerDecision == DecisionStatus.Approved)
-                    return new ErrorDataResult<bool>(false, "M├╝┼şteri onay verdi─şi i├ğin bu randevu art─▒k reddedilemez.");
+                    return new ErrorDataResult<bool>(false, Messages.CannotRejectAfterCustomerApproval);
 
-                // Randevu tamam─▒ Approved olduysa red edemez
+                // Randevu tamamı Approved olduysa red edemez
                 if (appt.Status == AppointmentStatus.Approved)
-                    return new ErrorDataResult<bool>(false, "Randevu onayland─▒, art─▒k red edemezsiniz.");
+                    return new ErrorDataResult<bool>(false, Messages.CannotRejectAfterApproval);
 
                 // Randevu iptal olduysa red edemez
                 if (appt.Status == AppointmentStatus.Cancelled)
-                    return new ErrorDataResult<bool>(false, "Randevu iptal edildi, art─▒k red edemezsiniz.");
+                    return new ErrorDataResult<bool>(false, Messages.CannotRejectAfterCancellation);
 
-                // Randevu tamamland─▒ysa red edemez
+                // Randevu tamamlandıysa red edemez
                 if (appt.Status == AppointmentStatus.Completed)
-                    return new ErrorDataResult<bool>(false, "Randevu tamamland─▒, art─▒k red edemezsiniz.");
+                    return new ErrorDataResult<bool>(false, Messages.CannotRejectAfterCompletion);
 
-                // 30 dakika dolmad─▒ysa red edebilir (FreeBarberDecision durumuna bakmadan)
+                // 30 dakika dolmadıysa red edebilir (FreeBarberDecision durumuna bakmadan)
                 if (now > overallExpiresAt)
-                    return new ErrorDataResult<bool>(false, "Reddetme s├╝resi doldu.");
+                    return new ErrorDataResult<bool>(false, Messages.RejectionTimeoutExpired);
             }
             else
             {
@@ -858,11 +854,11 @@ namespace Business.Concrete
                 if (appt.StoreSelectionType == StoreSelectionType.StoreSelection &&
                     appt.CustomerUserId.HasValue)
                 {
-                    // 30 dakikal─▒k s├╝re dolmad─▒─ş─▒n─▒ kontrol et (opsiyonel g├╝venlik kontrol├╝)
+                    // 30 dakikalık süre dolmadığını kontrol et (opsiyonel güvenlik kontrolü)
                     var now = DateTime.UtcNow;
                     var overallExpiresAt = appt.CreatedAt.AddMinutes(StoreSelectionTotalMinutes);
                     if (now > overallExpiresAt)
-                        return new ErrorDataResult<bool>(false, "Reddetme s├╝resi doldu.");
+                        return new ErrorDataResult<bool>(false, Messages.RejectionTimeoutExpired);
 
                     appt.Status = AppointmentStatus.Rejected;
                     appt.PendingExpiresAt = null;
@@ -902,8 +898,7 @@ namespace Business.Concrete
                     // SignalR ile bildir
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                    // Transaction commit sonrası badge update'leri çalıştır
-                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                    // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                     return new SuccessDataResult<bool>(true);
                 }
@@ -943,8 +938,7 @@ namespace Business.Concrete
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                    // Transaction commit sonrası badge update'leri çalıştır
-                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                    // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                     return new SuccessDataResult<bool>(true);
                 }
@@ -1018,8 +1012,7 @@ namespace Business.Concrete
                 // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                // Transaction commit sonrası badge update'leri çalıştır
-                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                 return new SuccessDataResult<bool>(true);
             }
@@ -1043,8 +1036,7 @@ namespace Business.Concrete
                 // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir (aktif tab'da g├Âr├╝nmesi i├ğin)
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                // Transaction commit sonrası badge update'leri çalıştır
-                await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                 return new SuccessDataResult<bool>(true);
             }
@@ -1053,8 +1045,7 @@ namespace Business.Concrete
             // Decision g├╝ncellendi─şinde ilgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1090,9 +1081,9 @@ namespace Business.Concrete
                 appt.FreeBarberUserId.HasValue &&
                 !appt.BarberStoreUserId.HasValue)
             {
-                // FreeBarber onaylam─▒┼ş olmal─▒
+                // FreeBarber onaylamış olmalı
                 if (appt.FreeBarberDecision != DecisionStatus.Approved)
-                    return new ErrorDataResult<bool>(false, "Serbest berber onay─▒ bekleniyor.");
+                    return new ErrorDataResult<bool>(false, Messages.FreeBarberApprovalPending);
 
                 appt.CustomerDecision = approve ? DecisionStatus.Approved : DecisionStatus.Rejected;
                 appt.UpdatedAt = DateTime.UtcNow;
@@ -1116,8 +1107,7 @@ namespace Business.Concrete
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                    // Transaction commit sonrası badge update'leri çalıştır
-                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                    // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                     return new SuccessDataResult<bool>(true);
                 }
@@ -1142,20 +1132,19 @@ namespace Business.Concrete
                     await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                    // Transaction commit sonrası badge update'leri çalıştır
-                    await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+                    // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
                     return new SuccessDataResult<bool>(true);
                 }
             }
 
-            // StoreSelection (D├╝kkan Se├ğ) senaryosu - 3'l├╝ sistem
+            // StoreSelection (Dükkan Seç) senaryosu - 3'lü sistem
             if (!appt.FreeBarberUserId.HasValue || !appt.BarberStoreUserId.HasValue)
-                return new ErrorDataResult<bool>(false, "Bu randevu i├ğin m├╝┼şteri karar─▒ verilemez.");
+                return new ErrorDataResult<bool>(false, Messages.CustomerDecisionNotAllowed);
 
-            // Store onaylam─▒┼ş olmal─▒
+            // Store onaylamış olmalı
             if (appt.StoreDecision != DecisionStatus.Approved)
-                return new ErrorDataResult<bool>(false, "D├╝kkan onay─▒ bekleniyor.");
+                return new ErrorDataResult<bool>(false, Messages.StoreApprovalPending);
 
             // Customer karar adımında (StoreApprovedSelection notification) PendingExpiresAt daha sonra değişebilir.
             // Bu yüzden mevcut değeri saklıyoruz; reject senaryosunda customer'ın action notification'ını doğru güncellemek için kullanacağız.
@@ -1231,8 +1220,7 @@ namespace Business.Concrete
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1304,8 +1292,7 @@ namespace Business.Concrete
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1408,8 +1395,7 @@ namespace Business.Concrete
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1434,7 +1420,7 @@ namespace Business.Concrete
 
             // Pending veya Approved durumundaki randevular silinemez
             if (appt.Status == AppointmentStatus.Pending || appt.Status == AppointmentStatus.Approved)
-                return new ErrorDataResult<bool>(false, "Pending veya Approved durumundaki randevular silinemez");
+                return new ErrorDataResult<bool>(false, Messages.CannotDeletePendingOrApproved);
 
             // Kullanıcının tipine göre ilgili soft delete flag'ini true yap
             if (appt.CustomerUserId == userId)
@@ -1527,8 +1513,7 @@ namespace Business.Concrete
             // Appointment güncellemesini bildir (kullanıcı için)
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -1545,7 +1530,7 @@ namespace Business.Concrete
                 (x.FreeBarberUserId == userId && !x.IsDeletedByFreeBarberUserId));
 
             if (appointments == null || !appointments.Any())
-                return new ErrorDataResult<bool>(false, "Silinecek randevu bulunamadı.");
+                return new ErrorDataResult<bool>(false, Messages.AppointmentNotFoundForDelete);
 
             var appointmentsToDelete = new List<Appointment>();
             var cannotDeleteCount = 0;
@@ -1580,11 +1565,11 @@ namespace Business.Concrete
 
             if (!appointmentsToDelete.Any() && cannotDeleteCount > 0)
             {
-                return new ErrorDataResult<bool>(false, $"Hiçbir randevu silinemedi. {cannotDeleteCount} adet randevu Pending veya Approved durumunda.");
+                return new ErrorDataResult<bool>(false, string.Format(Messages.NoAppointmentsDeleted, cannotDeleteCount));
             }
             else if (!appointmentsToDelete.Any() && cannotDeleteCount == 0)
             {
-                return new ErrorDataResult<bool>(false, "Silinecek randevu bulunamadı.");
+                return new ErrorDataResult<bool>(false, Messages.AppointmentNotFoundForDelete);
             }
 
             // Soft delete flag'lerini güncelle
@@ -1701,8 +1686,7 @@ namespace Business.Concrete
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
             }
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -2183,6 +2167,10 @@ namespace Business.Concrete
                     await threadDal.Update(thread);
 
                     // Her katılımcı için badge güncellemesi yap (unread count değişti)
+                    foreach (var userId in participants)
+                    {
+                        badgeUpdateService.ScheduleBadgeUpdate(userId);
+                    }
 
                     // T├╝m kat─▒l─▒mc─▒lara thread kald─▒r─▒ld─▒─ş─▒n─▒ bildir
                     foreach (var userId in participants)

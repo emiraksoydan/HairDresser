@@ -302,8 +302,15 @@ namespace Business.Concrete
 
         private async Task<IDataResult<AccessToken>> CreateAccessAndRefreshAsync(User user, string? ip, string? device, Guid? familyId)
         {
-            var claims = await userService.GetClaims(user);
-            var access = tokenHelper.CreateToken(user, claims.Data);
+            // Kullanıcıyı veritabanından yeniden yükle (role'lerin atandığından emin olmak için)
+            var refreshedUser = await userService.GetById(user.Id);
+            if (refreshedUser.Data == null)
+            {
+                return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı.");
+            }
+            
+            var claims = await userService.GetClaims(refreshedUser.Data);
+            var access = tokenHelper.CreateToken(refreshedUser.Data, claims.Data);
             
             // Get refresh token expiration from configuration (default: 30 days)
             var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
@@ -312,7 +319,7 @@ namespace Business.Concrete
             var entity = new RefreshToken
             {
                 Id = Guid.NewGuid(),
-                UserId = user.Id,
+                UserId = refreshedUser.Data.Id,
                 TokenHash = rt.Hash,
                 TokenSalt = rt.Salt,
                 Fingerprint = rt.Fingerprint,

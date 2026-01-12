@@ -159,6 +159,68 @@ namespace Business.Resources
         public const string FavoriteNotFound = "Favori bulunamadı.";
         public const string CannotFavoriteYourself = "Kendi kendinizi favorilere ekleyemezsiniz.";
         public const string TargetUserNotFound = "Hedef kullanıcı bulunamadı.";
+        public const string AppointmentMustBeCompletedForFavorite = "Randevu sayfasından favorileme için randevunuzun sonuçlanması gerekir.";
+        
+        // Appointment Additional Messages
+        public const string AppointmentCannotAddStore = "Bu randevuya dükkan eklenemez.";
+        public const string FreeBarberApprovalStepNotAvailable = "Bu randevuda serbest berber onay adımı yok. Dükkan seçimi bekleniyor.";
+        public const string CannotRejectAfterApproval = "Randevu onaylandı, artık red edemezsiniz.";
+        public const string CannotRejectAfterCancellation = "Randevu iptal edildi, artık red edemezsiniz.";
+        public const string CannotRejectAfterCompletion = "Randevu tamamlandı, artık red edemezsiniz.";
+        public const string RejectionTimeoutExpired = "Reddetme süresi doldu.";
+        public const string FreeBarberApprovalPending = "Serbest berber onayı bekleniyor.";
+        public const string CustomerDecisionNotAllowed = "Bu randevu için müşteri kararı verilemez.";
+        public const string StoreApprovalPending = "Dükkan onayı bekleniyor.";
+        public const string CannotDeletePendingOrApproved = "Pending veya Approved durumundaki randevular silinemez";
+        public const string AppointmentNotFoundForDelete = "Silinecek randevu bulunamadı.";
+        public const string NoAppointmentsDeleted = "Hiçbir randevu silinemedi. {0} adet randevu Pending veya Approved durumunda.";
+        
+        // Rating Additional Messages
+        public const string RatingAlreadyExists = "Bu randevu için bu hedefe zaten değerlendirme yaptınız. Değerlendirme güncellenemez.";
+        public const string TargetNotFound = "Hedef bulunamadı.";
+        
+        // Chat Additional Messages
+        public const string MessageRequiresActiveAppointmentOrFavorite = "Mesaj göndermek için randevu aktif olmalı veya karşılıklı favori olmalısınız.";
+        public const string MethodOnlyForFavoriteThreads = "Bu metod sadece favori thread'ler için kullanılabilir";
+        public const string FavoriteNotActive = "Favori aktif değil, mesaj gönderilemez";
+        public const string FavoriteNotActiveForMessages = "Favori aktif değil";
+        
+        // FreeBarber Additional Messages
+        public const string FreeBarberPortalCreatedSuccess = "Serbest berber portalı başarıyla oluşturuldu.";
+        public const string FreeBarberUpdatedSuccess = "Serbest berber güncellendi.";
+        public const string FreeBarberDeletedSuccess = "Serbest berber silindi.";
+        public const string BarberNotFound = "Berber bulunamadı";
+        public const string LocationUpdatedSuccess = "Konum başarıyla güncellendi";
+        public const string PanelGetFailed = "Panel getirilemedi";
+        public const string FilteredFreeBarbersRetrieved = "Filtrelenmiş serbest berberler getirildi";
+        public const string PanelDetailGetFailed = "Panel detayı getirilemedi";
+        
+        // BarberStore Additional Messages
+        public const string BarberStoreUpdatedSuccess = "Berber dükkanı başarıyla güncellendi.";
+        public const string StoreDeletedSuccess = "Dükkan silindi.";
+        public const string NearbyBarbersRetrieved = "1 Kilometreye sınırdaki berberler getirildi";
+        public const string FilteredBarberStoresRetrieved = "Filtrelenmiş berber dükkanları getirildi";
+        
+        // Category Messages
+        public const string CategoryAddedSuccess = "Kategori Eklendi";
+        public const string CategoryDeletedSuccess = "Kategori Silindi";
+        public const string MainCategoriesRetrieved = "Ana kategoriler getirildi";
+        public const string SubCategoriesRetrieved = "Alt kategoriler getirildi";
+        
+        // Image Messages
+        public const string ImageOwnerIdRequired = "Resim sahibi ID'si boş olamaz";
+        public const string ImageIdRequired = "Resim ID'si boş olamaz";
+        
+        // HelpGuide Messages
+        public const string InvalidUserType = "Geçersiz kullanıcı tipi.";
+        
+        // Chat Default Names
+        public const string BarberDefaultName = "Berber";
+        public const string FreeBarberDefaultName = "Serbest Berber";
+        public const string UserDefaultName = "Kullanıcı";
+        
+        // Additional Appointment Messages
+        public const string CannotRejectAfterCustomerApproval = "Müşteri onay verdiği için bu randevu artık reddedilemez.";
     }
 }
 

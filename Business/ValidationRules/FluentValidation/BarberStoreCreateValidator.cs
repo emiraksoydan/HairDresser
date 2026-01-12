@@ -1,4 +1,4 @@
-﻿using Entities.Concrete.Dto;
+using Entities.Concrete.Dto;
 using Entities.Concrete.Enums;
 using FluentValidation;
 using System.Globalization;
@@ -135,35 +135,7 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
                     .WithMessage("Başlangıç saati bitiş saatinden küçük olmalı.")
                     .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
 
-                c.RuleFor(w => w)
-          .Must(w =>
-          {
-              if (!TryParseHHmm(w.StartTime, out var s)) return false;
-              if (!TryParseHHmm(w.EndTime, out var e)) return false;
-
-              var minutes = (e - s).TotalMinutes;
-              return minutes > 0 && minutes % 60 == 0;
-          })
-          .WithMessage("Çalışma aralığı 1 saatlik slotlara tam bölünebilmeli.")
-          .When(w => IsHHmm(w.StartTime) && IsHHmm(w.EndTime));
-
-                // 6–18 saat aralığı
-                c.RuleFor(w => w)
-                    .Must(w =>
-                    {
-                        TryParseHHmm(w.StartTime, out var s);
-                        TryParseHHmm(w.EndTime, out var e);
-                        var hours = (e - s).TotalHours;
-                        return hours >= 6 && hours <= 18;
-                    })
-                    .WithMessage("Çalışma süresi en az 6 ve en fazla 18 saat olmalı.")
-                    .When(w =>
-                    {
-                        if (!IsHHmm(w.StartTime) || !IsHHmm(w.EndTime)) return false;
-                        TryParseHHmm(w.StartTime, out var s);
-                        TryParseHHmm(w.EndTime, out var e);
-                        return s < e;
-                    });
+                // 1 saatlik slot kontrolü ve minimum/maksimum saat kontrolleri kaldırıldı
             });
 
 

@@ -1,4 +1,5 @@
 using Business.Abstract;
+using Business.Resources;
 using Entities.Concrete.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +19,7 @@ namespace Api.Controllers
             // Validate ownerId is not empty
             if (ownerId == Guid.Empty)
             {
-                return BadRequest(new { success = false, message = "Resim sahibi ID'si boş olamaz" });
+                return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
             }
             
             var result = await imageService.UploadImageAsync(file, ownerType, ownerId);
@@ -34,7 +35,7 @@ namespace Api.Controllers
             // Validate ownerId is not empty
             if (ownerId == Guid.Empty)
             {
-                return BadRequest(new { success = false, message = "Resim sahibi ID'si boş olamaz" });
+                return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
             }
             
             var result = await imageService.UploadImagesAsync(files, ownerType, ownerId);
@@ -79,7 +80,7 @@ namespace Api.Controllers
         {
             if (imageId == Guid.Empty)
             {
-                return BadRequest(new { success = false, message = "Resim ID'si boş olamaz" });
+                return BadRequest(new { success = false, message = Messages.ImageIdRequired });
             }
 
             var result = await imageService.UpdateImageBlobAsync(imageId, file);

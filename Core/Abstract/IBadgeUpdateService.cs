@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Business.Abstract
+namespace Core.Abstract
 {
     /// <summary>
     /// Transaction commit sonrası badge update'leri yönetmek için service
@@ -19,4 +19,3 @@ namespace Business.Abstract
         Task ProcessScheduledBadgeUpdatesAsync();
     }
 }
-

@@ -15,7 +15,6 @@ namespace Business.Concrete
 {
     public class UserOperationClaimManager(IUserOperationClaimDal userOperationClaimDal) : IUserOperationClaimService
     {
-        [SecuredOperation("Admin")]
         [LogAspect]
         public async Task<IDataResult<List<UserOperationClaim>>> AddUserOperationsClaim(List<UserOperationClaim> userOperationClaims)
         {

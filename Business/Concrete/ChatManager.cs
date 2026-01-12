@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
+using Core.Abstract;
 using Business.Helpers;
 using Business.Resources;
 using Core.Aspect.Autofac.Logging;
@@ -84,7 +85,7 @@ namespace Business.Concrete
             }
 
             if (!canSendMessage)
-                return new ErrorDataResult<ChatMessageDto>("Mesaj göndermek için randevu aktif olmalı veya karşılıklı favori olmalısınız.");
+                return new ErrorDataResult<ChatMessageDto>(Messages.MessageRequiresActiveAppointmentOrFavorite);
 
             // Performance: Use Get instead of GetAll().FirstOrDefault()
             var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
@@ -161,8 +162,7 @@ namespace Business.Concrete
             // Thread güncellemesini tüm katılımcılara push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
             await PushAppointmentThreadUpdatedAsync(appointmentId);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
@@ -199,9 +199,9 @@ namespace Business.Concrete
 
             await threadDal.Update(thread);
 
-            // Badge count güncellemesi - okundu işaretleyen kullanıcı için
-            var badges = await badgeSvc.GetCountsAsync(userId);
-            if (badges.Success) await realtime.PushBadgeAsync(userId, badges.Data);
+            // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
+            // TransactionScopeAspect transaction commit sonrası otomatik olarak badge update'leri çalıştıracak
+            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -229,7 +229,7 @@ namespace Business.Concrete
             // Mevcut kullanıcının UserType'ını al
             var currentUser = await userDal.Get(u => u.Id == userId);
             if (currentUser == null)
-                return new ErrorDataResult<List<ChatThreadListItemDto>>("Kullanıcı bulunamadı");
+                return new ErrorDataResult<List<ChatThreadListItemDto>>(Messages.UserNotFound);
             var currentUserType = currentUser.UserType;
 
             // Mevcut kullanıcının profil resmini al
@@ -809,7 +809,7 @@ namespace Business.Concrete
             }
 
             if (!isFavoriteActive)
-                return new ErrorDataResult<ChatMessageDto>("Favori aktif değil, mesaj gönderilemez");
+                return new ErrorDataResult<ChatMessageDto>(Messages.FavoriteNotActive);
 
             var msg = new ChatMessage
             {
@@ -868,8 +868,7 @@ namespace Business.Concrete
             // EnsureFavoriteThreadAsync mantığını kullanarak thread detaylarını oluştur ve push et
             await PushFavoriteThreadUpdatedAsync(fromUserId, toUserId, thread.Id);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
@@ -913,8 +912,7 @@ namespace Business.Concrete
             // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
             badgeUpdateService.ScheduleBadgeUpdate(userId);
 
-            // Transaction commit sonrası badge update'leri çalıştır
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
+            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
         }
@@ -997,7 +995,7 @@ namespace Business.Concrete
                 }
 
                 if (!isFavoriteActive)
-                    return new ErrorDataResult<List<ChatMessageItemDto>>("Favori aktif değil");
+                    return new ErrorDataResult<List<ChatMessageItemDto>>(Messages.FavoriteNotActiveForMessages);
             }
 
             if (!isParticipant) return new ErrorDataResult<List<ChatMessageItemDto>>(Messages.NotAParticipant);
@@ -1029,7 +1027,7 @@ namespace Business.Concrete
                 var toUser = await userDal.Get(u => u.Id == toUserId);
 
                 if (fromUser == null || toUser == null)
-                    return new ErrorDataResult<Guid>("Kullanıcı bulunamadı");
+                    return new ErrorDataResult<Guid>(Messages.UserNotFound);
 
                 thread = new ChatThread
                 {
@@ -1741,12 +1739,12 @@ namespace Business.Concrete
                 else if (user.UserType == UserType.BarberStore)
                 {
                     var store = await barberStoreDal.Get(x => x.BarberStoreOwnerId == userId);
-                    userName = store?.StoreName ?? "Berber";
+                    userName = store?.StoreName ?? Messages.BarberDefaultName;
                 }
                 else if (user.UserType == UserType.FreeBarber)
                 {
                     var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == userId);
-                    userName = freeBarber != null ? $"{freeBarber.FirstName} {freeBarber.LastName}" : "Serbest Berber";
+                    userName = freeBarber != null ? $"{freeBarber.FirstName} {freeBarber.LastName}" : Messages.FreeBarberDefaultName;
                 }
             }
 
@@ -1762,7 +1760,7 @@ namespace Business.Concrete
 
             foreach (var participantId in participants.Distinct())
             {
-                await realtime.PushChatTypingAsync(participantId, threadId, userId, userName ?? "Kullanıcı", isTyping);
+                await realtime.PushChatTypingAsync(participantId, threadId, userId, userName ?? Messages.UserDefaultName, isTyping);
             }
 
             return new SuccessDataResult<bool>(true);

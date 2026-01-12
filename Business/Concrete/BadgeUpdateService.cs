@@ -1,4 +1,5 @@
 using Business.Abstract;
+using Core.Abstract;
 using Core.Utilities.Results;
 using Entities.Concrete.Dto;
 using System;
@@ -52,12 +53,13 @@ namespace Business.Concrete
             }
 
             // Her kullanıcı için badge update yap
-            foreach (var userId in userIdsToUpdate)
+            // Paralel işleme ile performansı artır (aynı anda birden fazla kullanıcı için badge update)
+            var updateTasks = userIdsToUpdate.Select(async userId =>
             {
                 try
                 {
                     var badges = await _badgeService.GetCountsAsync(userId);
-                    if (badges.Success)
+                    if (badges.Success && badges.Data != null)
                     {
                         await _realtime.PushBadgeAsync(userId, badges.Data);
                     }
@@ -67,7 +69,10 @@ namespace Business.Concrete
                     // Badge güncellemesi başarısız olursa devam et, kritik değil
                     // Loglama eklenebilir
                 }
-            }
+            });
+
+            // Tüm badge update'leri paralel olarak çalıştır
+            await Task.WhenAll(updateTasks);
         }
     }
 }

@@ -41,7 +41,7 @@ namespace Business.Concrete
             entity.FreeBarberUserId = currentUserId;
             await freeBarberDal.Add(entity);
             await SaveOfferingsAsync(freeBarberCreateDto, entity.Id);
-            return new SuccessResult("Serbest berber portalı başarıyla oluşturuldu.");
+            return new SuccessResult(Messages.FreeBarberPortalCreatedSuccess);
         }
         [SecuredOperation("FreeBarber")]
         [LogAspect]
@@ -67,7 +67,7 @@ namespace Business.Concrete
         public async Task<IResult> DeleteAsync(Guid storeId)
         {
 
-            return new SuccessResult("Serbest berber silindi.");
+            return new SuccessResult(Messages.FreeBarberDeletedSuccess);
         }
 
         [SecuredOperation("FreeBarber")]
@@ -79,14 +79,14 @@ namespace Business.Concrete
             // FreeBarber'ı CurrentUserId ile bul (Id yerine)
             var getBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
             if (getBarber == null)
-                return new ErrorResult("Berber bulunamadı");
+                return new ErrorResult(Messages.BarberNotFound);
 
             getBarber.Latitude = dto.Latitude;
             getBarber.Longitude = dto.Longitude;
 
             await freeBarberDal.Update(getBarber);
 
-            return new SuccessResult("Konum başarıyla güncellendi");
+            return new SuccessResult(Messages.LocationUpdatedSuccess);
 
         }
         [SecuredOperation("FreeBarber")]
@@ -94,7 +94,7 @@ namespace Business.Concrete
         {
             var result = await freeBarberDal.GetMyPanel(currentUserId);
             if (result == null) {
-                return new ErrorDataResult<FreeBarberMinePanelDto>("Panel getirilemedi");
+                return new ErrorDataResult<FreeBarberMinePanelDto>(Messages.PanelGetFailed);
             }
             return new SuccessDataResult<FreeBarberMinePanelDto>(result);
         }
@@ -108,7 +108,7 @@ namespace Business.Concrete
         public async Task<IDataResult<List<FreeBarberGetDto>>> GetFilteredFreeBarbersAsync(FilterRequestDto filter)
         {
             var result = await freeBarberDal.GetFilteredFreeBarbersAsync(filter);
-            return new SuccessDataResult<List<FreeBarberGetDto>>(result, "Filtrelenmiş serbest berberler getirildi");
+            return new SuccessDataResult<List<FreeBarberGetDto>>(result, Messages.FilteredFreeBarbersRetrieved);
         }
 
         [SecuredOperation("FreeBarber")]
@@ -116,7 +116,7 @@ namespace Business.Concrete
         {
             var result = await freeBarberDal.GetPanelDetailById(panelId);
             if (result == null) {
-                return new ErrorDataResult<FreeBarberMinePanelDetailDto>("Panel detayı getirilemedi");
+                return new ErrorDataResult<FreeBarberMinePanelDetailDto>(Messages.PanelDetailGetFailed);
             }
             return new SuccessDataResult<FreeBarberMinePanelDetailDto>(result);
         }

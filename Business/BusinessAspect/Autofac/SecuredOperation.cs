@@ -18,17 +18,12 @@ namespace Business.BusinessAspect.Autofac
 
         public SecuredOperation(string roles)
         {
-            _roles = roles.Split(',');
-            _httpContextAccessor = ServiceTool.ServiceProvider?.GetService<IHttpContextAccessor>();
+            _roles = roles.Split(',').Select(r => r.Trim()).ToArray();
+            _httpContextAccessor =  ServiceTool.ServiceProvider.GetService<IHttpContextAccessor>();
         }
 
-        protected override void OnBefore(IInvocation invocation)
+      protected override void OnBefore(IInvocation invocation)
         {
-            if (_httpContextAccessor?.HttpContext?.User == null)
-            {
-                throw new UnauthorizedOperationException(Business.Resources.Messages.UnauthorizedOperation);
-            }
-            
             var roleClaims = _httpContextAccessor.HttpContext.User.ClaimRoles();
             foreach (var role in _roles)
             {
@@ -37,7 +32,7 @@ namespace Business.BusinessAspect.Autofac
                     return;
                 }
             }
-            throw new UnauthorizedOperationException(Business.Resources.Messages.UnauthorizedOperation);
+            throw new Exception("Yetkisiz Ýþlem");
         }
     }
 }

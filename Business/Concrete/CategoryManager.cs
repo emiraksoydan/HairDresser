@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
+using Business.Resources;
 using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
@@ -22,7 +23,7 @@ namespace Business.Concrete
         public async Task<IResult> AddCategory(Category category)
         {
             await categoriesDal.Add(category);
-            return new SuccessResult("Kategori Eklendi");
+            return new SuccessResult(Messages.CategoryAddedSuccess);
         }
 
         [SecuredOperation("Admin")]
@@ -31,7 +32,7 @@ namespace Business.Concrete
         {
             var getCat = await categoriesDal.Get(x => x.Id == id);
             await categoriesDal.Remove(getCat);
-            return new SuccessResult("Kategori Silindi");
+            return new SuccessResult(Messages.CategoryDeletedSuccess);
         }
 
         public async Task<IDataResult<List<Category>>> GetAllCategories()
@@ -43,13 +44,13 @@ namespace Business.Concrete
         public async Task<IDataResult<List<Category>>> GetParentCategories()
         {
             var categories = await categoriesDal.GetAll(x => x.ParentId == null);
-            return new SuccessDataResult<List<Category>>(categories, "Ana kategoriler getirildi");
+            return new SuccessDataResult<List<Category>>(categories, Messages.MainCategoriesRetrieved);
         }
 
         public async Task<IDataResult<List<Category>>> GetChildCategories(Guid parentId)
         {
             var categories = await categoriesDal.GetAll(x => x.ParentId == parentId);
-            return new SuccessDataResult<List<Category>>(categories, "Alt kategoriler getirildi");
+            return new SuccessDataResult<List<Category>>(categories, Messages.SubCategoriesRetrieved);
         }
     }
 }
