@@ -29,14 +29,17 @@ namespace Core.Aspect.Autofac.Transaction
         {
             try
             {
-                // ÖNEMLİ: Önce AspectInterceptorSelector.LifetimeScope'u dene (request scope)
-                // Eğer null ise ServiceTool.ServiceProvider'ı kullan (root container)
+                // ÖNEMLİ: BadgeUpdateService'i transaction commit'ten önce capture et
+                // Lifetime scope dispose edilmeden önce service'i al
                 IBadgeUpdateService? badgeUpdateService = null;
+                ILifetimeScope? lifetimeScope = null;
                 
-                var lifetimeScope = AspectInterceptorSelector.LifetimeScope;
-                if (lifetimeScope != null && lifetimeScope.TryResolve<IBadgeUpdateService>(out var resolvedFromScope))
+                // Önce AspectInterceptorSelector.LifetimeScope'u dene (request scope)
+                var tempLifetimeScope = AspectInterceptorSelector.LifetimeScope;
+                if (tempLifetimeScope != null && tempLifetimeScope.TryResolve<IBadgeUpdateService>(out var resolvedFromScope))
                 {
                     badgeUpdateService = resolvedFromScope;
+                    lifetimeScope = tempLifetimeScope;
                 }
                 else
                 {
@@ -56,21 +59,42 @@ namespace Core.Aspect.Autofac.Transaction
                     {
                         try
                         {
-                            // Transaction commit edilene kadar bekle (100ms - daha hızlı yanıt için optimize edildi)
-                            await Task.Delay(100);
+                            // Transaction commit edilene kadar bekle (10ms - daha hızlı yanıt için optimize edildi)
+                            await Task.Delay(10);
                             
                             // Retry mekanizması: İlk denemede başarısız olursa tekrar dene
                             // Daha agresif retry stratejisi - badge count'un anlık güncellenmesi için
                             const int maxRetries = 5;
-                            const int initialRetryDelay = 50;
+                            const int initialRetryDelay = 25;
                             
                             for (int attempt = 0; attempt < maxRetries; attempt++)
                             {
                                 try
                                 {
-                                    // BadgeUpdateService aynı request'in instance'ı kullanılır (InstancePerLifetimeScope)
+                                    // BadgeUpdateService'i kullan (capture edilmiş instance)
                                     await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
                                     break; // Başarılı olursa döngüden çık
+                                }
+                                catch (ObjectDisposedException)
+                                {
+                                    // Lifetime scope dispose edilmiş, ServiceTool'dan yeni instance al
+                                    if (attempt < maxRetries - 1)
+                                    {
+                                        var serviceProvider = ServiceTool.ServiceProvider;
+                                        if (serviceProvider != null)
+                                        {
+                                            var newService = serviceProvider.GetService<IBadgeUpdateService>();
+                                            if (newService != null)
+                                            {
+                                                badgeUpdateService = newService;
+                                                var delay = initialRetryDelay * (int)Math.Pow(2, attempt);
+                                                await Task.Delay(delay);
+                                                continue; // Tekrar dene
+                                            }
+                                        }
+                                    }
+                                    // Son denemede de başarısız olursa sessizce devam et (kritik değil)
+                                    break;
                                 }
                                 catch
                                 {
