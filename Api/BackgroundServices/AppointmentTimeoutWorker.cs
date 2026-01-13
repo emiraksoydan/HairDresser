@@ -95,7 +95,6 @@ namespace Api.BackgroundServices
             var freeBarberDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IFreeBarberDal>();
             var threadDal = scope.ServiceProvider.GetRequiredService<DataAccess.Abstract.IChatThreadDal>();
             var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
-            var badgeUpdateService = scope.ServiceProvider.GetRequiredService<IBadgeUpdateService>();
 
             // Begin transaction to ensure atomicity of all operations
             await using var transaction = await db.Database.BeginTransactionAsync(stoppingToken);
@@ -140,7 +139,7 @@ namespace Api.BackgroundServices
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
 
-                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
                         // Commit transaction for store timeout scenario
                         await transaction.CommitAsync(stoppingToken);
@@ -174,7 +173,7 @@ namespace Api.BackgroundServices
                         await UpdateThreadStoreOwnerAsync(threadDal, trackedAppt.Id, null);
                         await chatService.PushAppointmentThreadUpdatedAsync(trackedAppt.Id);
 
-                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+                        await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
                         // Commit transaction for customer timeout scenario
                         await transaction.CommitAsync(stoppingToken);
@@ -216,7 +215,6 @@ namespace Api.BackgroundServices
                     foreach (var userId in participantUserIds)
                     {
                         try { await realtime.PushChatThreadRemovedAsync(userId, thread.Id); } catch { /* non-critical */ }
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                     }
                 }
 
@@ -238,7 +236,7 @@ namespace Api.BackgroundServices
                     }
                 }
 
-                await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, badgeUpdateService, scope, stoppingToken);
+                await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
                 // Commit transaction - all operations successful
                 await transaction.CommitAsync(stoppingToken);
@@ -320,7 +318,6 @@ namespace Api.BackgroundServices
             DatabaseContext db,
             IAppointmentNotifyService notifySvc,
             IRealTimePublisher realtime,
-            IBadgeUpdateService badgeUpdateService,
             IServiceScope scope,
             CancellationToken stoppingToken)
         {
@@ -354,8 +351,6 @@ namespace Api.BackgroundServices
             {
                 await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
             }
-
-            await badgeUpdateService.ProcessScheduledBadgeUpdatesAsync();
         }
 
         /// <summary>

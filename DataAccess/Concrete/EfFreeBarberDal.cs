@@ -58,7 +58,7 @@ namespace DataAccess.Concrete
 
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -136,7 +136,7 @@ namespace DataAccess.Concrete
   
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -190,6 +190,7 @@ namespace DataAccess.Concrete
                     s.LastName,
                     s.FreeBarberUserId,
                     s.IsAvailable,
+                    s.BarberCertificateImageId
 
                 })
                 .ToListAsync();
@@ -301,7 +302,7 @@ namespace DataAccess.Concrete
                         Id = s.Id,
                         FreeBarberUserId = s.FreeBarberUserId,
                         IsAvailable = s.IsAvailable,
-                        ImageList = images ?? new List<ImageGetDto>(),
+                        ImageList = images?.Where(img => img.Id != s.BarberCertificateImageId).ToList() ?? new List<ImageGetDto>(),
                         Type = s.Type,
                         Latitude = s.Latitude,
                         Longitude = s.Longitude,
@@ -347,7 +348,7 @@ namespace DataAccess.Concrete
 
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -455,7 +456,8 @@ namespace DataAccess.Concrete
                     fb.Latitude,
                     fb.Longitude,
                     fb.Type,
-                    fb.IsAvailable
+                    fb.IsAvailable,
+                    fb.BarberCertificateImageId
                 })
                 .ToListAsync();
 
@@ -642,7 +644,8 @@ namespace DataAccess.Concrete
                     FavoriteCount = favoriteDict.GetValueOrDefault(fb.FreeBarberUserId, 0),
                     IsFavorited = isFavoritedDict.GetValueOrDefault(fb.FreeBarberUserId, false),
                     Offerings = fbOfferings,
-                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>())
+
+                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>()).Where(img => img.Id != fb.BarberCertificateImageId).ToList()
                 };
             }).ToList();
 

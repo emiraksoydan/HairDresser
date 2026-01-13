@@ -36,8 +36,7 @@ namespace Business.Concrete
         IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings,
         IUserDal userDal,
-        AppointmentBusinessRules businessRules,
-        IBadgeUpdateService badgeUpdateService
+        AppointmentBusinessRules businessRules
     ) : IAppointmentService
     {
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
@@ -789,6 +788,10 @@ namespace Business.Concrete
 
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
+
+            // Store kararını verdi, ilgili bildirimleri okundu olarak işaretle
+            await notificationService.MarkReadByAppointmentIdAsync(storeOwnerUserId, appt.Id);
+
             return new SuccessDataResult<bool>(true);
         }
         [SecuredOperation("FreeBarber")]
@@ -1038,7 +1041,11 @@ namespace Business.Concrete
 
                 // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
-                return new SuccessDataResult<bool>(true);
+    
+            // Free Barber kararını verdi, ilgili bildirimleri okundu olarak işaretle
+            await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
+
+            return new SuccessDataResult<bool>(true);
             }
 
 
@@ -1221,6 +1228,10 @@ namespace Business.Concrete
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
+
+
+            // Customer kararını verdi, ilgili bildirimleri okundu olarak işaretle
+            await notificationService.MarkReadByAppointmentIdAsync(customerUserId, appt.Id);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -2166,11 +2177,6 @@ namespace Business.Concrete
                     thread.FreeBarberUnreadCount = 0;
                     await threadDal.Update(thread);
 
-                    // Her katılımcı için badge güncellemesi yap (unread count değişti)
-                    foreach (var userId in participants)
-                    {
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
-                    }
 
                     // T├╝m kat─▒l─▒mc─▒lara thread kald─▒r─▒ld─▒─ş─▒n─▒ bildir
                     foreach (var userId in participants)
@@ -2178,6 +2184,7 @@ namespace Business.Concrete
                         await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
                     }
                 }
+
                 // Thread yoksa (hen├╝z olu┼şturulmam─▒┼ş) hi├ğbir ┼şey yapmaya gerek yok
                 // ├ç├╝nk├╝ SendMessageAsync'te zaten status kontrol├╝ var ve Pending/Approved de─şilse mesaj g├Ânderilmez
             }
@@ -2207,6 +2214,8 @@ namespace Business.Concrete
 
             if (participantUserIds.Count == 0) return;
 
+
+
             // Her kullan─▒c─▒ i├ğin g├╝ncellenmi┼ş appointment'─▒ al ve SignalR ile g├Ânder
             // Performans i├ğin: ├ûnce appointment'─▒n hangi filter'a uydu─şunu belirle
             AppointmentFilter? targetFilter = null;
@@ -2233,13 +2242,7 @@ namespace Business.Concrete
                         {
                             await realtime.PushAppointmentUpdatedAsync(userId, updatedAppt);
 
-                            // Badge count g├╝ncellemesi - appointment g├╝ncellemesi sonras─▒
-                            var badgeSvcProperty = realtime.GetType().GetProperty("BadgeService");
-                            if (badgeSvcProperty != null)
-                            {
-                                var badgeSvc = badgeSvcProperty.GetValue(realtime) as IBadgeService;
-                                // BadgeService kullan─▒m─▒ gerekti─şinde buraya eklenecek
-                            }
+
                             continue;
                         }
                     }
@@ -2252,19 +2255,18 @@ namespace Business.Concrete
                         if (targetFilter.HasValue && filter == targetFilter.Value)
                             continue; // Zaten kontrol ettik
 
-                        var appointments = await appointmentDal.GetAllAppointmentByFilter(userId, filter);
-                        var updatedAppt = appointments.FirstOrDefault(a => a.Id == appt.Id);
-
-                        if (updatedAppt != null)
+                        var filterAppointments = await appointmentDal.GetAllAppointmentByFilter(userId, filter);
+                        var updatedInFilter = filterAppointments.FirstOrDefault(a => a.Id == appt.Id);
+                        
+                        if (updatedInFilter != null)
                         {
-                            await realtime.PushAppointmentUpdatedAsync(userId, updatedAppt);
+                            await realtime.PushAppointmentUpdatedAsync(userId, updatedInFilter);
                             break;
                         }
                     }
                 }
                 catch
                 {
-                    // Hata durumunda devam et, kritik de─şil
                 }
             }
         }
@@ -2272,8 +2274,6 @@ namespace Business.Concrete
 
     }
 }
-
-
 
 
 

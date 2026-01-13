@@ -42,11 +42,6 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<PhoneService>().As<IPhoneService>().InstancePerLifetimeScope();
             builder.RegisterType<ImageManager>().As<IImageService>().InstancePerLifetimeScope();
             builder.RegisterType<NotificationManager>().As<INotificationService>().InstancePerLifetimeScope();
-            builder.RegisterType<BadgeManager>().As<IBadgeService>().InstancePerLifetimeScope();
-            // InstancePerLifetimeScope olarak kaydet - her request kendi instance'ını kullanır
-            // TransactionScopeAspect aynı request içinde çağrıldığı için aynı instance kullanılır
-            // Her request kendi HashSet'ini kullanır, thread-safe gerekmez
-            builder.RegisterType<BadgeUpdateService>().As<IBadgeUpdateService>().InstancePerLifetimeScope();
             builder.RegisterType<ChatManager>().As<IChatService>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();

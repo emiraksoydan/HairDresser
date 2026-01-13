@@ -19,9 +19,7 @@ namespace Business.Concrete
 {
     public class NotificationManager(INotificationDal notificationDal,
         IRealTimePublisher realtime,
-        IBadgeService badgeService,
         IAppointmentDal appointmentDal,
-        IBadgeUpdateService badgeUpdateService,
         IPushNotificationService? pushNotificationService = null) : INotificationService
     {
         // ÖNEMLİ: TransactionScopeAspect kaldırıldı çünkü bu metod zaten dış transaction scope içinde çağrılıyor
@@ -83,8 +81,6 @@ namespace Business.Concrete
                             }
                         }
                         
-                        // Badge count'u transaction commit sonrası güncellemek için schedule et
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existingAny.Id);
                     }
@@ -146,8 +142,6 @@ namespace Business.Concrete
                             }
                         }
                         
-                        // Badge count'u transaction commit sonrası güncellemek için schedule et
-                        badgeUpdateService.ScheduleBadgeUpdate(userId);
                         
                         return new SuccessDataResult<Guid>(existing.Id);
                     }
@@ -202,8 +196,6 @@ namespace Business.Concrete
                 }
             }
 
-            // Badge count'u transaction commit sonrası güncellemek için schedule et
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<Guid>(n.Id);
         }
@@ -243,9 +235,6 @@ namespace Business.Concrete
 
             await notificationDal.Update(n);
 
-            // Badge count'u transaction commit sonrası güncellemek için schedule et
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
-
             return new SuccessDataResult<bool>(true);
         }
 
@@ -265,9 +254,6 @@ namespace Business.Concrete
             }
             
             await notificationDal.UpdateRange(notifications);
-
-            // Badge count'u transaction commit sonrası güncellemek için schedule et
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -475,15 +461,12 @@ namespace Business.Concrete
                 n.ReadAt = DateTime.UtcNow;
                 await notificationDal.Update(n);
                 
-                // Badge count'u transaction commit sonrası güncellemek için schedule et
-                badgeUpdateService.ScheduleBadgeUpdate(userId);
+                n.ReadAt = DateTime.UtcNow;
+                await notificationDal.Update(n);
             }
 
             // Bildirimi sil
             await notificationDal.Remove(n);
-
-            // Badge count'u transaction commit sonrası güncellemek için schedule et (silme sonrası)
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -551,9 +534,6 @@ namespace Business.Concrete
             {
                 await notificationDal.Remove(n);
             }
-
-            // Badge count'u transaction commit sonrası güncellemek için schedule et
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
 
             return new SuccessDataResult<bool>(true);
         }

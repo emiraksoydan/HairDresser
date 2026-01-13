@@ -22,5 +22,6 @@ namespace Business.Abstract
         Task<IResult> UpdateLocationAsync(UpdateLocationDto dto, Guid currentUserId);
 
 
+        Task<IResult> UpdateAvailabilityAsync(bool isAvailable, Guid currentUserId);
     }
 }

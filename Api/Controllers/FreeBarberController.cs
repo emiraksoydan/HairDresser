@@ -77,5 +77,11 @@ namespace Api.Controllers
             var result = await _freeBarberService.UpdateLocationAsync(req, CurrentUserId);
             return result.Success ? Ok(result) : BadRequest(result);
         }
+        [HttpPost("update-availability")]
+        public async Task<IActionResult> UpdateAvailability([FromQuery] bool isAvailable)
+        {
+            var result = await _freeBarberService.UpdateAvailabilityAsync(isAvailable, CurrentUserId);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
     }
 }

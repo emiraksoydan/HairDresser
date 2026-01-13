@@ -17,15 +17,13 @@ namespace Business.Concrete
              IAppointmentDal appointmentDal,
              IChatThreadDal threadDal,
              IChatMessageDal messageDal,
-             IBadgeService badgeSvc,
              IBarberStoreDal barberStoreDal,
              IUserDal userDal,
              IFreeBarberDal freeBarberDal,
              IImageDal imageDal,
              IFavoriteDal favoriteDal,
              IRealTimePublisher realtime,
-             FavoriteHelper favoriteHelper,
-             IBadgeUpdateService badgeUpdateService
+             FavoriteHelper favoriteHelper
      ) : IChatService
     {
 
@@ -155,8 +153,6 @@ namespace Business.Concrete
             foreach (var u in recipients)
             {
                 await realtime.PushChatMessageAsync(u, dto);
-                // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
-                badgeUpdateService.ScheduleBadgeUpdate(u);
             }
 
             // Thread güncellemesini tüm katılımcılara push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
@@ -199,17 +195,13 @@ namespace Business.Concrete
 
             await threadDal.Update(thread);
 
-            // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
-            // TransactionScopeAspect transaction commit sonrası otomatik olarak badge update'leri çalıştıracak
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
-
             return new SuccessDataResult<bool>(true);
         }
 
 
         [SecuredOperation("Customer,FreeBarber,BarberStore")]
         [LogAspect]
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        // Read-only query - no transaction needed
         public async Task<IDataResult<List<ChatThreadListItemDto>>> GetThreadsAsync(Guid userId)
         {
             // sadece Pending + Approved randevular için
@@ -709,7 +701,7 @@ namespace Business.Concrete
 
         [SecuredOperation("Customer,FreeBarber,BarberStore")]
         [LogAspect]
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        // Read-only query - no transaction needed
         public async Task<IDataResult<List<ChatMessageItemDto>>> GetMessagesAsync(
             Guid userId, Guid appointmentId, DateTime? beforeUtc)
         {
@@ -860,8 +852,6 @@ namespace Business.Concrete
             foreach (var recipientId in favoriteRecipients.Distinct())
             {
                 await realtime.PushChatMessageAsync(recipientId, dto);
-                // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
-                badgeUpdateService.ScheduleBadgeUpdate(recipientId);
             }
 
             // Thread güncellemesini her iki kullanıcıya da push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
@@ -909,9 +899,6 @@ namespace Business.Concrete
 
             await threadDal.Update(thread);
 
-            // Badge count güncellemesi - transaction commit sonrası güncellemek için schedule et
-            badgeUpdateService.ScheduleBadgeUpdate(userId);
-
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
             return new SuccessDataResult<bool>(true);
@@ -919,7 +906,7 @@ namespace Business.Concrete
 
         [SecuredOperation("Customer,FreeBarber,BarberStore")]
         [LogAspect]
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        // Read-only query - no transaction needed
         public async Task<IDataResult<List<ChatMessageItemDto>>> GetMessagesByThreadAsync(Guid userId, Guid threadId, DateTime? beforeUtc)
         {
             var thread = await threadDal.Get(t => t.Id == threadId);
@@ -1766,46 +1753,41 @@ namespace Business.Concrete
             return new SuccessDataResult<bool>(true);
         }
 
+        /// <summary>
+        /// Generic helper method to fetch images for multiple owners based on owner type.
+        /// Consolidates previous GetImagesForUsersAsync, GetImagesForStoresAsync, and GetImagesForFreeBarberAsync methods.
+        /// Returns a dictionary mapping owner ID to their most recent image URL.
+        /// </summary>
+        /// <param name="ownerIds">List of owner IDs to fetch images for</param>
+        /// <param name="ownerType">Type of owner (User, Store, FreeBarber)</param>
+        /// <returns>Dictionary mapping owner ID to latest image URL (null if no image found)</returns>
+        private async Task<Dictionary<Guid, string?>> GetImagesForOwnersAsync(
+            List<Guid> ownerIds,
+            ImageOwnerType ownerType)
+        {
+            if (ownerIds == null || ownerIds.Count == 0)
+                return new Dictionary<Guid, string?>();
+
+            var images = await imageDal.GetAll(img =>
+                ownerIds.Contains(img.ImageOwnerId) &&
+                img.OwnerType == ownerType);
+
+            return images
+                .GroupBy(img => img.ImageOwnerId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
+        }
+
+        // Legacy method wrappers for backward compatibility - consider removing if not used
+        [Obsolete("Use GetImagesForOwnersAsync(ownerIds, ImageOwnerType.User) instead")]
         private async Task<Dictionary<Guid, string?>> GetImagesForUsersAsync(List<Guid> userIds)
-        {
-            if (userIds == null || userIds.Count == 0)
-                return new Dictionary<Guid, string?>();
+            => await GetImagesForOwnersAsync(userIds, ImageOwnerType.User);
 
-            var images = await imageDal.GetAll(img =>
-                userIds.Contains(img.ImageOwnerId) &&
-                img.OwnerType == ImageOwnerType.User);
-
-            return images
-                .GroupBy(img => img.ImageOwnerId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
-        }
-
+        [Obsolete("Use GetImagesForOwnersAsync(ownerIds, ImageOwnerType.Store) instead")]
         private async Task<Dictionary<Guid, string?>> GetImagesForStoresAsync(List<Guid> storeIds)
-        {
-            if (storeIds == null || storeIds.Count == 0)
-                return new Dictionary<Guid, string?>();
+            => await GetImagesForOwnersAsync(storeIds, ImageOwnerType.Store);
 
-            var images = await imageDal.GetAll(img =>
-                storeIds.Contains(img.ImageOwnerId) &&
-                img.OwnerType == ImageOwnerType.Store);
-
-            return images
-                .GroupBy(img => img.ImageOwnerId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
-        }
-
+        [Obsolete("Use GetImagesForOwnersAsync(ownerIds, ImageOwnerType.FreeBarber) instead")]
         private async Task<Dictionary<Guid, string?>> GetImagesForFreeBarberAsync(List<Guid> freeBarberIds)
-        {
-            if (freeBarberIds == null || freeBarberIds.Count == 0)
-                return new Dictionary<Guid, string?>();
-
-            var images = await imageDal.GetAll(img =>
-                freeBarberIds.Contains(img.ImageOwnerId) &&
-                img.OwnerType == ImageOwnerType.FreeBarber);
-
-            return images
-                .GroupBy(img => img.ImageOwnerId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.CreatedAt).FirstOrDefault()?.ImageUrl);
-        }
+            => await GetImagesForOwnersAsync(freeBarberIds, ImageOwnerType.FreeBarber);
     }
 }

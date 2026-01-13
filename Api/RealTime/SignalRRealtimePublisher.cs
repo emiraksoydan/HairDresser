@@ -33,17 +33,7 @@ namespace Api.RealTime
             }
         }
 
-        public async Task PushBadgeAsync(Guid userId, BadgeCountDto dto)
-        {
-            try
-            {
-                await hub.Clients.Group($"user:{userId}").SendAsync("badge.updated", dto);
-            }
-            catch (Exception)
-            {
-                // Log error but don't throw - badge count can be refetched
-            }
-        }
+
 
         public async Task PushChatThreadCreatedAsync(Guid userId, ChatThreadListItemDto dto)
         {
