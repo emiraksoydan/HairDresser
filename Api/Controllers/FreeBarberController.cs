@@ -1,87 +1,80 @@
 using Business.Abstract;
 using Core.Extensions;
 using Entities.Concrete.Dto;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class FreeBarberController : ControllerBase
+    public class FreeBarberController : BaseApiController
     {
         private readonly IFreeBarberService _freeBarberService;
+
         public FreeBarberController(IFreeBarberService freeBarberService)
         {
             _freeBarberService = freeBarberService;
         }
-        private Guid CurrentUserId => User.GetUserIdOrThrow();
 
         [HttpPost("create-free-barber")]
         public async Task<IActionResult> Add([FromBody] FreeBarberCreateDto dto)
         {
-            var result = await _freeBarberService.Add(dto, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleCreateOperation(dto, _freeBarberService.Add);
         }
 
         [HttpPut("update-free-barber")]
         public async Task<IActionResult> Update([FromBody] FreeBarberUpdateDto dto)
         {
-            var result = await _freeBarberService.Update(dto, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUpdateOperation(dto, _freeBarberService.Update);
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var result = await _freeBarberService.DeleteAsync(id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_freeBarberService.DeleteAsync(id));
         }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(Guid id)
         {
-            var result = await _freeBarberService.GetMyPanelDetail(id);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleDataResultAsync(_freeBarberService.GetMyPanelDetail(id));
         }
+
         [HttpGet("nearby")]
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
             var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
-            var result = await _freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId);
-            return result.Success ? Ok(result.Data) : BadRequest(result);
+            return await HandleDataResultAsync(_freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId));
         }
 
         [HttpPost("filtered")]
         public async Task<IActionResult> GetFiltered([FromBody] FilterRequestDto filter)
         {
             filter.CurrentUserId = CurrentUserId; // Set current user for favorites
-            var result = await _freeBarberService.GetFilteredFreeBarbersAsync(filter);
-            return result.Success ? Ok(result.Data) : BadRequest(result);
+            return await HandleDataResultAsync(_freeBarberService.GetFilteredFreeBarbersAsync(filter));
         }
 
         [HttpGet("mypanel")]
         public async Task<IActionResult> GetMine()
         {
-            var result = await _freeBarberService.GetMyPanel(CurrentUserId);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleUserDataOperation(userId => _freeBarberService.GetMyPanel(userId));
         }
 
         [HttpGet("get-freebarber-for-users")]
         public async Task<IActionResult> GetFreeBarberForUsers([FromQuery] Guid freeBarberId)
         {
-            var result = await _freeBarberService.GetFreeBarberForUsers(freeBarberId);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleDataResultAsync(_freeBarberService.GetFreeBarberForUsers(freeBarberId));
         }
+
         [HttpPost("update-location")]
         public async Task<IActionResult> UpdateLocation([FromBody] UpdateLocationDto req)
         {
-            var result = await _freeBarberService.UpdateLocationAsync(req, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserOperation(userId => _freeBarberService.UpdateLocationAsync(req, userId));
         }
+
         [HttpPost("update-availability")]
         public async Task<IActionResult> UpdateAvailability([FromQuery] bool isAvailable)
         {
-            var result = await _freeBarberService.UpdateAvailabilityAsync(isAvailable, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserOperation(userId => _freeBarberService.UpdateAvailabilityAsync(isAvailable, userId));
         }
     }
 }

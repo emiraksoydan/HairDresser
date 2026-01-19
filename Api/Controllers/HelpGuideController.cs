@@ -1,16 +1,12 @@
 using Business.Abstract;
 using Business.Resources;
-using Core.Extensions;
 using Entities.Concrete.Enums;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
-    public class HelpGuideController : ControllerBase
+    public class HelpGuideController : BaseApiController
     {
         private readonly IHelpGuideService _helpGuideService;
 
@@ -28,8 +24,7 @@ namespace Api.Controllers
                 return BadRequest(new { success = false, message = Messages.InvalidUserType });
             }
 
-            var result = await _helpGuideService.GetActiveByUserTypeAsync(userType);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleDataResultAsync(_helpGuideService.GetActiveByUserTypeAsync(userType));
         }
     }
 }

@@ -409,7 +409,18 @@ namespace DataAccess.Concrete
             // Base query
             var query = _context.FreeBarbers.AsNoTracking().AsQueryable();
 
-            // 1. Konum filtresi (nearby)
+            // 0. Kullanıcının kendi FreeBarber panelinin ID'sini al (IsOwnPanel için kullanılacak)
+            Guid? ownFreeBarberPanelId = null;
+            if (filter.CurrentUserId.HasValue)
+            {
+                ownFreeBarberPanelId = await _context.FreeBarbers
+                    .AsNoTracking()
+                    .Where(fb => fb.FreeBarberUserId == filter.CurrentUserId.Value)
+                    .Select(fb => fb.Id)
+                    .FirstOrDefaultAsync();
+            }
+
+            // 1. Konum filtresi (nearby) - tüm paneller için geçerli (kendi paneli dahil)
             if (filter.Latitude.HasValue && filter.Longitude.HasValue)
             {
                 var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
@@ -457,7 +468,8 @@ namespace DataAccess.Concrete
                     fb.Longitude,
                     fb.Type,
                     fb.IsAvailable,
-                    fb.BarberCertificateImageId
+                    fb.BarberCertificateImageId,
+                    IsOwnPanel = ownFreeBarberPanelId.HasValue && fb.Id == ownFreeBarberPanelId.Value
                 })
                 .ToListAsync();
 
@@ -489,8 +501,6 @@ namespace DataAccess.Concrete
                 .ToDictionary(g => g.Key, g => g.Select(x => x.Offering).ToList());
 
             // 5. Hizmet filtresi (CategoryId listesi)
-            // Not: ServiceOffering tablosu serviceName tuttuğu için, Category.Id -> Category.Name map edip ServiceName ile eşliyoruz.
-            // Backward compatibility: Eğer istemci ServiceOffering.Id gönderirse onu da destekliyoruz.
             if (filter.ServiceIds != null && filter.ServiceIds.Any())
             {
                 var categoryNames = await _context.Categories
@@ -577,7 +587,7 @@ namespace DataAccess.Concrete
 
             var favoriteDict = favoriteStats.ToDictionary(x => x.FreeBarber, x => x.FavoriteCount);
 
-            // 8. Favori filtresi (kullanıcının favorileri + kendi paneli)
+            // 8. Favori filtresi
             if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
             {
                 var userFavorites = await _context.Favorites
@@ -586,8 +596,7 @@ namespace DataAccess.Concrete
                     .Select(f => f.FavoritedToId)
                     .ToListAsync();
                 
-                // Kullanıcının favorileri + kendi paneli (FreeBarberUserId == CurrentUserId)
-                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.FreeBarberUserId) || fb.FreeBarberUserId == filter.CurrentUserId.Value).ToList();
+                freeBarbers = freeBarbers.Where(fb => userFavorites.Contains(fb.FreeBarberUserId)).ToList();
                 freeBarberIds = freeBarbers.Select(fb => fb.Id).ToList();
                 freeBarberUserIds = freeBarbers.Select(fb => fb.FreeBarberUserId).Distinct().ToList();
             }
@@ -644,8 +653,8 @@ namespace DataAccess.Concrete
                     FavoriteCount = favoriteDict.GetValueOrDefault(fb.FreeBarberUserId, 0),
                     IsFavorited = isFavoritedDict.GetValueOrDefault(fb.FreeBarberUserId, false),
                     Offerings = fbOfferings,
-
-                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>()).Where(img => img.Id != fb.BarberCertificateImageId).ToList()
+                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>()).Where(img => img.Id != fb.BarberCertificateImageId).ToList(),
+                    IsOwnPanel = fb.IsOwnPanel // Kendi paneli mi bilgisi (frontend'de kullanılabilir)
                 };
             }).ToList();
 

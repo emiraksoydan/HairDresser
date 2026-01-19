@@ -35,8 +35,7 @@ namespace Business.Resources
 
         // Store Messages
         public const string StoreNotFound = "Dükkan bulunamadı";
-        public const string StoreNotFoundEnglish = "Store not found";
-        public const string StoreNotFoundOrNotOwner = "Store not found or not owner";
+        public const string StoreNotFoundOrNotOwner = "Dükkan bulunamadı veya sahibi değilsiniz";
         public const string StoreNotOpen = "Dükkan bu saat aralığında açık değil";
         public const string StoreClosed = "Dükkan bu gün kapalı (tatil)";
         public const string StoreNoWorkingHours = "Dükkan bu gün için çalışma saati tanımlamamış (kapalı)";
@@ -61,14 +60,15 @@ namespace Business.Resources
         public const string FreeBarberPanelAlreadyExists = "Zaten bir serbest berber paneliniz bulunmaktadır. Her kullanıcının sadece bir paneli olabilir.";
 
         // Customer Messages
-        public const string CustomerHasActiveAppointment = "Müşterinin aktif (Pending/Approved) randevusu var.";
+        public const string CustomerHasActiveAppointment = "Müşterinin aktif (Bekleyen/Onaylanmış) randevusu var.";
         public const string CustomerAlreadyHasActiveAppointment = "Zaten aktif bir randevunuz var. Önce onu tamamlayın.";
         public const string CustomerDistanceExceeded = "Dükkan 1 km dışında. Yakın değilken randevu oluşturamazsın.";
 
         // Store Messages (continued)
         public const string StoreHasActiveCall = "Dükkanın aktif bir serbest berber çağrısı var. Önce onu sonuçlandır.";
         public const string StoreAlreadyHasActiveAppointment = "Dükkanın zaten aktif bir randevusu var.";
-        public const string FreeBarberHasActiveAppointment = "Serbest berberin aktif (Pending/Approved) randevusu var.";
+        public const string StoreAlreadyHasActiveAppointmentWithThisFreeBarber = "Bu dükkanınızın bu serbest berber ile aktif bir randevusu var. Önce onu sonuçlandırın.";
+        public const string FreeBarberHasActiveAppointment = "Serbest berberin aktif (Bekleyen/Onaylanmış) randevusu var.";
         public const string FreeBarberAlreadyHasActiveAppointment = "Serbest berberin zaten aktif bir randevusu var.";
         public const string FreeBarberHasActiveAppointmentUpdate = "Randevu işleminiz bulunmaktadır. Lütfen işlemden sonra güncelleyiniz";
 
@@ -88,9 +88,9 @@ namespace Business.Resources
         public const string OnlyCustomersCanCreateAppointment = "Sadece müşteriler randevu oluşturabilir.";
 
         // Chat Messages
-        public const string ChatOnlyForActiveAppointments = "Chat is only allowed for Pending/Approved appointments";
-        public const string EmptyMessage = "Empty message";
-        public const string ChatThreadNotFound = "Chat thread bulunamadı";
+        public const string ChatOnlyForActiveAppointments = "Sohbet sadece Bekleyen/Onaylanmış randevular için aktiftir.";
+        public const string EmptyMessage = "Boş mesaj gönderilemez";
+        public const string ChatThreadNotFound = "Sohbet kaydı bulunamadı";
         public const string ChatNotFound = "Sohbet bulunamadı";
         public const string ParticipantNotFound = "Katılımcı bulunamadı";
 
@@ -125,8 +125,8 @@ namespace Business.Resources
         public const string OperationClaimsGetFailed = "Yetkiler getirilemedi";
         
         // Additional Distance/Coordinate Messages
-        public const string LocationNotSet = "konumu ayarlı değil";
-        public const string LocationInvalid = "konumu geçersiz";
+        public const string LocationNotSet = "Konumu ayarlı değil";
+        public const string LocationInvalid = "Konumu geçersiz";
         public const string RequestLocationNotSet = "İstek konumu ayarlı değil";
         public const string TargetLocationNotSet = "Hedef konumu ayarlı değil";
         public const string FreeBarberLocationNotSet = "Serbest berber konumu ayarlı değil";

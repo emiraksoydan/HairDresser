@@ -1,25 +1,28 @@
 using Business.Abstract;
-using Core.Extensions;
 using Entities.Concrete.Dto;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    [Authorize]
-    public class UserController(IUserService userService, IPushNotificationService pushNotificationService) : ControllerBase
+    public class UserController : BaseApiController
     {
-        private Guid CurrentUserId => User.GetUserIdOrThrow();
+        private readonly IUserService _userService;
+        private readonly IPushNotificationService _pushNotificationService;
+
+        public UserController(IUserService userService, IPushNotificationService pushNotificationService)
+        {
+            _userService = userService;
+            _pushNotificationService = pushNotificationService;
+        }
+
         /// <summary>
         /// Update current user's profile information
         /// </summary>
         [HttpPut("update-profile")]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateUserDto dto)
         {
-            var result = await userService.UpdateProfile(dto, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _userService.UpdateProfile(dto, userId));
         }
 
         /// <summary>
@@ -28,8 +31,7 @@ namespace Api.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetMe()
         {
-            var result = await userService.GetMe(CurrentUserId);
-            return result.Success ? Ok(result) : NotFound(result);
+            return await HandleUserDataOperation(userId => _userService.GetMe(userId));
         }
 
         /// <summary>
@@ -38,8 +40,8 @@ namespace Api.Controllers
         [HttpPost("register-fcm-token")]
         public async Task<IActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenDto dto)
         {
-            var result = await pushNotificationService.RegisterFcmTokenAsync(CurrentUserId, dto.FcmToken, dto.DeviceId, dto.Platform);
-            return result ? Ok(new { success = true, message = "FCM token registered successfully" }) 
+            var result = await _pushNotificationService.RegisterFcmTokenAsync(CurrentUserId, dto.FcmToken, dto.DeviceId, dto.Platform);
+            return result ? Ok(new { success = true, message = "FCM token registered successfully" })
                          : BadRequest(new { success = false, message = "Failed to register FCM token" });
         }
 
@@ -49,8 +51,8 @@ namespace Api.Controllers
         [HttpPost("unregister-fcm-token")]
         public async Task<IActionResult> UnregisterFcmToken([FromBody] UnregisterFcmTokenDto dto)
         {
-            var result = await pushNotificationService.UnregisterFcmTokenAsync(CurrentUserId, dto.FcmToken);
-            return result ? Ok(new { success = true, message = "FCM token unregistered successfully" }) 
+            var result = await _pushNotificationService.UnregisterFcmTokenAsync(CurrentUserId, dto.FcmToken);
+            return result ? Ok(new { success = true, message = "FCM token unregistered successfully" })
                          : BadRequest(new { success = false, message = "Failed to unregister FCM token" });
         }
     }

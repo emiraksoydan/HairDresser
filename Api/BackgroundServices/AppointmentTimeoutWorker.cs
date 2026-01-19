@@ -103,8 +103,17 @@ namespace Api.BackgroundServices
             {
                 var trackedAppt = await db.Appointments
                     .FirstOrDefaultAsync(a => a.Id == appt.Id, stoppingToken);
+
+                // ÖNEMLĐ: Status Pending değilse işleme (zaten işlenmiş demektir)
                 if (trackedAppt == null || trackedAppt.Status != AppointmentStatus.Pending)
+                {
+                    if (trackedAppt != null && trackedAppt.Status == AppointmentStatus.Unanswered)
+                    {
+                        _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} is already Unanswered, skipping processing",
+                            trackedAppt.Id);
+                    }
                     return;
+                }
 
             var now = DateTime.UtcNow;
             var isStoreSelectionFlow = trackedAppt.StoreSelectionType == StoreSelectionType.StoreSelection &&
@@ -182,7 +191,15 @@ namespace Api.BackgroundServices
                 }
             }
 
+            // ✅ DEBUG: Status güncellemesi öncesi log
+            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status BEFORE update: {Status}",
+                trackedAppt.Id, trackedAppt.Status);
+
             UpdateAppointmentStatus(trackedAppt);
+
+            // ✅ DEBUG: Status güncellemesi sonrası log
+            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status AFTER update: {Status}",
+                trackedAppt.Id, trackedAppt.Status);
 
             // Katılımcılar (thread removal + appointment.updated + badge update için)
             var participantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
@@ -192,14 +209,27 @@ namespace Api.BackgroundServices
                 .ToList();
 
             // Cevapsız olduğunda slot kilidini kaldır (availability + unique index için)
-            // ÖNEMLİ: Store bilgisini silme (BarberStoreUserId iptal tabında görünmeli).
+            // ÖNEMLİ: Store bilgisini (BarberStoreUserId) SAKLIYORUZ - iptal tabında görünmeli.
+            // UYARI: Tarih ve saat bilgileri TEMİZLENMELİ - başka randevular alınabilsin!
             if (trackedAppt.ChairId.HasValue)
             {
                 trackedAppt.ChairId = null;
                 trackedAppt.ManuelBarberId = null;
+                trackedAppt.AppointmentDate = null;
+                trackedAppt.StartTime = null;
+                trackedAppt.EndTime = null;
             }
 
+                // ✅ DEBUG: SaveChanges öncesi log
+                _logger.LogInformation("AppointmentTimeoutWorker: Saving changes for appointment {AppointmentId} with Status={Status}",
+                    trackedAppt.Id, trackedAppt.Status);
+
                 await db.SaveChangesAsync(stoppingToken);
+
+                // ✅ DEBUG: SaveChanges sonrası log
+                _logger.LogInformation("AppointmentTimeoutWorker: Changes saved successfully for appointment {AppointmentId}",
+                    trackedAppt.Id);
+
                 await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
 
                 // Thread'i kaldır + unread count'ları sıfırla + badge update schedule et
@@ -238,8 +268,17 @@ namespace Api.BackgroundServices
 
                 await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
+                // ✅ DEBUG: Transaction commit öncesi log
+                _logger.LogInformation("AppointmentTimeoutWorker: Committing transaction for appointment {AppointmentId} with final Status={Status}",
+                    trackedAppt.Id, trackedAppt.Status);
+
                 // Commit transaction - all operations successful
                 await transaction.CommitAsync(stoppingToken);
+
+                // ✅ DEBUG: Transaction commit sonrası log
+                _logger.LogInformation("AppointmentTimeoutWorker: Transaction committed successfully for appointment {AppointmentId}",
+                    trackedAppt.Id);
+
             }
             catch (Exception ex)
             {
@@ -264,7 +303,7 @@ namespace Api.BackgroundServices
 
             if (appt.FreeBarberDecision == DecisionStatus.Pending)
                 appt.FreeBarberDecision = DecisionStatus.NoAnswer;
-            
+
             // CustomerDecision için de NoAnswer ekle (Customer -> FreeBarber + Store senaryosunda)
             if (appt.CustomerDecision == DecisionStatus.Pending)
                 appt.CustomerDecision = DecisionStatus.NoAnswer;
@@ -330,8 +369,13 @@ namespace Api.BackgroundServices
             // Mevcut notification'ları olan kullanıcılar (bunların notification'ları güncellenecek)
             var usersWithExistingNotifications = existingNotifications.Select(n => n.UserId).Distinct().ToList();
 
-            // Mevcut notification'ları güncelle: Sadece payload'daki status'u güncelle, Type değiştirme
-            foreach (var notif in existingNotifications)
+            // DÜZELTME: Sadece OKUNMAMIŞ (isRead: false) bildirimlerin payload'u güncellensin
+            // Kullanıcı zaten aksiyon aldıysa (Onayla/Reddet) ve bildirim okundu işaretliyse,
+            // payload'u güncellemeye gerek yok - zaten karar verilmiş durumda
+            var unreadNotifications = existingNotifications.Where(n => !n.IsRead).ToList();
+
+            // Mevcut notification'ları güncelle: Sadece okunmamış olanların payload'daki status'u güncelle, Type değiştirme
+            foreach (var notif in unreadNotifications)
             {
                 await UpdateNotificationPayloadAsync(notif, trackedAppt, db, realtime, stoppingToken);
             }
@@ -350,6 +394,14 @@ namespace Api.BackgroundServices
             if (usersWithoutNotifications.Any())
             {
                 await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
+
+                // Unanswered: Thread okundu sayılsın (timeout olduğu için)
+                // MarkThreadReadByAppointmentSystemAsync internally handles badge updates
+                var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
+
+                if (trackedAppt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.CustomerUserId.Value, trackedAppt.Id);
+                if (trackedAppt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.FreeBarberUserId.Value, trackedAppt.Id);
+                if (trackedAppt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.BarberStoreUserId.Value, trackedAppt.Id);
             }
         }
 
@@ -460,13 +512,24 @@ namespace Api.BackgroundServices
         {
             try
             {
+                // ÖNEMLĐ: Eğer liste boşsa bildirim gönderme (duplicate engellemek için)
+                if (usersWithoutNotifications == null || !usersWithoutNotifications.Any())
+                {
+                    _logger.LogInformation("AppointmentTimeoutWorker: No users without notifications for appointment {AppointmentId}, skipping notification send",
+                        trackedAppt.Id);
+                    return;
+                }
+
                 _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}",
                     usersWithoutNotifications.Count, trackedAppt.Id);
 
-                // NotifyAsync tüm kullanıcılara gönderir, ama CreateAndPushAsync içinde duplicate kontrolü var
-                // Mevcut notification'ı olan kullanıcılar için: Zaten yukarıda güncellendi
-                // Mevcut notification'ı olmayan kullanıcılar için: Yeni AppointmentUnanswered gönderilecek
-                await notifySvc.NotifyAsync(trackedAppt.Id, NotificationType.AppointmentUnanswered, actorUserId: null);
+                // DÜZELTME: NotifyToRecipientsAsync kullan - sadece belirtilen kullanıcılara gönder
+                // NotifyAsync tüm participants'a gönderir (istenmeyen davranış)
+                await notifySvc.NotifyToRecipientsAsync(
+                    trackedAppt.Id,
+                    NotificationType.AppointmentUnanswered,
+                    usersWithoutNotifications,
+                    actorUserId: null);
             }
             catch (Exception ex)
             {

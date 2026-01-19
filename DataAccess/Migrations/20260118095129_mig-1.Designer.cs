@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260111213555_mig-1")]
+    [Migration("20260118095129_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -101,6 +101,9 @@ namespace DataAccess.Migrations
 
                     b.Property<int?>("StoreDecision")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
 
                     b.Property<int?>("StoreSelectionType")
                         .HasColumnType("integer");

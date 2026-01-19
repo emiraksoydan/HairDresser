@@ -3,6 +3,7 @@ using Business.BusinessAspect.Autofac;
 using Core.Abstract;
 using Business.Helpers;
 using Business.Resources;
+using Core.Aspect.Autofac.ExceptionHandling;
 using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
@@ -153,6 +154,8 @@ namespace Business.Concrete
             foreach (var u in recipients)
             {
                 await realtime.PushChatMessageAsync(u, dto);
+                // NOT: Badge update burada yapılmıyor - frontend chat.message event'inde
+                // optimistic olarak badge count'u artırıyor
             }
 
             // Thread güncellemesini tüm katılımcılara push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
@@ -184,16 +187,64 @@ namespace Business.Concrete
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkThreadReadByAppointmentAsync(Guid userId, Guid appointmentId)
         {
+            return await MarkThreadReadByAppointmentInternalAsync(userId, appointmentId);
+        }
+
+        [LogAspect]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        public async Task<IDataResult<bool>> MarkThreadReadByAppointmentSystemAsync(Guid userId, Guid appointmentId)
+        {
+            return await MarkThreadReadByAppointmentInternalAsync(userId, appointmentId);
+        }
+
+        [ExceptionHandlingAspect]
+        private async Task<IDataResult<bool>> MarkThreadReadByAppointmentInternalAsync(Guid userId, Guid appointmentId)
+        {
             // Randevu thread'i için okundu işaretleme (geriye dönük uyumluluk)
             var thread = await threadDal.Get(t => t.AppointmentId == appointmentId);
             if (thread is null) return new ErrorDataResult<bool>(false, Messages.ChatNotFound);
 
-            if (thread.CustomerUserId == userId) thread.CustomerUnreadCount = 0;
-            else if (thread.StoreOwnerUserId == userId) thread.StoreUnreadCount = 0;
-            else if (thread.FreeBarberUserId == userId) thread.FreeBarberUnreadCount = 0;
+            bool needsUpdate = false;
+
+            if (thread.CustomerUserId == userId)
+            {
+                if (thread.CustomerUnreadCount > 0)
+                {
+                    thread.CustomerUnreadCount = 0;
+                    needsUpdate = true;
+                }
+            }
+            else if (thread.StoreOwnerUserId == userId)
+            {
+                if (thread.StoreUnreadCount > 0)
+                {
+                    thread.StoreUnreadCount = 0;
+                    needsUpdate = true;
+                }
+            }
+            else if (thread.FreeBarberUserId == userId)
+            {
+                if (thread.FreeBarberUnreadCount > 0)
+                {
+                    thread.FreeBarberUnreadCount = 0;
+                    needsUpdate = true;
+                }
+            }
             else return new ErrorDataResult<bool>(false, Messages.ParticipantNotFound);
 
-            await threadDal.Update(thread);
+            if (needsUpdate)
+            {
+                await threadDal.Update(thread);
+
+                // Badge count'u güncelle (kendim için) - chat unread count hesapla
+                var userThreads = await threadDal.GetAll(t =>
+                    t.CustomerUserId == userId || t.StoreOwnerUserId == userId || t.FreeBarberUserId == userId);
+                var chatUnreadCount = userThreads.Sum(t =>
+                    t.CustomerUserId == userId ? t.CustomerUnreadCount :
+                    t.StoreOwnerUserId == userId ? t.StoreUnreadCount :
+                    t.FreeBarberUserId == userId ? t.FreeBarberUnreadCount : 0);
+                await realtime.PushBadgeUpdateAsync(userId, chatUnreadCount: chatUnreadCount);
+            }
 
             return new SuccessDataResult<bool>(true);
         }
@@ -388,15 +439,15 @@ namespace Business.Concrete
                         {
                             // Tüm participant ID'leri için favorileri batch olarak çek
                             var participantIdsList = threadParticipantIds.ToList();
-                            var favorites1 = await favoriteDal.GetAll(x => 
-                                x.FavoritedFromId == userId && 
-                                participantIdsList.Contains(x.FavoritedToId) && 
+                            var favorites1 = await favoriteDal.GetAll(x =>
+                                x.FavoritedFromId == userId &&
+                                participantIdsList.Contains(x.FavoritedToId) &&
                                 x.IsActive);
-                            var favorites2 = await favoriteDal.GetAll(x => 
-                                participantIdsList.Contains(x.FavoritedFromId) && 
-                                x.FavoritedToId == userId && 
+                            var favorites2 = await favoriteDal.GetAll(x =>
+                                participantIdsList.Contains(x.FavoritedFromId) &&
+                                x.FavoritedToId == userId &&
                                 x.IsActive);
-                            
+
                             if (favorites1.Any() || favorites2.Any())
                             {
                                 isFavoriteVisible = true;
@@ -540,9 +591,9 @@ namespace Business.Concrete
                         if (stores.Any())
                         {
                             var storeIds = stores.Select(s => s.Id).ToList();
-                            var favoriteStores = await favoriteDal.GetAll(x => 
-                                x.FavoritedFromId == fromUserId && 
-                                storeIds.Contains(x.FavoritedToId) && 
+                            var favoriteStores = await favoriteDal.GetAll(x =>
+                                x.FavoritedFromId == fromUserId &&
+                                storeIds.Contains(x.FavoritedToId) &&
                                 x.IsActive);
                             if (favoriteStores.Any())
                             {
@@ -558,9 +609,9 @@ namespace Business.Concrete
                         if (stores.Any())
                         {
                             var storeIds = stores.Select(s => s.Id).ToList();
-                            var favoriteStores = await favoriteDal.GetAll(x => 
-                                x.FavoritedFromId == toUserId && 
-                                storeIds.Contains(x.FavoritedToId) && 
+                            var favoriteStores = await favoriteDal.GetAll(x =>
+                                x.FavoritedFromId == toUserId &&
+                                storeIds.Contains(x.FavoritedToId) &&
                                 x.IsActive);
                             if (favoriteStores.Any())
                             {
@@ -609,7 +660,7 @@ namespace Business.Concrete
                         var favoriteStores = await favoriteDal.GetAll(x => x.FavoritedFromId == userId && x.IsActive);
                         var storeIds = favoriteStores.Select(f => f.FavoritedToId).ToList();
                         var stores = await barberStoreDal.GetAll(x => storeIds.Contains(x.Id) && x.BarberStoreOwnerId == otherUserId);
-                        
+
                         // En az bir dükkan favoriye alınmışsa, ilk dükkanın bilgilerini göster
                         var store = stores.FirstOrDefault();
                         if (store != null)
@@ -993,6 +1044,7 @@ namespace Business.Concrete
 
         [SecuredOperation("Customer,FreeBarber,BarberStore")]
         [LogAspect]
+        [ExceptionHandlingAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<Guid>> EnsureFavoriteThreadAsync(Guid fromUserId, Guid toUserId, Guid? storeId = null)
         {
@@ -1120,159 +1172,154 @@ namespace Business.Concrete
 
             foreach (var recipientUserId in recipients)
             {
-                try
+                // ExceptionHandlingAspect method seviyesinde exception'ları handle eder
+                // Burada try-catch'e gerek yok, aspect otomatik handle edecek
+                string displayName = "";
+                string? imageUrl = null;
+                BarberType? barberType = null;
+                Guid participantUserId = Guid.Empty;
+                UserType participantUserType;
+
+                // REVIZE: Thread bilgisinde dükkan/serbest berber panel bilgileri gösterilsin
+                // Store bazlı favoriler için: En az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
+                // FreeBarber için: Panel bilgileri gösterilsin
+                var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                    ? thread.FavoriteToUserId!.Value
+                    : thread.FavoriteFromUserId!.Value;
+
+                var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                if (otherUser == null) continue;
+
+                participantUserId = otherUser.Id;
+
+                if (otherUser.UserType == UserType.Customer)
                 {
-                    string displayName = "";
-                    string? imageUrl = null;
-                    BarberType? barberType = null;
-                    Guid participantUserId = Guid.Empty;
-                    UserType participantUserType;
-
-                    // REVIZE: Thread bilgisinde dükkan/serbest berber panel bilgileri gösterilsin
-                    // Store bazlı favoriler için: En az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
-                    // FreeBarber için: Panel bilgileri gösterilsin
-                    var otherUserId = thread.FavoriteFromUserId == recipientUserId
-                        ? thread.FavoriteToUserId!.Value
-                        : thread.FavoriteFromUserId!.Value;
-
-                    var otherUser = await userDal.Get(u => u.Id == otherUserId);
-                    if (otherUser == null) continue;
-
-                    participantUserId = otherUser.Id;
-
-                    if (otherUser.UserType == UserType.Customer)
+                    displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                    if (otherUser.ImageId.HasValue)
                     {
-                        displayName = $"{otherUser.FirstName} {otherUser.LastName}";
-                        if (otherUser.ImageId.HasValue)
-                        {
-                            var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
-                            imageUrl = img?.ImageUrl;
-                        }
-                        barberType = null;
-                        participantUserType = UserType.Customer;
+                        var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                        imageUrl = img?.ImageUrl;
                     }
-                    else if (otherUser.UserType == UserType.BarberStore)
+                    barberType = null;
+                    participantUserType = UserType.Customer;
+                }
+                else if (otherUser.UserType == UserType.BarberStore)
+                {
+                    // REVIZE: Store sahibi için - en az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
+                    // recipientUserId'nin otherUserId'nin store'larından birini favoriye eklemiş olabilir
+                    var favoriteStores = await favoriteDal.GetAll(x => x.FavoritedFromId == recipientUserId && x.IsActive);
+                    var storeIds = favoriteStores.Select(f => f.FavoritedToId).ToList();
+                    var stores = await barberStoreDal.GetAll(x => storeIds.Contains(x.Id) && x.BarberStoreOwnerId == otherUserId);
+
+                    // En az bir dükkan favoriye alınmışsa, ilk dükkanın bilgilerini göster
+                    var store = stores.FirstOrDefault();
+                    if (store != null)
                     {
-                        // REVIZE: Store sahibi için - en az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
-                        // recipientUserId'nin otherUserId'nin store'larından birini favoriye eklemiş olabilir
-                        var favoriteStores = await favoriteDal.GetAll(x => x.FavoritedFromId == recipientUserId && x.IsActive);
-                        var storeIds = favoriteStores.Select(f => f.FavoritedToId).ToList();
-                        var stores = await barberStoreDal.GetAll(x => storeIds.Contains(x.Id) && x.BarberStoreOwnerId == otherUserId);
-                        
-                        // En az bir dükkan favoriye alınmışsa, ilk dükkanın bilgilerini göster
-                        var store = stores.FirstOrDefault();
-                        if (store != null)
-                        {
-                            displayName = store.StoreName;
-                            barberType = store.Type;
-                            var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
-                            imageUrl = img?.ImageUrl;
-                        }
-                        else
-                        {
-                            // Favori store yoksa, ilk store'u göster (fallback)
-                            var firstStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
-                            if (firstStore != null)
-                            {
-                                displayName = firstStore.StoreName;
-                                barberType = firstStore.Type;
-                                var img = await imageDal.GetLatestImageAsync(firstStore.Id, ImageOwnerType.Store);
-                                imageUrl = img?.ImageUrl;
-                            }
-                        }
-                        participantUserType = UserType.BarberStore;
-                    }
-                    else if (otherUser.UserType == UserType.FreeBarber)
-                    {
-                        // REVIZE: FreeBarber için panel bilgileri gösterilsin
-                        var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
-                        if (freeBarber != null)
-                        {
-                            displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
-                            barberType = freeBarber.Type;
-                            var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
-                            imageUrl = img?.ImageUrl;
-                        }
-                        participantUserType = UserType.FreeBarber;
+                        displayName = store.StoreName;
+                        barberType = store.Type;
+                        var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                        imageUrl = img?.ImageUrl;
                     }
                     else
                     {
-                        continue; // Beklenmeyen durum
-                    }
-
-                    // UnreadCount'u thread entity'den al
-                    int unreadCount = 0;
-                    if (thread.CustomerUserId == recipientUserId)
-                        unreadCount = thread.CustomerUnreadCount;
-                    else if (thread.StoreOwnerUserId == recipientUserId)
-                        unreadCount = thread.StoreUnreadCount;
-                    else if (thread.FreeBarberUserId == recipientUserId)
-                        unreadCount = thread.FreeBarberUnreadCount;
-
-                    // Mevcut kullanıcının (recipientUserId) profil resmini al
-                    string? currentUserImageUrlForRecipient = null;
-                    var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
-                    if (recipientUser != null)
-                    {
-                        if (recipientUser.UserType == UserType.Customer)
+                        // Favori store yoksa, ilk store'u göster (fallback)
+                        var firstStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                        if (firstStore != null)
                         {
-                            var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
-                            currentUserImageUrlForRecipient = userImg?.ImageUrl;
-                        }
-                        else if (recipientUser.UserType == UserType.BarberStore)
-                        {
-                            var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
-                            if (userStore != null)
-                            {
-                                var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
-                                currentUserImageUrlForRecipient = storeImg?.ImageUrl;
-                            }
-                        }
-                        else if (recipientUser.UserType == UserType.FreeBarber)
-                        {
-                            var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
-                            if (userFreeBarber != null)
-                            {
-                                var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
-                                currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
-                            }
+                            displayName = firstStore.StoreName;
+                            barberType = firstStore.Type;
+                            var img = await imageDal.GetLatestImageAsync(firstStore.Id, ImageOwnerType.Store);
+                            imageUrl = img?.ImageUrl;
                         }
                     }
-
-                    var threadDto = new ChatThreadListItemDto
-                    {
-                        ThreadId = thread.Id,
-                        AppointmentId = null,
-                        Status = null,
-                        IsFavoriteThread = true,
-                        Title = displayName,
-                        LastMessagePreview = thread.LastMessagePreview,
-                        LastMessageAt = thread.LastMessageAt,
-                        UnreadCount = unreadCount,
-                        CurrentUserImageUrl = currentUserImageUrlForRecipient,
-                        Participants = new List<ChatThreadParticipantDto>
-                        {
-                            new ChatThreadParticipantDto
-                            {
-                                UserId = participantUserId,
-                                DisplayName = displayName,
-                                ImageUrl = imageUrl,
-                                UserType = participantUserType,
-                                BarberType = barberType
-                            }
-                        }
-                    };
-
-                    // Thread oluşturulduğunda veya güncellendiğinde SignalR ile bildir
-                    if (isNewThread)
-                        await realtime.PushChatThreadCreatedAsync(recipientUserId, threadDto);
-                    else
-                        await realtime.PushChatThreadUpdatedAsync(recipientUserId, threadDto);
+                    participantUserType = UserType.BarberStore;
                 }
-                catch
+                else if (otherUser.UserType == UserType.FreeBarber)
                 {
-                    // Hata durumunda devam et
+                    // REVIZE: FreeBarber için panel bilgileri gösterilsin
+                    var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                    if (freeBarber != null)
+                    {
+                        displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                        barberType = freeBarber.Type;
+                        var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                        imageUrl = img?.ImageUrl;
+                    }
+                    participantUserType = UserType.FreeBarber;
                 }
+                else
+                {
+                    continue; // Beklenmeyen durum
+                }
+
+                // UnreadCount'u thread entity'den al
+                int unreadCount = 0;
+                if (thread.CustomerUserId == recipientUserId)
+                    unreadCount = thread.CustomerUnreadCount;
+                else if (thread.StoreOwnerUserId == recipientUserId)
+                    unreadCount = thread.StoreUnreadCount;
+                else if (thread.FreeBarberUserId == recipientUserId)
+                    unreadCount = thread.FreeBarberUnreadCount;
+
+                // Mevcut kullanıcının (recipientUserId) profil resmini al
+                string? currentUserImageUrlForRecipient = null;
+                var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
+                if (recipientUser != null)
+                {
+                    if (recipientUser.UserType == UserType.Customer)
+                    {
+                        var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
+                        currentUserImageUrlForRecipient = userImg?.ImageUrl;
+                    }
+                    else if (recipientUser.UserType == UserType.BarberStore)
+                    {
+                        var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
+                        if (userStore != null)
+                        {
+                            var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
+                            currentUserImageUrlForRecipient = storeImg?.ImageUrl;
+                        }
+                    }
+                    else if (recipientUser.UserType == UserType.FreeBarber)
+                    {
+                        var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
+                        if (userFreeBarber != null)
+                        {
+                            var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
+                            currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
+                        }
+                    }
+                }
+
+                var threadDto = new ChatThreadListItemDto
+                {
+                    ThreadId = thread.Id,
+                    AppointmentId = null,
+                    Status = null,
+                    IsFavoriteThread = true,
+                    Title = displayName,
+                    LastMessagePreview = thread.LastMessagePreview,
+                    LastMessageAt = thread.LastMessageAt,
+                    UnreadCount = unreadCount,
+                    CurrentUserImageUrl = currentUserImageUrlForRecipient,
+                    Participants = new List<ChatThreadParticipantDto>
+                    {
+                        new ChatThreadParticipantDto
+                        {
+                            UserId = participantUserId,
+                            DisplayName = displayName,
+                            ImageUrl = imageUrl,
+                            UserType = participantUserType,
+                            BarberType = barberType
+                        }
+                    }
+                };
+
+                // Thread oluşturulduğunda veya güncellendiğinde SignalR ile bildir
+                if (isNewThread)
+                    await realtime.PushChatThreadCreatedAsync(recipientUserId, threadDto);
+                else
+                    await realtime.PushChatThreadUpdatedAsync(recipientUserId, threadDto);
             }
 
             return new SuccessDataResult<Guid>(thread.Id);
@@ -1326,9 +1373,9 @@ namespace Business.Concrete
 
             foreach (var userId in participants)
             {
-                try
-                {
-                    var title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
+                // ExceptionHandlingAspect method seviyesinde exception'ları handle eder
+                // Burada try-catch'e gerek yok, aspect otomatik handle edecek
+                var title = BuildThreadTitleForUser(userId, appt, store?.StoreName);
 
                     // Participants listesini oluştur - ÖNEMLİ: Sadece kendi userId'miz hariç diğer participant'ları göster
                     var participantsList = new List<ChatThreadParticipantDto>();
@@ -1450,11 +1497,6 @@ namespace Business.Concrete
                         await realtime.PushChatThreadCreatedAsync(userId, threadDto);
                     else
                         await realtime.PushChatThreadUpdatedAsync(userId, threadDto);
-                }
-                catch
-                {
-                    // Hata durumunda devam et
-                }
             }
         }
 
@@ -1528,160 +1570,155 @@ namespace Business.Concrete
             // Performance: Parallel processing için Task.WhenAll kullanılabilir ama şimdilik sequential
             foreach (var recipientUserId in recipients)
             {
-                try
+                // ExceptionHandlingAspect method seviyesinde exception'ları handle eder
+                // Burada try-catch'e gerek yok, aspect otomatik handle edecek
+                string displayName = "";
+                string? imageUrl = null;
+                BarberType? barberType = null;
+                Guid participantUserId = Guid.Empty;
+                UserType participantUserType;
+
+                // REVIZE: Thread bilgisinde dükkan/serbest berber panel bilgileri gösterilsin
+                // Store bazlı favoriler için: En az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
+                // FreeBarber için: Panel bilgileri gösterilsin
+                var otherUserId = thread.FavoriteFromUserId == recipientUserId
+                    ? thread.FavoriteToUserId!.Value
+                    : thread.FavoriteFromUserId!.Value;
+
+                var otherUser = await userDal.Get(u => u.Id == otherUserId);
+                if (otherUser == null) continue;
+
+                participantUserId = otherUser.Id;
+                participantUserType = otherUser.UserType; // ÖNEMLİ: participantUserType'ı burada set et
+
+                if (otherUser.UserType == UserType.Customer)
                 {
-                    string displayName = "";
-                    string? imageUrl = null;
-                    BarberType? barberType = null;
-                    Guid participantUserId = Guid.Empty;
-                    UserType participantUserType;
-
-                    // REVIZE: Thread bilgisinde dükkan/serbest berber panel bilgileri gösterilsin
-                    // Store bazlı favoriler için: En az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
-                    // FreeBarber için: Panel bilgileri gösterilsin
-                    var otherUserId = thread.FavoriteFromUserId == recipientUserId
-                        ? thread.FavoriteToUserId!.Value
-                        : thread.FavoriteFromUserId!.Value;
-
-                    var otherUser = await userDal.Get(u => u.Id == otherUserId);
-                    if (otherUser == null) continue;
-
-                    participantUserId = otherUser.Id;
-                    participantUserType = otherUser.UserType; // ÖNEMLİ: participantUserType'ı burada set et
-
-                    if (otherUser.UserType == UserType.Customer)
+                    displayName = $"{otherUser.FirstName} {otherUser.LastName}";
+                    if (otherUser.ImageId.HasValue)
                     {
-                        displayName = $"{otherUser.FirstName} {otherUser.LastName}";
-                        if (otherUser.ImageId.HasValue)
-                        {
-                            var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
-                            imageUrl = img?.ImageUrl;
-                        }
-                        barberType = null;
+                        var img = await imageDal.GetLatestImageAsync(otherUser.Id, ImageOwnerType.User);
+                        imageUrl = img?.ImageUrl;
                     }
-                    else if (otherUser.UserType == UserType.BarberStore)
+                    barberType = null;
+                }
+                else if (otherUser.UserType == UserType.BarberStore)
+                {
+                    // REVIZE: Store sahibi için - en az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
+                    // recipientUserId'nin otherUserId'nin store'larından birini favoriye eklemiş olabilir
+                    var favoriteStores = await favoriteDal.GetAll(x => x.FavoritedFromId == recipientUserId && x.IsActive);
+                    var storeIds = favoriteStores.Select(f => f.FavoritedToId).ToList();
+                    var stores = await barberStoreDal.GetAll(x => storeIds.Contains(x.Id) && x.BarberStoreOwnerId == otherUserId);
+
+                    // En az bir dükkan favoriye alınmışsa, ilk dükkanın bilgilerini göster
+                    var store = stores.FirstOrDefault();
+                    if (store != null)
                     {
-                        // REVIZE: Store sahibi için - en az bir dükkanı favoriye almışsa o dükkanın bilgileri gösterilsin
-                        // recipientUserId'nin otherUserId'nin store'larından birini favoriye eklemiş olabilir
-                        var favoriteStores = await favoriteDal.GetAll(x => x.FavoritedFromId == recipientUserId && x.IsActive);
-                        var storeIds = favoriteStores.Select(f => f.FavoritedToId).ToList();
-                        var stores = await barberStoreDal.GetAll(x => storeIds.Contains(x.Id) && x.BarberStoreOwnerId == otherUserId);
-                        
-                        // En az bir dükkan favoriye alınmışsa, ilk dükkanın bilgilerini göster
-                        var store = stores.FirstOrDefault();
-                        if (store != null)
-                        {
-                            displayName = store.StoreName;
-                            barberType = store.Type;
-                            var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
-                            imageUrl = img?.ImageUrl;
-                        }
-                        else
-                        {
-                            // Favori store yoksa, ilk store'u göster (fallback)
-                            var firstStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
-                            if (firstStore != null)
-                            {
-                                displayName = firstStore.StoreName;
-                                barberType = firstStore.Type;
-                                var img = await imageDal.GetLatestImageAsync(firstStore.Id, ImageOwnerType.Store);
-                                imageUrl = img?.ImageUrl;
-                            }
-                        }
-                    }
-                    else if (otherUser.UserType == UserType.FreeBarber)
-                    {
-                        // REVIZE: FreeBarber için panel bilgileri gösterilsin
-                        var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
-                        if (freeBarber != null)
-                        {
-                            displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
-                            barberType = freeBarber.Type;
-                            var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
-                            imageUrl = img?.ImageUrl;
-                        }
+                        displayName = store.StoreName;
+                        barberType = store.Type;
+                        var img = await imageDal.GetLatestImageAsync(store.Id, ImageOwnerType.Store);
+                        imageUrl = img?.ImageUrl;
                     }
                     else
                     {
-                        continue; // Beklenmeyen durum
-                    }
-
-                    // Participant bilgilerini kontrol et - geçerli değilse atla
-                    if (participantUserId == recipientUserId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
-                    {
-                        continue; // Geçersiz participant bilgisi
-                    }
-
-                    // UnreadCount'u thread entity'den al
-                    int unreadCount = 0;
-                    if (thread.CustomerUserId == recipientUserId)
-                        unreadCount = thread.CustomerUnreadCount;
-                    else if (thread.StoreOwnerUserId == recipientUserId)
-                        unreadCount = thread.StoreUnreadCount;
-                    else if (thread.FreeBarberUserId == recipientUserId)
-                        unreadCount = thread.FreeBarberUnreadCount;
-
-                    // Mevcut kullanıcının (recipientUserId) profil resmini al
-                    string? currentUserImageUrlForRecipient = null;
-                    var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
-                    if (recipientUser != null)
-                    {
-                        if (recipientUser.UserType == UserType.Customer)
+                        // Favori store yoksa, ilk store'u göster (fallback)
+                        var firstStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == otherUserId);
+                        if (firstStore != null)
                         {
-                            var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
-                            currentUserImageUrlForRecipient = userImg?.ImageUrl;
-                        }
-                        else if (recipientUser.UserType == UserType.BarberStore)
-                        {
-                            var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
-                            if (userStore != null)
-                            {
-                                var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
-                                currentUserImageUrlForRecipient = storeImg?.ImageUrl;
-                            }
-                        }
-                        else if (recipientUser.UserType == UserType.FreeBarber)
-                        {
-                            var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
-                            if (userFreeBarber != null)
-                            {
-                                var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
-                                currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
-                            }
+                            displayName = firstStore.StoreName;
+                            barberType = firstStore.Type;
+                            var img = await imageDal.GetLatestImageAsync(firstStore.Id, ImageOwnerType.Store);
+                            imageUrl = img?.ImageUrl;
                         }
                     }
-
-                    var threadDto = new ChatThreadListItemDto
-                    {
-                        ThreadId = thread.Id,
-                        AppointmentId = null,
-                        Status = null,
-                        IsFavoriteThread = true,
-                        Title = displayName,
-                        LastMessagePreview = thread.LastMessagePreview,
-                        LastMessageAt = thread.LastMessageAt,
-                        UnreadCount = unreadCount,
-                        CurrentUserImageUrl = currentUserImageUrlForRecipient,
-                        Participants = new List<ChatThreadParticipantDto>
-                        {
-                            new ChatThreadParticipantDto
-                            {
-                                UserId = participantUserId,
-                                DisplayName = displayName,
-                                ImageUrl = imageUrl,
-                                UserType = participantUserType,
-                                BarberType = barberType
-                            }
-                        }
-                    };
-
-                    // ThreadUpdated gönder
-                    await realtime.PushChatThreadUpdatedAsync(recipientUserId, threadDto);
                 }
-                catch
+                else if (otherUser.UserType == UserType.FreeBarber)
                 {
-                    // Hata durumunda devam et
+                    // REVIZE: FreeBarber için panel bilgileri gösterilsin
+                    var freeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == otherUserId);
+                    if (freeBarber != null)
+                    {
+                        displayName = $"{freeBarber.FirstName} {freeBarber.LastName}";
+                        barberType = freeBarber.Type;
+                        var img = await imageDal.GetLatestImageAsync(freeBarber.Id, ImageOwnerType.FreeBarber);
+                        imageUrl = img?.ImageUrl;
+                    }
                 }
+                else
+                {
+                    continue; // Beklenmeyen durum
+                }
+
+                // Participant bilgilerini kontrol et - geçerli değilse atla
+                if (participantUserId == recipientUserId || participantUserId == Guid.Empty || string.IsNullOrEmpty(displayName))
+                {
+                    continue; // Geçersiz participant bilgisi
+                }
+
+                // UnreadCount'u thread entity'den al
+                int unreadCount = 0;
+                if (thread.CustomerUserId == recipientUserId)
+                    unreadCount = thread.CustomerUnreadCount;
+                else if (thread.StoreOwnerUserId == recipientUserId)
+                    unreadCount = thread.StoreUnreadCount;
+                else if (thread.FreeBarberUserId == recipientUserId)
+                    unreadCount = thread.FreeBarberUnreadCount;
+
+                // Mevcut kullanıcının (recipientUserId) profil resmini al
+                string? currentUserImageUrlForRecipient = null;
+                var recipientUser = await userDal.Get(u => u.Id == recipientUserId);
+                if (recipientUser != null)
+                {
+                    if (recipientUser.UserType == UserType.Customer)
+                    {
+                        var userImg = await imageDal.GetLatestImageAsync(recipientUser.Id, ImageOwnerType.User);
+                        currentUserImageUrlForRecipient = userImg?.ImageUrl;
+                    }
+                    else if (recipientUser.UserType == UserType.BarberStore)
+                    {
+                        var userStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == recipientUserId);
+                        if (userStore != null)
+                        {
+                            var storeImg = await imageDal.GetLatestImageAsync(userStore.Id, ImageOwnerType.Store);
+                            currentUserImageUrlForRecipient = storeImg?.ImageUrl;
+                        }
+                    }
+                    else if (recipientUser.UserType == UserType.FreeBarber)
+                    {
+                        var userFreeBarber = await freeBarberDal.Get(x => x.FreeBarberUserId == recipientUserId);
+                        if (userFreeBarber != null)
+                        {
+                            var freeBarberImg = await imageDal.GetLatestImageAsync(userFreeBarber.Id, ImageOwnerType.FreeBarber);
+                            currentUserImageUrlForRecipient = freeBarberImg?.ImageUrl;
+                        }
+                    }
+                }
+
+                var threadDto = new ChatThreadListItemDto
+                {
+                    ThreadId = thread.Id,
+                    AppointmentId = null,
+                    Status = null,
+                    IsFavoriteThread = true,
+                    Title = displayName,
+                    LastMessagePreview = thread.LastMessagePreview,
+                    LastMessageAt = thread.LastMessageAt,
+                    UnreadCount = unreadCount,
+                    CurrentUserImageUrl = currentUserImageUrlForRecipient,
+                    Participants = new List<ChatThreadParticipantDto>
+                    {
+                        new ChatThreadParticipantDto
+                        {
+                            UserId = participantUserId,
+                            DisplayName = displayName,
+                            ImageUrl = imageUrl,
+                            UserType = participantUserType,
+                            BarberType = barberType
+                        }
+                    }
+                };
+
+                // ThreadUpdated gönder
+                await realtime.PushChatThreadUpdatedAsync(recipientUserId, threadDto);
             }
         }
 

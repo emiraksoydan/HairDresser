@@ -32,6 +32,7 @@ namespace Business.Concrete
         IWorkingHourDal workingHourDal,
         IAppointmentNotifyService notifySvc,
         INotificationService notificationService,
+        INotificationDal notificationDal,
         IRealTimePublisher realtime,
         IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings,
@@ -229,7 +230,7 @@ namespace Business.Concrete
                 () => Task.FromResult(businessRules.CheckTimeRangeValid(start, end)),
                 () => Task.FromResult(businessRules.CheckDateNotPast(appointmentDate, start)),
                 () => Task.FromResult(businessRules.CheckDistance(req.RequestLatitude.Value, req.RequestLongitude.Value, store.Latitude, store.Longitude, Messages.CustomerDistanceExceeded)),
-                async () => await businessRules.CheckActiveAppointmentRules(customerUserId, null, store.BarberStoreOwnerId, AppointmentRequester.Customer),
+                async () => await businessRules.CheckActiveAppointmentRules(customerUserId, null, req.StoreId, AppointmentRequester.Customer),
                 async () => await EnsureStoreIsOpenAsync(req.StoreId, appointmentDate, start, end),
                 async () => await EnsureChairNoOverlapAsync(req.ChairId.Value, appointmentDate, start, end)
             );
@@ -245,6 +246,7 @@ namespace Business.Concrete
                 StartTime = start,
                 EndTime = end,
                 BarberStoreUserId = store.BarberStoreOwnerId,
+                StoreId = req.StoreId,  // Multi-store support
                 CustomerUserId = customerUserId,
                 FreeBarberUserId = null,
                 ManuelBarberId = chair.ManuelBarberId,
@@ -268,9 +270,9 @@ namespace Business.Concrete
             }
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
-            
+
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
-            
+
             return new SuccessDataResult<Guid>(appt.Id);
         }
         // ---------------- CREATE: FREEBARBER -> STORE ----------------
@@ -288,7 +290,7 @@ namespace Business.Concrete
 
             // Store ve FreeBarber entity'lerini al
             var store = await barberStoreDal.Get(x => x.Id == req.StoreId);
-            if (store is null) return new ErrorDataResult<Guid>(Messages.StoreNotFoundEnglish);
+            if (store is null) return new ErrorDataResult<Guid>(Messages.StoreNotFound);
 
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
             if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
@@ -301,7 +303,7 @@ namespace Business.Concrete
                 () => Task.FromResult(businessRules.CheckTimeRangeValid(start, end)),
                 () => Task.FromResult(businessRules.CheckDateNotPast(appointmentDate, start)),
                 () => Task.FromResult(businessRules.CheckDistance(fb.Latitude, fb.Longitude, store.Latitude, store.Longitude, Messages.FreeBarberStoreDistanceExceeded)),
-                async () => await businessRules.CheckActiveAppointmentRules(null, freeBarberUserId, store.BarberStoreOwnerId, AppointmentRequester.FreeBarber),
+                async () => await businessRules.CheckActiveAppointmentRules(null, freeBarberUserId, req.StoreId, AppointmentRequester.FreeBarber),
                 async () => await EnsureStoreIsOpenAsync(req.StoreId, appointmentDate, start, end)
             );
 
@@ -325,6 +327,7 @@ namespace Business.Concrete
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId,
                 BarberStoreUserId = store.BarberStoreOwnerId,
+                StoreId = req.StoreId,  // Multi-store support
                 CustomerUserId = null,
                 FreeBarberUserId = freeBarberUserId,
                 ManuelBarberId = null,
@@ -392,7 +395,7 @@ namespace Business.Concrete
                 async () => await businessRules.CheckStoreOwnership(req.StoreId, storeOwnerUserId),
                 async () => await businessRules.CheckFreeBarberExists(req.FreeBarberUserId),
                 () => Task.FromResult(businessRules.CheckDistance(store.Latitude, store.Longitude, fb.Latitude, fb.Longitude, Messages.StoreFreeBarberDistanceExceeded)),
-                async () => await businessRules.CheckActiveAppointmentRules(null, req.FreeBarberUserId, storeOwnerUserId, AppointmentRequester.Store),
+                async () => await businessRules.CheckActiveAppointmentRules(null, req.FreeBarberUserId, req.StoreId, AppointmentRequester.Store),
                 async () => await EnsureStoreIsOpenNowAsync(req.StoreId)
             );
 
@@ -404,6 +407,7 @@ namespace Business.Concrete
                 Id = Guid.NewGuid(),
                 ChairId = null,
                 BarberStoreUserId = storeOwnerUserId,
+                StoreId = req.StoreId,  // Multi-store support
                 CustomerUserId = null,
                 FreeBarberUserId = req.FreeBarberUserId,
                 ManuelBarberId = null,
@@ -476,7 +480,7 @@ namespace Business.Concrete
 
             // Business Rules kontrol├╝
             var store = await barberStoreDal.Get(x => x.Id == storeId);
-            if (store is null) return new ErrorDataResult<bool>(false, Messages.StoreNotFoundEnglish);
+            if (store is null) return new ErrorDataResult<bool>(false, Messages.StoreNotFound);
 
             var chair = await chairDal.Get(c => c.Id == chairId && c.StoreId == storeId);
             if (chair is null) return new ErrorDataResult<bool>(false, Messages.ChairNotInStore);
@@ -501,20 +505,21 @@ namespace Business.Concrete
             var offeringRes = await EnsureServiceOfferingsBelongToOwnerAsync(serviceOfferingIds, store.Id);
             if (!offeringRes.Success) return new ErrorDataResult<bool>(false, offeringRes.Message);
 
-            // Randevuya d├╝kkan bilgisini ekle
+            // Randevuya dükkan bilgisini ekle
             appt.BarberStoreUserId = store.BarberStoreOwnerId;
+            appt.StoreId = storeId;  // Çoklu dükkan desteği
             appt.ChairId = chairId;
-            // D├╝kkan i├ğin 5 dakikal─▒k onay s├╝resi (ama toplam 30 dakikaya dahil)
+            // Dükkan için 5 dakikalık onay süresi (ama toplam 30 dakikaya dahil)
             SetStoreSelectionStepExpiry(appt);
             appt.AppointmentDate = appointmentDate;
             appt.StartTime = startTime;
             appt.EndTime = endTime;
-            appt.StoreDecision = DecisionStatus.Pending; // Store 5dk i├ğinde onay verecek
-            // FreeBarberDecision hala Pending (30dk i├ğinde red edebilir)
-            // CustomerDecision hala null (Store onaylad─▒ktan sonra Pending olacak)
+            appt.StoreDecision = DecisionStatus.Pending; // Store 5dk içinde onay verecek
+            // FreeBarberDecision hala Pending (30dk içinde red edebilir)
+            // CustomerDecision hala null (Store onayladıktan sonra Pending olacak)
             appt.UpdatedAt = DateTime.UtcNow;
 
-            // Manuel barber kontrol├╝
+            // Manuel barber kontrolü
             appt.ManuelBarberId = chair.ManuelBarberId;
 
             await appointmentDal.Update(appt);
@@ -522,10 +527,11 @@ namespace Business.Concrete
 
             await UpdateThreadStoreOwnerAsync(appt.Id, appt.BarberStoreUserId);
 
-            // Thread'i g├╝ncelle (3'l├╝ thread olacak)
+            // Thread'i güncelle (3'lü thread olacak)
             await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
 
-            // D├╝kkana bildirim g├Ânder (sadece d├╝kkan, m├╝┼şteriye g├Ânderme)
+            // Dükkana bildirim gönder (sadece dükkan, müşteriye gönderme)
+            // Bu metot içinde SignalR 'notification.received' eventi tetiklenir (PUSH)
             if (appt.BarberStoreUserId.HasValue)
             {
                 await notifySvc.NotifyWithAppointmentToRecipientsAsync(
@@ -535,7 +541,7 @@ namespace Business.Concrete
                     actorUserId: freeBarberUserId);
             }
 
-            // Notification payload update
+            // Mevcut bildirimlerin payload'ını güncelle (senkronizasyon için)
             await notificationService.UpdateNotificationPayloadByAppointmentAsync(
                 appt.Id,
                 appt.Status,
@@ -545,7 +551,7 @@ namespace Business.Concrete
                 appt.PendingExpiresAt
             );
 
-            // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
+            // İlgili kullanıcılara appointment güncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
@@ -747,6 +753,16 @@ namespace Business.Concrete
                 // Rejected: Actor'ın (store) bildirimlerini otomatik okunmuş yap
                 await notificationService.MarkReadByAppointmentIdAsync(storeOwnerUserId, appt.Id);
 
+                // Thread'deki mesajları okundu işaretle (Rejected olduğu için)
+                // - Store için mesajları okundu yap
+                await chatService.MarkThreadReadByAppointmentAsync(storeOwnerUserId, appt.Id);
+                // - Diğer taraf varsa (Customer veya FreeBarber) onun için de thread kapatılmalı ve okunmuş sayılmalı mı?
+                // Genelde thread kapatılırken unread count sıfırlanır (AppointmentTimeoutWorker'da yapıldığı gibi)
+                // Burada da aynısını yapalım:
+                if (appt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.FreeBarberUserId.Value, appt.Id);
+                if (appt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.CustomerUserId.Value, appt.Id);
+                // NOT: Badge update MarkThreadReadByAppointmentAsync içinde zaten yapılıyor
+
                 await UpdateThreadOnAppointmentStatusChangeAsync(appt);
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
@@ -770,6 +786,9 @@ namespace Business.Concrete
 
                 // Approved: Actor'ın (store) bildirimlerini otomatik okunmuş yap
                 await notificationService.MarkReadByAppointmentIdAsync(storeOwnerUserId, appt.Id);
+
+                // Approved durumunda sadece store okumuş sayılır, diğerleri hala okumamış olabilir (normal akış)
+                await chatService.MarkThreadReadByAppointmentAsync(storeOwnerUserId, appt.Id); // Badge update içinde tetiklenir
 
                 await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
 
@@ -895,16 +914,24 @@ namespace Business.Concrete
                     // M├╝┼şteri'ye ├Âzel bildirim: FreeBarberRejectedInitial
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.FreeBarberRejectedInitial, actorUserId: freeBarberUserId);
 
-                    // Rejected: Actor'ın (freeBarber) bildirimlerini otomatik okunmuş yap
-                    await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
+                    // Rejected: Actor'ın (freebarber) bildirimlerini otomatik okunmuş yap
+                await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
 
-                    // SignalR ile bildir
-                    await NotifyAppointmentUpdateToParticipantsAsync(appt);
+                // Thread'deki mesajları okundu işaretle (Rejected olduğu için)
+                // - FreeBarber için okundu yap
+                await chatService.MarkThreadReadByAppointmentAsync(freeBarberUserId, appt.Id);
+                // - Diğer taraf (Customer veya Store)
+                if (appt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.BarberStoreUserId.Value, appt.Id);
+                if (appt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.CustomerUserId.Value, appt.Id);
+                // NOT: Badge update MarkThreadReadByAppointmentAsync içinde zaten yapılıyor
 
-                    // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
+                await UpdateThreadOnAppointmentStatusChangeAsync(appt);
+                await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
-                    return new SuccessDataResult<bool>(true);
-                }
+                // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
+
+                return new SuccessDataResult<bool>(true);
+            }
 
                 // Di─şer senaryolar (CustomRequest, Store -> FreeBarber, vs.)
                 appt.Status = AppointmentStatus.Rejected;
@@ -1000,7 +1027,7 @@ namespace Business.Concrete
                 appt.PendingExpiresAt
             );
 
- 
+
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
@@ -1030,8 +1057,11 @@ namespace Business.Concrete
                 }
                 await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentApproved, actorUserId: freeBarberUserId);
 
-                // Approved: Actor'ın (freeBarber) bildirimlerini otomatik okunmuş yap
+                // Approved: Actor'ın (freebarber) bildirimlerini otomatik okunmuş yap
                 await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
+
+                // Approved durumunda sadece freebarber yapmış sayılır
+                await chatService.MarkThreadReadByAppointmentAsync(freeBarberUserId, appt.Id);
 
                 await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
 
@@ -1041,11 +1071,7 @@ namespace Business.Concrete
 
                 // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
-    
-            // Free Barber kararını verdi, ilgili bildirimleri okundu olarak işaretle
-            await notificationService.MarkReadByAppointmentIdAsync(freeBarberUserId, appt.Id);
-
-            return new SuccessDataResult<bool>(true);
+                return new SuccessDataResult<bool>(true);
             }
 
 
@@ -1109,8 +1135,15 @@ namespace Business.Concrete
 
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: customerUserId);
 
-                    // Rejected: Sadece actor'ın (müşteri) bildirimini read yap
+                    // Rejected: Actor'ın (müşteri) bildirimini read yap
                     await notificationService.MarkReadByAppointmentIdAsync(customerUserId, appt.Id);
+
+                    // Thread okundu yap (Rejected - herkes için)
+                    await chatService.MarkThreadReadByAppointmentAsync(customerUserId, appt.Id);
+                    if (appt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.FreeBarberUserId.Value, appt.Id);
+                    // Store varsa
+                    if (appt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.BarberStoreUserId.Value, appt.Id);
+                    // NOT: Badge update MarkThreadReadByAppointmentAsync içinde zaten yapılıyor
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
@@ -1135,6 +1168,9 @@ namespace Business.Concrete
 
                     // Approved: Actor'ın (customer) bildirimlerini otomatik okunmuş yap
                     await notificationService.MarkReadByAppointmentIdAsync(customerUserId, appt.Id);
+
+                    // Approved - sadece customer okudu
+                    await chatService.MarkThreadReadByAppointmentAsync(customerUserId, appt.Id);
 
                     await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -1267,7 +1303,15 @@ namespace Business.Concrete
             // FreeBarber'ı müsait yap
             await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
 
+
+
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCancelled, actorUserId: userId);
+
+            // Cancelled: Thread okunmuş sayılsın (herkes için)
+            // Thread read + badge updates (MarkThreadReadByAppointmentAsync handles badge internally)
+            if (appt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.CustomerUserId.Value, appt.Id);
+            if (appt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.FreeBarberUserId.Value, appt.Id);
+            if (appt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.BarberStoreUserId.Value, appt.Id);
 
             // İptal sonrası slot kilidini kaldır (availability + unique index için)
             // ÖNEMLİ: Store bilgisini (BarberStoreUserId) silme.
@@ -1372,6 +1416,11 @@ namespace Business.Concrete
             // Completed durumunda serbest berberi m├╝sait yap
             await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
 
+            // Thread read + badge updates (MarkThreadReadByAppointmentAsync handles badge internally)
+            if (appt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.CustomerUserId.Value, appt.Id);
+            if (appt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.FreeBarberUserId.Value, appt.Id);
+            if (appt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentAsync(appt.BarberStoreUserId.Value, appt.Id);
+
             await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentCompleted, actorUserId: userId);
 
             // Tamamlama sonrası slot kilidini kaldır (availability + unique index için)
@@ -1450,6 +1499,14 @@ namespace Business.Concrete
             appt.UpdatedAt = DateTime.UtcNow;
             await appointmentDal.Update(appt);
 
+            // ✅ DÜZELTME: İlgili bildirimleri de sil (kullanıcı için)
+            // Randevu silindiğinde bildirimleri de silmeliyiz, aksi takdirde tutarsızlık oluşur
+            var notifications = await notificationDal.GetAll(x => x.AppointmentId == appt.Id && x.UserId == userId);
+            foreach (var notification in notifications)
+            {
+                await notificationDal.Remove(notification);
+            }
+
             // İlgili ChatThread'i bul ve kullanıcı için soft delete yap
             var thread = await threadDal.Get(t => t.AppointmentId == appt.Id);
             if (thread != null)
@@ -1479,14 +1536,10 @@ namespace Business.Concrete
 
                 // Thread removed push et (kullanıcı için)
                 await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
-
-                // Badge count'u güncelle (thread unread count değişti)
-                // Badge service thread unread count'ları da sayıyor, bu yüzden güncellememiz gerekiyor
-                // Ancak AppointmentManager'da badgeService yok, bu yüzden chatService üzerinden yapabiliriz
-                // veya notification service üzerinden badge güncellemesi yapılabilir
-                // Şimdilik chat service'in PushChatThreadRemovedAsync'i badge'i de güncelliyor olabilir
-                // Kontrol etmek gerekiyor, ama şimdilik bu şekilde bırakalım
             }
+
+            // ✅ DÜZELTME: Badge count güncelle (bildirim silindi)
+            await realtime.PushBadgeUpdateAsync(userId);
 
             // Eğer tüm kullanıcılar soft delete yaptıysa, appointment'ı hard delete et
             var allDeleted = true;
@@ -1572,6 +1625,13 @@ namespace Business.Concrete
                 }
 
                 appt.UpdatedAt = DateTime.UtcNow;
+
+                // ✅ DÜZELTME: Her randevu için ilgili bildirimleri de sil
+                var notifications = await notificationDal.GetAll(x => x.AppointmentId == appt.Id && x.UserId == userId);
+                foreach (var notification in notifications)
+                {
+                    await notificationDal.Remove(notification);
+                }
             }
 
             if (!appointmentsToDelete.Any() && cannotDeleteCount > 0)
@@ -1696,6 +1756,9 @@ namespace Business.Concrete
             {
                 await NotifyAppointmentUpdateToParticipantsAsync(appt);
             }
+
+            // ✅ DÜZELTME: Badge count güncelle (bildirimler silindi)
+            await realtime.PushBadgeUpdateAsync(userId);
 
             // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
 
@@ -1852,9 +1915,9 @@ namespace Business.Concrete
 
         private async Task<IResult> EnsureStoreIsOpenNowAsync(Guid storeId)
         {
-            var now = DateTime.Now;
-            var dow = now.DayOfWeek;
-            var currentTime = now.TimeOfDay;
+            var nowTr = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
+            var dow = nowTr.DayOfWeek;
+            var currentTime = nowTr.TimeOfDay;
 
             var wh = await workingHourDal.Get(x =>
                 x.OwnerId == storeId &&
@@ -1867,7 +1930,7 @@ namespace Business.Concrete
                 return new ErrorResult(Messages.StoreClosed);
 
             if (wh.StartTime > currentTime || wh.EndTime < currentTime)
-                return new ErrorResult("D├╝kkan ┼şu an kapal─▒. L├╝tfen mesai saatleri i├ğinde randevu olu┼şturun.");
+                return new ErrorResult(Messages.StoreNotOpen);
 
             return new SuccessResult();
         }
@@ -1979,7 +2042,7 @@ namespace Business.Concrete
 
 
 
- 
+
 
         // NOTE: This method is an overload that accepts FreeBarber entity directly
         // Used when we already have the entity loaded to avoid extra database query
@@ -2257,7 +2320,7 @@ namespace Business.Concrete
 
                         var filterAppointments = await appointmentDal.GetAllAppointmentByFilter(userId, filter);
                         var updatedInFilter = filterAppointments.FirstOrDefault(a => a.Id == appt.Id);
-                        
+
                         if (updatedInFilter != null)
                         {
                             await realtime.PushAppointmentUpdatedAsync(userId, updatedInFilter);
@@ -2274,27 +2337,3 @@ namespace Business.Concrete
 
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

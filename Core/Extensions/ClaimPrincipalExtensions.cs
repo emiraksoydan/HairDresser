@@ -18,7 +18,8 @@ namespace Core.Extensions
 
         public static List<string> ClaimRoles(this ClaimsPrincipal claimsPrincipal)
         {
-              return claimsPrincipal?.Claims(ClaimTypes.Role);
+              var result = claimsPrincipal?.Claims(ClaimTypes.Role);
+              return result ?? new List<string>();
         }
 
         public static Guid GetUserIdOrThrow(this ClaimsPrincipal user)

@@ -1,41 +1,41 @@
 using Business.Abstract;
 using Entities.Concrete.Dto;
-using Entities.Concrete.Enums;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class WorkingController(IWorkingHourService workingHourService) : ControllerBase
+    public class WorkingController : BaseApiController
     {
+        private readonly IWorkingHourService _workingHourService;
+
+        public WorkingController(IWorkingHourService workingHourService)
+        {
+            _workingHourService = workingHourService;
+        }
+
         [HttpPost]
         public async Task<IActionResult> Add([FromBody] WorkingHourCreateDto dto)
         {
-            var result = await workingHourService.AddAsync(dto);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_workingHourService.AddAsync(dto));
         }
 
         [HttpPut]
         public async Task<IActionResult> Update([FromBody] WorkingHourUpdateDto dto)
         {
-            var result = await workingHourService.UpdateAsync(dto);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_workingHourService.UpdateAsync(dto));
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var result = await workingHourService.DeleteAsync(id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_workingHourService.DeleteAsync(id));
         }
 
         [HttpGet("{targetId}")]
         public async Task<IActionResult> Get(Guid targetId)
         {
-            var result = await workingHourService.GetByTargetAsync(targetId);
-            return result.Success ? Ok(result) : NotFound(result);
+            return await HandleDataResultAsync(_workingHourService.GetByTargetAsync(targetId));
         }
     }
 }

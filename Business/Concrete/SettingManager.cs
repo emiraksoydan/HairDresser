@@ -9,10 +9,12 @@ namespace Business.Concrete
     public class SettingManager : ISettingService
     {
         private readonly ISettingDal _settingDal;
+        private readonly IUserDal _userDal;
 
-        public SettingManager(ISettingDal settingDal)
+        public SettingManager(ISettingDal settingDal, IUserDal userDal)
         {
             _settingDal = settingDal;
+            _userDal = userDal;
         }
 
         public async Task<IDataResult<SettingGetDto>> GetByUserIdAsync(Guid userId)
@@ -64,6 +66,15 @@ namespace Business.Concrete
                 return new SuccessResult("Ayarlar zaten mevcut.");
             }
 
+            // FIX: UserId foreign key constraint validation
+            // Settings tablosu User tablosuna foreign key ile bağlı
+            // User varlığını kontrol et, yoksa error döndür
+            var user = await _userDal.Get(u => u.Id == userId);
+            if (user == null)
+            {
+                return new ErrorResult($"Kullanıcı bulunamadı. UserId: {userId}");
+            }
+            
             var setting = new Setting
             {
                 Id = Guid.NewGuid(),
@@ -79,4 +90,3 @@ namespace Business.Concrete
         }
     }
 }
-

@@ -441,6 +441,7 @@ namespace Business.Concrete
                     storeDetails[store.Id] = new BarberStoreGetDto
                     {
                         Id = store.Id, // Her store'un kendi ID'si
+                        BarberStoreOwnerId = store.BarberStoreOwnerId, // Kendi dükkanına tıklandığında güncelleme sheet'i açmak için gerekli
                         StoreName = store.StoreName, // Her store'un kendi ismi
                         Type = store.Type,
                         Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2), // Her store'un kendi rating'i
@@ -523,6 +524,7 @@ namespace Business.Concrete
                     freeBarberDetails[freeBarberOwnerId] = new FreeBarberGetDto // Key olarak owner User ID kullan
                     {
                         Id = fb.Id, // Her freeBarber'ın kendi ID'si
+                        FreeBarberUserId = fb.FreeBarberUserId, // Kendi paneline tıklandığında güncelleme sheet'i açmak için gerekli
                         FullName = $"{fb.FirstName} {fb.LastName}", // Her freeBarber'ın kendi ismi
                         Type = fb.Type,
                         Rating = Math.Round(ratingInfo?.AvgRating ?? 0, 2),

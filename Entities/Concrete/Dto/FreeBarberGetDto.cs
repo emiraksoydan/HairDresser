@@ -26,6 +26,7 @@ namespace Entities.Concrete.Dto
         public double Longitude { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
+        public bool IsOwnPanel { get; set; } // Kullanıcının kendi paneli mi (filtrelerden etkilenmez)
     }
 }
 

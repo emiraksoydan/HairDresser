@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Castle.DynamicProxy;
 using Core.CrossCuttingConcerns.Validation;
 using Core.Utilities.Interceptors;
-using Entities.Abstract;
 using FluentValidation;
 
 namespace Core.Aspect.Autofac.Validation

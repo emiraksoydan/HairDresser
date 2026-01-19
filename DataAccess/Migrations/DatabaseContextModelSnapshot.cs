@@ -99,6 +99,9 @@ namespace DataAccess.Migrations
                     b.Property<int?>("StoreDecision")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("StoreSelectionType")
                         .HasColumnType("integer");
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +12,7 @@ namespace Entities.Concrete.Dto
     public class BarberStoreGetDto : IDto
     {
         public Guid Id { get; set; }
+        public Guid? BarberStoreOwnerId { get; set; } // Kendi dükkanına tıklandığında güncelleme sheet'i açmak için gerekli
         public string StoreName { get; set; }
         public string PricingType { get; set; }
         public double PricingValue { get; set; }
@@ -28,6 +29,7 @@ namespace Entities.Concrete.Dto
         public List<ServiceOfferingGetDto> ServiceOfferings { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
+        public bool IsOwnStore { get; set; } // Kullanıcının kendi dükkanı mı (filtrelerden etkilenmez)
 
     }
 

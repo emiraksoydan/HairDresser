@@ -7,18 +7,10 @@ using Core.Aspect.Autofac.Transaction;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
-using DataAccess.Concrete;
-using Entities.Abstract;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Mapster;
-using MapsterMapper;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Transactions;
+
 
 namespace Business.Concrete
 {
@@ -33,9 +25,8 @@ namespace Business.Concrete
             // Kullanıcının zaten bir FreeBarber paneli var mı kontrol et
             var existingPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
             if (existingPanel != null)
-            {
                 return new ErrorResult(Messages.FreeBarberPanelAlreadyExists);
-            }
+            
 
             var entity = freeBarberCreateDto.Adapt<FreeBarber>();
             entity.FreeBarberUserId = currentUserId;
@@ -89,7 +80,7 @@ namespace Business.Concrete
             return new SuccessResult(Messages.LocationUpdatedSuccess);
 
         }
-        [SecuredOperation("FreeBarber")]
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
         public async Task<IDataResult<FreeBarberMinePanelDto>> GetMyPanel(Guid currentUserId)
         {
             var result = await freeBarberDal.GetMyPanel(currentUserId);
@@ -111,7 +102,7 @@ namespace Business.Concrete
             return new SuccessDataResult<List<FreeBarberGetDto>>(result, Messages.FilteredFreeBarbersRetrieved);
         }
 
-        [SecuredOperation("FreeBarber")]
+        [SecuredOperation("Customer,FreeBarber,BarberStore")]
         public async Task<IDataResult<FreeBarberMinePanelDetailDto>> GetMyPanelDetail(Guid panelId)
         {
             var result = await freeBarberDal.GetPanelDetailById(panelId);
@@ -147,25 +138,13 @@ namespace Business.Concrete
         {
             var existingPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
             if (existingPanel == null)
-            {
                 return new ErrorResult(Messages.BarberNotFound);
-            }
+            
 
-            // Eğer meşgul (Busy) durumuna geçilmek isteniyorsa aktif randevu kontrolüne gerek yok (kendi isteğiyle kapatıyor)
-            // Ancak, Müsait (Available) durumuna geçmek istiyorsa veya şu anki durumu Müsait ve Meşgul'e geçecekse...
-            // User request: "eğer aktif veya pending bir randevusu yok ise" -> Bu mantık genellikle meşguliyetten çıkarken veya meşgule alırken 
-            // randevu varsa "zaten randevun var, manuel değiştiremezsin" mi demek istedi?
-            // Genelde: Randevu varsa zaten sistem "Meşgul" gösterir.
-            // Kullanıcı "Meşgul"e almak istiyorsa (mola vs), randevu olmamalı (çakışma olmasın diye).
-            // Kullanıcı "Müsait"e almak istiyorsa, randevu olmamalı (randevu varken müsait olamaz).
-            // Kısaca: Aktif/Pending randevu varsa manuel durum değişikliği yapılamaz.
-
-            var hasActiveAppointments = await _appointmentService.AnyControl(existingPanel.Id);
-            if (hasActiveAppointments.Data)
-            {
-                // Mesaj: "Aktif veya bekleyen randevunuz varken durum değişikliği yapamazsınız."
+            var hasActiveAppointments = await _appointmentService.AnyControl(currentUserId);
+            if (hasActiveAppointments.Data)    
                 return new ErrorResult(Messages.FreeBarberHasActiveAppointmentUpdate); 
-            }
+            
 
             existingPanel.IsAvailable = isAvailable;
             await freeBarberDal.Update(existingPanel);

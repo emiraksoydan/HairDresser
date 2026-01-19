@@ -2,11 +2,12 @@ using Api.Hubs;
 using Business.Abstract;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using System;
 
 namespace Api.RealTime
 {
-    public class SignalRRealtimePublisher(IHubContext<AppHub> hub) : IRealTimePublisher
+    public class SignalRRealtimePublisher(IHubContext<AppHub> hub, ILogger<SignalRRealtimePublisher> logger) : IRealTimePublisher
     {
         public async Task PushNotificationAsync(Guid userId, NotificationDto dto)
         {
@@ -14,10 +15,23 @@ namespace Api.RealTime
             {
                 await hub.Clients.Group($"user:{userId}").SendAsync("notification.received", dto);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Log error but don't throw - notification is already in DB
-                // Consider adding ILogger<T> for proper logging
+                // Log error with full details but don't throw - notification is already in DB
+                logger.LogError(ex, "Failed to send notification.received to user {UserId} for notification {NotificationId}. Exception: {ExceptionMessage}, StackTrace: {StackTrace}",
+                    userId, dto.Id, ex.Message, ex.StackTrace);
+            }
+        }
+
+        public async Task PushNotificationSilentUpdateAsync(Guid userId, NotificationDto dto)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("notification.updated", dto);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send notification.updated to user {UserId} for notification {NotificationId}", userId, dto.Id);
             }
         }
 
@@ -98,6 +112,50 @@ namespace Api.RealTime
             catch (Exception)
             {
                 // Log error but don't throw - appointment update can be refetched
+            }
+        }
+
+        public async Task PushBadgeUpdateAsync(Guid userId, int? notificationUnreadCount = null, int? chatUnreadCount = null)
+        {
+            try
+            {
+                // Count'lar varsa frontend'e direkt gönder (ANLIK güncelleme)
+                // Yoksa sadece event gönder (frontend invalidate yapacak)
+                if (notificationUnreadCount.HasValue || chatUnreadCount.HasValue)
+                {
+                    await hub.Clients.Group($"user:{userId}").SendAsync("badge.updated", new
+                    {
+                        notificationUnreadCount,
+                        chatUnreadCount
+                    });
+                }
+                else
+                {
+                    await hub.Clients.Group($"user:{userId}").SendAsync("badge.updated");
+                }
+            }
+            catch (Exception)
+            {
+                // Log error but don't throw - non-critical
+            }
+        }
+
+        public async Task PushImageUpdatedAsync(Guid userId, Guid imageId, string imageUrl)
+        {
+            try
+            {
+                // Push to ALL users - image görünürlüğü global (chat, notification, card'lar)
+                await hub.Clients.All.SendAsync("image.updated", new
+                {
+                    userId,
+                    imageId,
+                    imageUrl,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send image.updated for user {UserId}, image {ImageId}", userId, imageId);
             }
         }
     }

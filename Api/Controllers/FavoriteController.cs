@@ -1,15 +1,11 @@
 using Business.Abstract;
-using Core.Extensions;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class FavoriteController : ControllerBase
+    public class FavoriteController : BaseApiController
     {
         private readonly IFavoriteService _favoriteService;
 
@@ -21,33 +17,25 @@ namespace Api.Controllers
         [HttpPost("toggle")]
         public async Task<IActionResult> Toggle([FromBody] ToggleFavoriteDto dto)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _favoriteService.ToggleFavoriteAsync(userId, dto);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _favoriteService.ToggleFavoriteAsync(userId, dto));
         }
 
         [HttpGet("check/{targetId}")]
         public async Task<IActionResult> IsFavorite(Guid targetId)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _favoriteService.IsFavoriteAsync(userId, targetId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _favoriteService.IsFavoriteAsync(userId, targetId));
         }
 
         [HttpGet("my-favorites")]
         public async Task<IActionResult> GetMyFavorites()
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _favoriteService.GetMyFavoritesAsync(userId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _favoriteService.GetMyFavoritesAsync(userId));
         }
 
         [HttpDelete("{targetId}")]
         public async Task<IActionResult> Remove(Guid targetId)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _favoriteService.RemoveFavoriteAsync(userId, targetId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _favoriteService.RemoveFavoriteAsync(userId, targetId));
         }
     }
 }

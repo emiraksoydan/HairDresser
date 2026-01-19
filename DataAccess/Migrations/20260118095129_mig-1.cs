@@ -24,6 +24,7 @@ namespace DataAccess.Migrations
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     BarberStoreUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
                     CustomerUserId = table.Column<Guid>(type: "uuid", nullable: true),
                     FreeBarberUserId = table.Column<Guid>(type: "uuid", nullable: true),
                     ManuelBarberId = table.Column<Guid>(type: "uuid", nullable: true),

@@ -1,77 +1,68 @@
 using Business.Abstract;
 using Core.Extensions;
 using Entities.Concrete.Dto;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class BarberStoreController : ControllerBase
+    public class BarberStoreController : BaseApiController
     {
         private readonly IBarberStoreService _storeService;
+
         public BarberStoreController(IBarberStoreService storeService)
         {
             _storeService = storeService;
         }
-        private Guid CurrentUserId => User.GetUserIdOrThrow();
 
         [HttpPost("create-store")]
         public async Task<IActionResult> Add([FromBody] BarberStoreCreateDto dto)
         {
-            var result = await _storeService.Add(dto, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleCreateOperation(dto, _storeService.Add);
         }
 
         [HttpPut("update-store")]
         public async Task<IActionResult> Update([FromBody] BarberStoreUpdateDto dto)
         {
-            var result = await _storeService.Update(dto, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUpdateOperation(dto, _storeService.Update);
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var result = await _storeService.DeleteAsync(id, CurrentUserId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleDeleteOperation(id, _storeService.DeleteAsync);
         }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(Guid id)
         {
-            var result = await _storeService.GetByIdAsync(id);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleDataResultAsync(_storeService.GetByIdAsync(id));
         }
 
         [HttpGet("nearby")]
         public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
         {
             var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
-            var result = await _storeService.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleDataResultAsync(_storeService.GetNearbyStoresAsync(lat, lon, distance, currentUserId));
         }
 
         [HttpPost("filtered")]
         public async Task<IActionResult> GetFiltered([FromBody] FilterRequestDto filter)
         {
             filter.CurrentUserId = CurrentUserId; // Set current user for favorites
-            var result = await _storeService.GetFilteredStoresAsync(filter);
-            return result.Success ? Ok(result.Data) : BadRequest(result);
+            return await HandleDataResultAsync(_storeService.GetFilteredStoresAsync(filter));
         }
 
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine()
         {
-            var result = await _storeService.GetByCurrentUserAsync(CurrentUserId);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleUserDataOperation(userId => _storeService.GetByCurrentUserAsync(userId));
         }
 
         [HttpGet("get-store-for-users")]
         public async Task<IActionResult> GetStoreForUsers([FromQuery] Guid storeId)
         {
-            var result = await _storeService.GetBarberStoreForUsers(storeId);
-            return result.Success ? Ok(result.Data) : NotFound(result);
+            return await HandleDataResultAsync(_storeService.GetBarberStoreForUsers(storeId));
         }
     }
 }

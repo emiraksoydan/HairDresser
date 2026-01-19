@@ -15,6 +15,10 @@ namespace Entities.Concrete.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public Guid? BarberStoreUserId { get; set; }
+        /// <summary>
+        /// Specific store ID - required for multi-store owners to identify which store is involved
+        /// </summary>
+        public Guid? StoreId { get; set; }
         public Guid? CustomerUserId { get; set; }
         public Guid? FreeBarberUserId { get; set; }
         public Guid? ManuelBarberId { get; set; }

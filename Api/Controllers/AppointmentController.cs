@@ -1,16 +1,12 @@
 using Business.Abstract;
-using Core.Extensions;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Enums;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class AppointmentController : ControllerBase
+    public class AppointmentController : BaseApiController
     {
         private readonly IAppointmentService _svc;
 
@@ -22,130 +18,95 @@ namespace Api.Controllers
         [HttpGet("getallbyfilter")]
         public async Task<IActionResult> GetAllByFilter([FromQuery] AppointmentFilter filter)
         {
-
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.GetAllAppointmentByFilter(userId, filter);
-            return result.Success ? Ok(result) : BadRequest(result);
-
+            return await HandleUserDataOperation(userId => _svc.GetAllAppointmentByFilter(userId, filter));
         }
 
         [HttpGet("availability")]
         public async Task<IActionResult> GetAvailability([FromQuery] Guid storeId, [FromQuery] DateOnly dateOnly, CancellationToken ct)
         {
-            var data = await _svc.GetAvailibity(storeId, dateOnly, ct);
-            return Ok(data);
+            return await HandleDataResultAsync(_svc.GetAvailibity(storeId, dateOnly, ct));
         }
 
         [HttpPost("customer-to-freebarber")]
         public async Task<IActionResult> CreateCustomerToFreeBarber([FromBody] CreateAppointmentRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateCustomerToFreeBarberAsync(userId, req);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CreateCustomerToFreeBarberAsync(userId, req));
         }
 
         [HttpPost("customer")]
         public async Task<IActionResult> CreateCustomer([FromBody] CreateAppointmentRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateCustomerToStoreControlAsync(userId, req);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CreateCustomerToStoreControlAsync(userId, req));
         }
-        
+
         [HttpPost("{id:guid}/add-store")]
         public async Task<IActionResult> AddStoreToAppointment(
             Guid id,
             [FromBody] AddStoreToAppointmentRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.AddStoreToExistingAppointmentAsync(
-                userId, id, req.StoreId, req.ChairId, req.AppointmentDate, req.StartTime, req.EndTime, req.ServiceOfferingIds);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId =>
+                _svc.AddStoreToExistingAppointmentAsync(
+                    userId, id, req.StoreId, req.ChairId, req.AppointmentDate, req.StartTime, req.EndTime, req.ServiceOfferingIds));
         }
 
-        // 3) FreeBarber -> Store
         [HttpPost("freebarber")]
         public async Task<IActionResult> CreateFreeBarber([FromBody] CreateAppointmentRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateFreeBarberToStoreAsync(userId, req);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CreateFreeBarberToStoreAsync(userId, req));
         }
 
-        // 4) Store -> FreeBarber call
         [HttpPost("store")]
         public async Task<IActionResult> CreateStoreToFreeBarber([FromBody] CreateStoreToFreeBarberRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateStoreToFreeBarberAsync(userId, req);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CreateStoreToFreeBarberAsync(userId, req));
         }
 
-        // 4b) Store -> FreeBarber call (Simplified - No date/time/services)
         [HttpPost("store/call-freebarber")]
         public async Task<IActionResult> CallFreeBarber([FromBody] CreateStoreToFreeBarberRequestDto req)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CreateStoreToFreeBarberAsync(userId, req);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CreateStoreToFreeBarberAsync(userId, req));
         }
 
         [HttpPost("{id:guid}/store-decision")]
         public async Task<IActionResult> StoreDecision(Guid id, [FromQuery] bool approve)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.StoreDecisionAsync(userId, id, approve);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.StoreDecisionAsync(userId, id, approve));
         }
 
         [HttpPost("{id:guid}/freebarber-decision")]
         public async Task<IActionResult> FreeBarberDecision(Guid id, [FromQuery] bool approve)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.FreeBarberDecisionAsync(userId, id, approve);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.FreeBarberDecisionAsync(userId, id, approve));
         }
-        
+
         [HttpPost("{id:guid}/customer-decision")]
         public async Task<IActionResult> CustomerDecision(Guid id, [FromQuery] bool approve)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CustomerDecisionAsync(userId, id, approve);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CustomerDecisionAsync(userId, id, approve));
         }
 
         [HttpPost("{id:guid}/cancel")]
         public async Task<IActionResult> Cancel(Guid id)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CancelAsync(userId, id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CancelAsync(userId, id));
         }
 
         [HttpPost("{id:guid}/complete")]
         public async Task<IActionResult> Complete(Guid id)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.CompleteAsync(userId, id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.CompleteAsync(userId, id));
         }
 
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.DeleteAsync(userId, id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.DeleteAsync(userId, id));
         }
 
         [HttpDelete("all")]
         public async Task<IActionResult> DeleteAll()
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _svc.DeleteAllAsync(userId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _svc.DeleteAllAsync(userId));
         }
-
     }
-   
 }

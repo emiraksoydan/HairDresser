@@ -26,6 +26,7 @@ namespace Entities.Concrete.Dto
         public double PricingValue { get; set; }
         public AppointmentRequester AppointmentRequester { get; set; }
         public Guid? BarberStoreId { get; set; }
+        public Guid? StoreId { get; set; } // Specific store ID for multi-store owners
         public string? StoreName { get; set; }
         public string? StoreImage { get; set; }
         public bool IsStoreFavorite { get; set; }

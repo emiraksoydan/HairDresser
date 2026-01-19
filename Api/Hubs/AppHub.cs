@@ -10,24 +10,24 @@ namespace Api.Hubs
     {
         public override async Task OnConnectedAsync()
         {
-            var userIdStr = Context?.User?.GetUserIdOrThrow();
+                var userIdStr = Context?.User?.GetUserIdOrThrow();
 
-            if (Guid.TryParse(userIdStr.ToString(), out var userId))
+                if (Guid.TryParse(userIdStr.ToString(), out var userId))
                 await Groups.AddToGroupAsync(Context?.ConnectionId!, $"user:{userId}");
 
-            await base.OnConnectedAsync();
-        }
+                await base.OnConnectedAsync();
+            }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            // Group'tan çıkar - memory leak'i önlemek için
-            var userIdStr = Context?.User?.GetUserIdOrThrow();
-            if (Guid.TryParse(userIdStr?.ToString(), out var userId))
-            {
+                // Group'tan çıkar - memory leak'i önlemek için
+                var userIdStr = Context?.User?.GetUserIdOrThrow();
+                if (Guid.TryParse(userIdStr?.ToString(), out var userId))
+                {
                 await Groups.RemoveFromGroupAsync(Context?.ConnectionId!, $"user:{userId}");
+                }
+                await base.OnDisconnectedAsync(exception);
             }
-            await base.OnDisconnectedAsync(exception);
-        }
 
         // Typing indicator için hub metodu (frontend'den çağrılacak)
         public async Task NotifyTyping(string threadId, bool isTyping)

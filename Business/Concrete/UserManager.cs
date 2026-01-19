@@ -1,18 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 using Business.Abstract;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Validation;
 using Core.Utilities.Results;
-using Core.Utilities.Security.Hashing;
 using Core.Utilities.Security.JWT;
 using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Abstract;
-using DataAccess.Concrete;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using Entities.Concrete.Enums;
@@ -48,10 +42,8 @@ namespace Business.Concrete
         {
             var rolesToAssign = new List<string>();
             
-            // Tüm kullanıcılara User rolü ver
-            rolesToAssign.Add("User");
-            
             // UserType'a göre spesifik rol ver
+            // Not: "User" rolü kaldırıldı - her kullanıcı zaten Customer, FreeBarber veya BarberStore rolüne sahip
             switch (user.UserType)
             {
                 case UserType.Customer:
@@ -79,8 +71,15 @@ namespace Business.Concrete
             
             foreach (var roleName in rolesToAssign)
             {
-                // Rolü veritabanından bul
+                // Rolü veritabanından bul veya oluştur
                 var operationClaim = await operationClaimDal.Get(oc => oc.Name == roleName);
+                
+                if (operationClaim == null)
+                {
+                    // Rol veritabanında yoksa oluştur
+                    operationClaim = new OperationClaim { Name = roleName };
+                    await operationClaimDal.Add(operationClaim);
+                }
                 
                 if (operationClaim != null && !existingClaimIds.Contains(operationClaim.Id))
                 {

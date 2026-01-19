@@ -552,6 +552,7 @@ namespace DataAccess.Concrete
                     return new BarberStoreGetDto
                     {
                         Id = s.Id,
+                        BarberStoreOwnerId = s.BarberStoreOwnerId, // Kendi dükkanına tıklandığında güncelleme sheet'i açmak için gerekli
                         StoreName = s.StoreName,
                         ImageList = images ?? new List<ImageGetDto>(),
                         PricingType = s.PricingType.ToString(),
@@ -584,7 +585,18 @@ namespace DataAccess.Concrete
             // Base query
             var query = _context.BarberStores.AsNoTracking().AsQueryable();
 
-            // 1. Konum filtresi (nearby)
+            // 0. Kullanıcının kendi dükkanlarının ID'lerini al (IsOwnStore için kullanılacak)
+            var ownStoreIds = new List<Guid>();
+            if (filter.CurrentUserId.HasValue)
+            {
+                ownStoreIds = await _context.BarberStores
+                    .AsNoTracking()
+                    .Where(s => s.BarberStoreOwnerId == filter.CurrentUserId.Value)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+            }
+
+            // 1. Konum filtresi (nearby) - tüm dükkanlar için geçerli (kendi dükkanları dahil)
             if (filter.Latitude.HasValue && filter.Longitude.HasValue)
             {
                 var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
@@ -640,7 +652,8 @@ namespace DataAccess.Concrete
                     s.PricingValue,
                     s.Type,
                     s.AddressDescription,
-                    s.BarberStoreOwnerId
+                    s.BarberStoreOwnerId,
+                    IsOwnStore = ownStoreIds.Contains(s.Id)
                 })
                 .ToListAsync();
 
@@ -650,8 +663,6 @@ namespace DataAccess.Concrete
             var storeIds = stores.Select(s => s.Id).ToList();
 
             // 6. Hizmet filtresi (CategoryId listesi)
-            // Not: ServiceOffering tablosu serviceName tuttuğu için, Category.Id -> Category.Name map edip ServiceName ile eşliyoruz.
-            // Backward compatibility: Eğer istemci ServiceOffering.Id gönderirse onu da destekliyoruz.
             if (filter.ServiceIds != null && filter.ServiceIds.Any())
             {
                 var categoryNames = await _context.Categories
@@ -693,8 +704,7 @@ namespace DataAccess.Concrete
             if (filter.MinRating.HasValue && filter.MinRating.Value > 0)
             {
                 stores = stores.Where(s => 
-                    ratingDict.ContainsKey(s.Id) && 
-                    ratingDict[s.Id].AvgRating >= filter.MinRating.Value
+                    ratingDict.ContainsKey(s.Id) && ratingDict[s.Id].AvgRating >= filter.MinRating.Value
                 ).ToList();
                 storeIds = stores.Select(s => s.Id).ToList();
             }
@@ -713,7 +723,7 @@ namespace DataAccess.Concrete
 
             var favoriteDict = favoriteStats.ToDictionary(x => x.StoreId, x => x.FavoriteCount);
 
-            // 8. Favori filtresi (kullanıcının favorileri + kendi dükkanları)
+            // 8. Favori filtresi
             if (filter.FavoritesOnly.HasValue && filter.FavoritesOnly.Value && filter.CurrentUserId.HasValue)
             {
                 var userFavorites = await _context.Favorites
@@ -722,8 +732,7 @@ namespace DataAccess.Concrete
                     .Select(f => f.FavoritedToId)
                     .ToListAsync();
                 
-                // Kullanıcının favorileri + kendi dükkanları (BarberStoreOwnerId == CurrentUserId)
-                stores = stores.Where(s => userFavorites.Contains(s.Id) || s.BarberStoreOwnerId == filter.CurrentUserId.Value).ToList();
+                stores = stores.Where(s => userFavorites.Contains(s.Id)).ToList();
                 storeIds = stores.Select(s => s.Id).ToList();
             }
 
@@ -798,6 +807,7 @@ namespace DataAccess.Concrete
                 return new BarberStoreGetDto
                 {
                     Id = s.Id,
+                    BarberStoreOwnerId = s.BarberStoreOwnerId,
                     StoreName = s.StoreName,
                     Latitude = s.Latitude,
                     Longitude = s.Longitude,
@@ -812,7 +822,8 @@ namespace DataAccess.Concrete
                     IsOpenNow = OpenControl.IsOpenNow(storeHours, nowLocal),
                     Offerings = offeringsDict.GetValueOrDefault(s.Id, new List<ServiceOfferingGetDto>()),
                     ServiceOfferings = offeringsDict.GetValueOrDefault(s.Id, new List<ServiceOfferingGetDto>()),
-                    ImageList = imagesDict.GetValueOrDefault(s.Id, new List<ImageGetDto>())
+                    ImageList = imagesDict.GetValueOrDefault(s.Id, new List<ImageGetDto>()),
+                    IsOwnStore = s.IsOwnStore // Kendi dükkanı mı bilgisi (frontend'de kullanılabilir)
                 };
             }).ToList();
 

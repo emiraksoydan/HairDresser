@@ -41,7 +41,14 @@ namespace Business.Helpers
             return new SuccessResult();
         }
 
-        public async Task<IResult> CheckActiveAppointmentRules(Guid? customerId, Guid? freeBarberId, Guid? storeOwnerId, AppointmentRequester requestedBy)
+        /// <summary>
+        /// Checks active appointment rules based on requester type
+        /// </summary>
+        /// <param name="customerId">Customer user ID</param>
+        /// <param name="freeBarberId">FreeBarber user ID</param>
+        /// <param name="storeId">Specific store ID (not owner ID) - for multi-store support</param>
+        /// <param name="requestedBy">Who is creating the appointment</param>
+        public async Task<IResult> CheckActiveAppointmentRules(Guid? customerId, Guid? freeBarberId, Guid? storeId, AppointmentRequester requestedBy)
         {
             switch (requestedBy)
             {
@@ -68,30 +75,31 @@ namespace Business.Helpers
                             return new ErrorResult(Messages.FreeBarberAlreadyHasActiveAppointment);
                     }
 
-                    if (storeOwnerId.HasValue)
-                    {
-                        var storeHasActive = await _appointmentDal.AnyAsync(x =>
-                            x.BarberStoreUserId == storeOwnerId.Value &&
-                            Active.Contains(x.Status));
-                        if (storeHasActive)
-                            return new ErrorResult(Messages.StoreAlreadyHasActiveAppointment);
-                    }
+                    // Store kontrolü Customer → Store senaryosunda YAPILMAMALI
+                    // Çünkü dükkan birden fazla koltukta aynı anda randevu alabilir
+                    // EnsureChairNoOverlapAsync zaten spesifik koltuk kontrolü yapıyor
                     break;
 
                 case AppointmentRequester.Store:
-                    if (storeOwnerId.HasValue)
+                    // ÖNEMLİ: Store → FreeBarber senaryosunda SADECE aynı store + aynı FreeBarber kontrolü yap
+                    // Aynı store farklı FreeBarber'lara çağrı yapabilir (ALLOWED)
+                    // Farklı store'lar aynı FreeBarber'a çağrı yapabilir (ALLOWED)
+                    // Aynı store aynı FreeBarber'a tekrar çağrı yapamaz (NOT ALLOWED)
+                    
+                    if (storeId.HasValue && freeBarberId.HasValue)
                     {
-                        var storeHasActive = await _appointmentDal.AnyAsync(x =>
-                            x.BarberStoreUserId == storeOwnerId.Value &&
-                            x.RequestedBy == AppointmentRequester.Store &&
+                        // Bu STORE'un bu FREEBARBER ile aktif randevusu var mı?
+                        var storeFreeBarberHasActive = await _appointmentDal.AnyAsync(x =>
+                            x.StoreId == storeId.Value &&
+                            x.FreeBarberUserId == freeBarberId.Value &&
                             Active.Contains(x.Status));
-                        if (storeHasActive)
-                            return new ErrorResult(Messages.StoreHasActiveCall);
+                        if (storeFreeBarberHasActive)
+                            return new ErrorResult(Messages.StoreAlreadyHasActiveAppointmentWithThisFreeBarber);
                     }
-
+                    
+                    // FreeBarber genel müsaitlik kontrolü (herhangi bir aktif randevusu varsa alamaz)
                     if (freeBarberId.HasValue)
                     {
-                        // Store'dan FreeBarber'a çağrı: FreeBarber'ın HERHANGİ BİR aktif randevusu varsa alamaz
                         var freeBarberHasActive = await _appointmentDal.AnyAsync(x =>
                             x.FreeBarberUserId == freeBarberId.Value &&
                             Active.Contains(x.Status));
@@ -132,14 +140,9 @@ namespace Business.Helpers
                             return new ErrorResult(Messages.FreeBarberAlreadyHasActiveAppointment);
                     }
 
-                    if (storeOwnerId.HasValue)
-                    {
-                        var storeHasActive = await _appointmentDal.AnyAsync(x =>
-                            x.BarberStoreUserId == storeOwnerId.Value &&
-                            Active.Contains(x.Status));
-                        if (storeHasActive)
-                            return new ErrorResult(Messages.StoreAlreadyHasActiveAppointment);
-                    }
+                    // Store kontrolü FreeBarber → Store senaryosunda YAPILMAMALI
+                    // Çünkü dükkan birden fazla koltukta aynı anda randevu alabilir
+                    // EnsureChairNoOverlapAsync zaten spesifik koltuk kontrolü yapıyor
                     break;
             }
 

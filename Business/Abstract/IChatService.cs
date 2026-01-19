@@ -20,6 +20,9 @@ namespace Business.Abstract
         // Randevu thread'i için okundu işaretleme (geriye dönük uyumluluk için)
         Task<IDataResult<bool>> MarkThreadReadByAppointmentAsync(Guid userId, Guid appointmentId);
 
+        // System worker kullanımı için (SecuredOperation olmadan)
+        Task<IDataResult<bool>> MarkThreadReadByAppointmentSystemAsync(Guid userId, Guid appointmentId);
+
         Task<IDataResult<List<ChatThreadListItemDto>>> GetThreadsAsync(Guid userId);
         
         // Mesajları getir (ThreadId ile - hem randevu hem favori için)

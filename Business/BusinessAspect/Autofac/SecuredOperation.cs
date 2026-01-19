@@ -24,7 +24,20 @@ namespace Business.BusinessAspect.Autofac
 
       protected override void OnBefore(IInvocation invocation)
         {
+            // KRITĐK: HttpContext null kontrolü (BackgroundService veya non-HTTP context'te çalışabilir)
+            if (_httpContextAccessor?.HttpContext == null)
+                throw new UnauthorizedOperationException("HTTP context bulunamadı. Bu işlem sadece HTTP request içinde çalıştırılabilir.");
+
+            // User null kontrolü
+            if (_httpContextAccessor.HttpContext.User == null)
+                throw new UnauthorizedOperationException("Kullanıcı bilgisi bulunamadı. Lütfen giriş yapın.");
+
             var roleClaims = _httpContextAccessor.HttpContext.User.ClaimRoles();
+            
+            // Role claims null veya boş kontrolü
+            if (roleClaims == null || !roleClaims.Any())
+                throw new UnauthorizedOperationException("Kullanıcı rolü bulunamadı. Lütfen yetkilendirme bilgilerinizi kontrol edin.");
+
             foreach (var role in _roles)
             {
                 if (roleClaims.Contains(role))
@@ -32,7 +45,7 @@ namespace Business.BusinessAspect.Autofac
                     return;
                 }
             }
-            throw new Exception("Yetkisiz ��lem");
+            throw new UnauthorizedOperationException($"Bu işlem için gerekli yetkiye sahip değilsiniz. Gerekli roller: {string.Join(", ", _roles)}");
         }
     }
 }

@@ -16,7 +16,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IFreeBarberDal freeBarberDal) : IBarberStoreService
     {
         [SecuredOperation("BarberStore")]
         [LogAspect]
@@ -86,6 +86,19 @@ namespace Business.Concrete
 
         public async Task<IDataResult<List<BarberStoreGetDto>>> GetNearbyStoresAsync(double lat, double lon, double distance, Guid? currentUserId = null)
         {
+            // Free barber kullanıcı tipinde ise ve panel oluşturmamışsa nearby stores döndürme
+            if (currentUserId.HasValue)
+            {
+                // Kullanıcının free barber paneli var mı kontrol et
+                var freeBarberPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId.Value);
+                
+                // Free barber paneli yoksa boş liste döndür
+                if (freeBarberPanel == null)
+                {
+                    return new SuccessDataResult<List<BarberStoreGetDto>>(new List<BarberStoreGetDto>(), Messages.NearbyBarbersRetrieved);
+                }
+            }
+            
             var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, Messages.NearbyBarbersRetrieved);
         }

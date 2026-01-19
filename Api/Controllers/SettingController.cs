@@ -1,15 +1,11 @@
 using Business.Abstract;
-using Core.Extensions;
 using Entities.Concrete.Dto;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
-    public class SettingController : ControllerBase
+    public class SettingController : BaseApiController
     {
         private readonly ISettingService _settingService;
 
@@ -21,18 +17,13 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _settingService.GetByUserIdAsync(userId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _settingService.GetByUserIdAsync(userId));
         }
 
         [HttpPut]
         public async Task<IActionResult> Update([FromBody] SettingUpdateDto dto)
         {
-            var userId = User.GetUserIdOrThrow();
-            var result = await _settingService.UpdateAsync(userId, dto);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserOperation(userId => _settingService.UpdateAsync(userId, dto));
         }
     }
 }
-

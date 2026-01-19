@@ -14,7 +14,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService, IUserDal _userDal) : IImageService
+    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService, IUserDal _userDal, DataAccess.Abstract.IBarberStoreDal _barberStoreDal, DataAccess.Abstract.IFreeBarberDal _freeBarberDal, IRealTimePublisher _realTimePublisher) : IImageService
     {
         public async Task<IResult> AddAsync(CreateImageDto createImageDto)
         {
@@ -151,10 +151,89 @@ namespace Business.Concrete
         }
 
         [LogAspect]
-        public async Task<IDataResult<string>> UploadImageAsync(Microsoft.AspNetCore.Http.IFormFile file, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
+        public async Task<IDataResult<string>> UploadImageAsync(Microsoft.AspNetCore.Http.IFormFile file, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId, bool updateProfileImage = true)
         {
-            // For User, ManuelBarber types, we replace the existing image instead of checking count
-            // For Store and FreeBarber, we check the count limit
+            // ÖNEMLİ: Bu metod sadece TEK RESİM için kullanılır:
+            // - User profile image (profil fotoğrafı)
+            // - Store tax document (vergi belgesi) - galeri resimlerinden bağımsız
+            // - FreeBarber certificate (sertifika) - galeri resimlerinden bağımsız
+            // - ManuelBarber image (manuel berber fotoğrafı)
+            //
+            // Galeri resimleri (Store/FreeBarber için max 3) UploadImagesAsync ile yüklenir
+            // Bu yüzden burada maxImages kontrolü YOK - belgeler ve sertifikalar galeri limitinden bağımsız
+
+            // Get container name based on owner type
+            var containerName = ownerType switch
+            {
+                Entities.Concrete.Enums.ImageOwnerType.User => "user-images",     // For profile images only
+                Entities.Concrete.Enums.ImageOwnerType.Store => "store-images",
+                Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "freebarber-images",
+                Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => "manuelbarber-images",
+                _ => throw new ArgumentOutOfRangeException(nameof(ownerType), ownerType, "Geçersiz resim sahibi tipi")
+            };
+
+            // Upload to Azure Blob Storage
+            var imageUrl = await _blobStorageService.UploadAsync(file, containerName);
+            
+            // Cache busting için timestamp ekle
+            var urlWithTimestamp = $"{imageUrl}?t={DateTime.UtcNow.Ticks}";
+
+            // Save to database
+            var image = new Image
+            {
+                Id = Guid.NewGuid(),
+                ImageUrl = urlWithTimestamp,
+                OwnerType = ownerType,
+                ImageOwnerId = ownerId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _imageDal.Add(image);
+
+            // If this is a User profile image, update the User's ImageId
+            if (updateProfileImage && ownerType == Entities.Concrete.Enums.ImageOwnerType.User)
+            {
+                var user = await _userDal.Get(u => u.Id == ownerId);
+                if (user != null)
+                {
+                    // If user already has a profile image, we keep the old one (don't delete)
+                    // Just update the ImageId to point to the new image
+                    user.ImageId = image.Id;
+                    await _userDal.Update(user);
+                }
+                
+                // SignalR push - tüm kullanıcılara yeni profil fotoğrafı bildir
+                try
+                {
+                    await _realTimePublisher.PushImageUpdatedAsync(ownerId, image.Id, urlWithTimestamp);
+                }
+                catch
+                {
+                    // SignalR failure should not break the upload
+                }
+            }
+
+            // Return the Image ID, not the URL
+            return new SuccessDataResult<string>(image.Id.ToString(), "Resim başarıyla yüklendi.");
+        }
+
+        [LogAspect(logParameters: true, logReturnValue: true)]
+        public async Task<IDataResult<List<string>>> UploadImagesAsync(List<Microsoft.AspNetCore.Http.IFormFile> files, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
+        {
+            // ÖNEMLİ: Bu metod SADECE PANEL GALERİ RESİMLERİ için kullanılır (Store/FreeBarber - max 3)
+            // Tax document, certificate, profile image gibi belgeler UploadImageAsync ile yüklenir
+            
+            // Sadece dosya sayısı kontrolü yap (request başına max 3 dosya - panel limiti)
+            if (files.Count > 3)
+            {
+                return new ErrorDataResult<List<string>>(
+                    $"Tek seferde en fazla 3 resim yüklenebilir. Gönderilen: {files.Count}");
+            }
+
+            // Store ve FreeBarber için mevcut GALERİ resim sayısını kontrol et
+            // ÖNEMLİ: Tax document ve certificate galeri resimlerinden bağımsızdır
+            // Bu yüzden sadece galeri resimlerini saymalıyız (certificate/tax document hariç)
             if (ownerId != Guid.Empty &&
                 (ownerType == Entities.Concrete.Enums.ImageOwnerType.Store ||
                  ownerType == Entities.Concrete.Enums.ImageOwnerType.FreeBarber))
@@ -166,11 +245,42 @@ namespace Business.Concrete
                     _ => 1
                 };
 
-                var existingCount = await _imageDal.CountAsync(x =>
+                // TÜM resimleri say
+                var allImagesCount = await _imageDal.CountAsync(x =>
                     x.ImageOwnerId == ownerId &&
                     x.OwnerType == ownerType);
 
-                if (existingCount >= maxImages)
+                // Tax document veya certificate'ı hariç tut - sadece galeri resimlerini say
+                int galleryImagesCount = allImagesCount;
+                
+                if (ownerType == Entities.Concrete.Enums.ImageOwnerType.Store)
+                {
+                    var store = await _barberStoreDal.Get(s => s.Id == ownerId);
+                    if (store != null && store.TaxDocumentImageId.HasValue)
+                    {
+                        // Tax document'ı hariç tut - galeri resimlerini say
+                        galleryImagesCount = await _imageDal.CountAsync(x =>
+                            x.ImageOwnerId == ownerId &&
+                            x.OwnerType == ownerType &&
+                            x.Id != store.TaxDocumentImageId.Value);
+                    }
+                }
+                else if (ownerType == Entities.Concrete.Enums.ImageOwnerType.FreeBarber)
+                {
+                    var freeBarber = await _freeBarberDal.Get(fb => fb.Id == ownerId);
+                    if (freeBarber != null && freeBarber.BarberCertificateImageId.HasValue)
+                    {
+                        // Certificate'ı hariç tut - galeri resimlerini say
+                        galleryImagesCount = await _imageDal.CountAsync(x =>
+                            x.ImageOwnerId == ownerId &&
+                            x.OwnerType == ownerType &&
+                            x.Id != freeBarber.BarberCertificateImageId.Value);
+                    }
+                }
+
+                var totalCount = galleryImagesCount + files.Count;
+
+                if (totalCount > maxImages)
                 {
                     var ownerTypeText = ownerType switch
                     {
@@ -179,106 +289,19 @@ namespace Business.Concrete
                         _ => "Sahip"
                     };
 
-                    return new ErrorDataResult<string>(
-                        $"{ownerTypeText} için en fazla {maxImages} resim eklenebilir. Mevcut resim sayısı: {existingCount}");
+                    return new ErrorDataResult<List<string>>(
+                        $"{ownerTypeText} için en fazla {maxImages} galeri resmi eklenebilir. Mevcut galeri resim sayısı: {galleryImagesCount}, eklenmek istenen: {files.Count}, toplam: {totalCount}");
                 }
             }
 
             // Get container name based on owner type
             var containerName = ownerType switch
             {
-                Entities.Concrete.Enums.ImageOwnerType.User => "user-images",
+                Entities.Concrete.Enums.ImageOwnerType.User => "user-images",     // For profile images only
                 Entities.Concrete.Enums.ImageOwnerType.Store => "store-images",
                 Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "freebarber-images",
                 Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => "manuelbarber-images",
-                _ => "images"
-            };
-
-            // Upload to Azure Blob Storage
-            var imageUrl = await _blobStorageService.UploadAsync(file, containerName);
-
-            // Save to database
-            var image = new Image
-            {
-                Id = Guid.NewGuid(),
-                ImageUrl = imageUrl,
-                OwnerType = ownerType,
-                ImageOwnerId = ownerId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            await _imageDal.Add(image);
-
-            // Update User's ImageId if ownerType is User
-            if (ownerType == Entities.Concrete.Enums.ImageOwnerType.User && ownerId != Guid.Empty)
-            {
-                var user = await _userDal.Get(u => u.Id == ownerId);
-                if (user != null)
-                {
-                    // Delete old image if exists
-                    if (user.ImageId.HasValue)
-                    {
-                        var oldImage = await _imageDal.Get(i => i.Id == user.ImageId.Value);
-                        if (oldImage != null)
-                        {
-                            await _blobStorageService.DeleteAsync(oldImage.ImageUrl);
-                            await _imageDal.Remove(oldImage);
-                        }
-                    }
-
-                    user.ImageId = image.Id;
-                    user.UpdatedAt = DateTime.UtcNow;
-                    await _userDal.Update(user);
-                }
-            }
-
-            // Return the Image ID, not the URL
-            return new SuccessDataResult<string>(image.Id.ToString(), "Resim başarıyla yüklendi.");
-        }
-
-        [LogAspect]
-        public async Task<IDataResult<List<string>>> UploadImagesAsync(List<Microsoft.AspNetCore.Http.IFormFile> files, Entities.Concrete.Enums.ImageOwnerType ownerType, Guid ownerId)
-        {
-            // Check image count limit
-            var maxImages = ownerType switch
-            {
-                Entities.Concrete.Enums.ImageOwnerType.User => 1,
-                Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => 1,
-                Entities.Concrete.Enums.ImageOwnerType.Store => 3,
-                Entities.Concrete.Enums.ImageOwnerType.FreeBarber => 3,
-                _ => 1
-            };
-
-            var existingCount = await _imageDal.CountAsync(x =>
-                x.ImageOwnerId == ownerId &&
-                x.OwnerType == ownerType);
-
-            var totalCount = existingCount + files.Count;
-
-            if (totalCount > maxImages)
-            {
-                var ownerTypeText = ownerType switch
-                {
-                    Entities.Concrete.Enums.ImageOwnerType.User => "Kullanıcı",
-                    Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => "Manuel berber",
-                    Entities.Concrete.Enums.ImageOwnerType.Store => "Dükkan",
-                    Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "Serbest berber",
-                    _ => "Sahip"
-                };
-
-                return new ErrorDataResult<List<string>>(
-                    $"{ownerTypeText} için en fazla {maxImages} resim eklenebilir. Mevcut: {existingCount}, Eklenmek istenen: {files.Count}");
-            }
-
-            // Get container name based on owner type
-            var containerName = ownerType switch
-            {
-                Entities.Concrete.Enums.ImageOwnerType.User => "user-images",
-                Entities.Concrete.Enums.ImageOwnerType.Store => "store-images",
-                Entities.Concrete.Enums.ImageOwnerType.FreeBarber => "freebarber-images",
-                Entities.Concrete.Enums.ImageOwnerType.ManuelBarber => "manuelbarber-images",
-                _ => "images"
+                _ => throw new ArgumentOutOfRangeException(nameof(ownerType), ownerType, "Geçersiz resim sahibi tipi")
             };
 
             // Upload all files to Azure Blob Storage
@@ -330,10 +353,26 @@ namespace Business.Concrete
             // Mevcut blob'u güncelle (yeni blob oluşturma)
             var updatedUrl = await _blobStorageService.UpdateAsync(file, entity.ImageUrl);
             
-            // ImageUrl aynı kalmalı (aynı blob name kullanıldığı için)
+            // ImageUrl'e cache busting için timestamp ekle
+            var urlWithTimestamp = $"{updatedUrl}?t={DateTime.UtcNow.Ticks}";
+            entity.ImageUrl = urlWithTimestamp;
+            
             // UpdatedAt'i güncelle
             entity.UpdatedAt = DateTime.UtcNow;
             await _imageDal.Update(entity);
+
+            // SignalR push - tüm kullanıcılara image güncellemesi bildir
+            if (entity.OwnerType == Entities.Concrete.Enums.ImageOwnerType.User && entity.ImageOwnerId != Guid.Empty)
+            {
+                try
+                {
+                    await _realTimePublisher.PushImageUpdatedAsync(entity.ImageOwnerId, imageId, urlWithTimestamp);
+                }
+                catch
+                {
+                    // SignalR failure should not break the update
+                }
+            }
 
             return new SuccessResult("Resim başarıyla güncellendi.");
         }

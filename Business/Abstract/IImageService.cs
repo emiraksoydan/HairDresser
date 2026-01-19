@@ -19,7 +19,7 @@ namespace Business.Abstract
         /// <summary>
         /// Upload single image to Azure Blob Storage
         /// </summary>
-        Task<IDataResult<string>> UploadImageAsync(IFormFile file, ImageOwnerType ownerType, Guid ownerId);
+        Task<IDataResult<string>> UploadImageAsync(IFormFile file, ImageOwnerType ownerType, Guid ownerId, bool updateProfileImage = true);
 
         /// <summary>
         /// Upload multiple images to Azure Blob Storage

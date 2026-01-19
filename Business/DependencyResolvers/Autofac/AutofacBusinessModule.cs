@@ -41,9 +41,14 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<OperationClaimManager>().As<IOperationClaimService>().InstancePerLifetimeScope();
             builder.RegisterType<PhoneService>().As<IPhoneService>().InstancePerLifetimeScope();
             builder.RegisterType<ImageManager>().As<IImageService>().InstancePerLifetimeScope();
-            builder.RegisterType<NotificationManager>().As<INotificationService>().InstancePerLifetimeScope();
+            // V2 Refactored Services - Improved performance and real-time sync
+            builder.RegisterType<NotificationManagerV2>().As<INotificationService>().InstancePerLifetimeScope();
             builder.RegisterType<ChatManager>().As<IChatService>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
+            
+            // New Helper Services
+            builder.RegisterType<ThreadVisibilityService>().InstancePerLifetimeScope();
+            builder.RegisterType<BadgeService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
             builder.RegisterType<FavoriteManager>().As<IFavoriteService>().InstancePerLifetimeScope();

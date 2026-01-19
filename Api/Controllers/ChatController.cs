@@ -1,15 +1,11 @@
 using Business.Abstract;
-using Core.Extensions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class ChatController : ControllerBase
+    public class ChatController : BaseApiController
     {
         private readonly IChatService _chatService;
 
@@ -21,62 +17,56 @@ namespace Api.Controllers
         [HttpPost("{appointmentId:guid}/message")]
         public async Task<IActionResult> Send(Guid appointmentId, [FromBody] SendMessageRequest req)
         {
-            var result = await _chatService.SendMessageAsync(User.GetUserIdOrThrow(), appointmentId, req.Text);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.SendMessageAsync(userId, appointmentId, req.Text));
         }
 
         [HttpPost("{appointmentId:guid}/read")]
         public async Task<IActionResult> Read(Guid appointmentId)
         {
             // Geriye dönük uyumluluk için AppointmentId ile okundu işaretleme
-            var result = await _chatService.MarkThreadReadByAppointmentAsync(User.GetUserIdOrThrow(), appointmentId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.MarkThreadReadByAppointmentAsync(userId, appointmentId));
         }
 
         [HttpPost("thread/{threadId:guid}/message")]
         public async Task<IActionResult> SendToThread(Guid threadId, [FromBody] SendMessageRequest req)
         {
-            var result = await _chatService.SendFavoriteMessageAsync(User.GetUserIdOrThrow(), threadId, req.Text);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.SendFavoriteMessageAsync(userId, threadId, req.Text));
         }
 
         [HttpPost("thread/{threadId:guid}/read")]
         public async Task<IActionResult> ReadThread(Guid threadId)
         {
-            var result = await _chatService.MarkThreadReadAsync(User.GetUserIdOrThrow(), threadId);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.MarkThreadReadAsync(userId, threadId));
         }
 
         [HttpGet("threads")]
         public async Task<IActionResult> Threads()
         {
-            var result = await _chatService.GetThreadsAsync(User.GetUserIdOrThrow());
+            var result = await _chatService.GetThreadsAsync(CurrentUserId);
             return Ok(result);
         }
 
         [HttpGet("{appointmentId:guid}/messages")]
         public async Task<IActionResult> Messages(Guid appointmentId, [FromQuery] DateTime? before)
         {
-            // before: UTC gönder (RN’de new Date().toISOString())
-            var result = await _chatService.GetMessagesAsync(User.GetUserIdOrThrow(), appointmentId, before);
-            return result.Success ? Ok(result) : BadRequest(result);
+            // before: UTC gönder (RN'de new Date().toISOString())
+            return await HandleUserDataOperation(userId => _chatService.GetMessagesAsync(userId, appointmentId, before));
         }
 
         [HttpGet("thread/{threadId:guid}/messages")]
         public async Task<IActionResult> ThreadMessages(Guid threadId, [FromQuery] DateTime? before)
         {
             // ThreadId ile mesaj getirme (hem randevu hem favori thread'leri için)
-            var result = await _chatService.GetMessagesByThreadAsync(User.GetUserIdOrThrow(), threadId, before);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.GetMessagesByThreadAsync(userId, threadId, before));
         }
 
         [HttpPost("thread/{threadId:guid}/typing")]
         public async Task<IActionResult> NotifyTyping(Guid threadId, [FromBody] TypingRequest req)
         {
-            var result = await _chatService.NotifyTypingAsync(User.GetUserIdOrThrow(), threadId, req.IsTyping);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleUserDataOperation(userId => _chatService.NotifyTypingAsync(userId, threadId, req.IsTyping));
         }
     }
+
     public class SendMessageRequest
     {
         [Required]

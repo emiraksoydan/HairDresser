@@ -1,29 +1,33 @@
 using Business.Abstract;
 using Business.Resources;
 using Entities.Concrete.Enums;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
-    public class ImageController(IImageService imageService) : ControllerBase
+    public class ImageController : BaseApiController
     {
+        private readonly IImageService _imageService;
+
+        public ImageController(IImageService imageService)
+        {
+            _imageService = imageService;
+        }
+
         /// <summary>
         /// Upload single image to Azure Blob Storage
         /// </summary>
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadImage([FromForm] IFormFile file, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId)
+        public async Task<IActionResult> UploadImage([FromForm] IFormFile file, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId, [FromQuery] bool isProfileImage = true)
         {
             // Validate ownerId is not empty
             if (ownerId == Guid.Empty)
             {
                 return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
             }
-            
-            var result = await imageService.UploadImageAsync(file, ownerType, ownerId);
-            return result.Success ? Ok(result) : BadRequest(result);
+
+            return await HandleDataResultAsync(_imageService.UploadImageAsync(file, ownerType, ownerId, isProfileImage));
         }
 
         /// <summary>
@@ -37,9 +41,8 @@ namespace Api.Controllers
             {
                 return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
             }
-            
-            var result = await imageService.UploadImagesAsync(files, ownerType, ownerId);
-            return result.Success ? Ok(result) : BadRequest(result);
+
+            return await HandleDataResultAsync(_imageService.UploadImagesAsync(files, ownerType, ownerId));
         }
 
         /// <summary>
@@ -48,8 +51,7 @@ namespace Api.Controllers
         [HttpGet("owner/{ownerId}")]
         public async Task<IActionResult> GetImagesByOwner(Guid ownerId, [FromQuery] ImageOwnerType ownerType)
         {
-            var result = await imageService.GetImagesByOwnerAsync(ownerId, ownerType);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleDataResultAsync(_imageService.GetImagesByOwnerAsync(ownerId, ownerType));
         }
 
         /// <summary>
@@ -58,8 +60,7 @@ namespace Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteImage(Guid id)
         {
-            var result = await imageService.DeleteAsync(id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_imageService.DeleteAsync(id));
         }
 
         /// <summary>
@@ -68,8 +69,7 @@ namespace Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetImage(Guid id)
         {
-            var result = await imageService.GetImage(id);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleDataResultAsync(_imageService.GetImage(id));
         }
 
         /// <summary>
@@ -83,8 +83,7 @@ namespace Api.Controllers
                 return BadRequest(new { success = false, message = Messages.ImageIdRequired });
             }
 
-            var result = await imageService.UpdateImageBlobAsync(imageId, file);
-            return result.Success ? Ok(result) : BadRequest(result);
+            return await HandleResultAsync(_imageService.UpdateImageBlobAsync(imageId, file));
         }
     }
 }

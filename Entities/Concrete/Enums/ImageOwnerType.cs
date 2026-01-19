@@ -8,7 +8,7 @@ namespace Entities.Concrete.Enums
 {
     public enum ImageOwnerType
     {
-        User = 1,
+        User = 1,        // Only for profile images (User.ImageId)
         Store = 2,
         ManuelBarber = 3,
         FreeBarber = 4
