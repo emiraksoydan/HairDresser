@@ -88,6 +88,23 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Blockeds",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    BlockedFromUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BlockedToUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BlockReason = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Blockeds", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Categories",
                 columns: table => new
                 {
@@ -148,6 +165,24 @@ namespace DataAccess.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChatThreads", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Complaints",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ComplaintFromUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ComplaintToUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AppointmentId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ComplaintReason = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Complaints", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -289,6 +324,24 @@ namespace DataAccess.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_RefreshTokens", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Requests",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RequestFromUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RequestTitle = table.Column<string>(type: "text", nullable: false),
+                    RequestMessage = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsProcessed = table.Column<bool>(type: "boolean", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Requests", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -500,6 +553,22 @@ namespace DataAccess.Migrations
                 column: "AppointmentId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Blockeds_BlockedFromUserId",
+                table: "Blockeds",
+                column: "BlockedFromUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Blockeds_BlockedFromUserId_BlockedToUserId",
+                table: "Blockeds",
+                columns: new[] { "BlockedFromUserId", "BlockedToUserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Blockeds_BlockedToUserId",
+                table: "Blockeds",
+                column: "BlockedToUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Categories_ParentId",
                 table: "Categories",
                 column: "ParentId");
@@ -522,6 +591,17 @@ namespace DataAccess.Migrations
                 columns: new[] { "FavoriteFromUserId", "FavoriteToUserId", "StoreId" },
                 unique: true,
                 filter: "\"FavoriteFromUserId\" IS NOT NULL AND \"FavoriteToUserId\" IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Complaints_ComplaintFromUserId",
+                table: "Complaints",
+                column: "ComplaintFromUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Complaints_ComplaintFromUserId_ComplaintToUserId_Appointmen~",
+                table: "Complaints",
+                columns: new[] { "ComplaintFromUserId", "ComplaintToUserId", "AppointmentId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Favorites_FavoritedFromId_FavoritedToId_IsActive",
@@ -596,6 +676,11 @@ namespace DataAccess.Migrations
                 columns: new[] { "UserId", "RevokedAt", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Requests_RequestFromUserId",
+                table: "Requests",
+                column: "RequestFromUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Settings_UserId",
                 table: "Settings",
                 column: "UserId",
@@ -646,6 +731,9 @@ namespace DataAccess.Migrations
                 name: "BarberStores");
 
             migrationBuilder.DropTable(
+                name: "Blockeds");
+
+            migrationBuilder.DropTable(
                 name: "Categories");
 
             migrationBuilder.DropTable(
@@ -653,6 +741,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "ChatThreads");
+
+            migrationBuilder.DropTable(
+                name: "Complaints");
 
             migrationBuilder.DropTable(
                 name: "Favorites");
@@ -674,6 +765,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
+
+            migrationBuilder.DropTable(
+                name: "Requests");
 
             migrationBuilder.DropTable(
                 name: "ServiceOfferings");

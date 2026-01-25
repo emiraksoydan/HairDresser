@@ -43,8 +43,9 @@ namespace Business.Concrete
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
         private readonly AppointmentSettings _settings = appointmentSettings.Value;
 
-        private const int StoreSelectionTotalMinutes = 30;
-        private const int StoreSelectionStepMinutes = 5;
+        // 3'lü sistem (StoreSelection) süreleri - appsettings.json'dan okunuyor
+        private int StoreSelectionTotalMinutes => _settings.StoreSelection.TotalMinutes;
+        private int StoreSelectionStepMinutes => _settings.StoreSelection.StoreStepMinutes;
 
         // NOT: ProcessBadgeUpdatesAfterCommit() kaldırıldı
         // TransactionScopeAspect artık transaction commit sonrası otomatik olarak badge update'leri çalıştırıyor
@@ -327,7 +328,7 @@ namespace Business.Concrete
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId,
                 BarberStoreUserId = store.BarberStoreOwnerId,
-                StoreId = req.StoreId,  // Multi-store support
+                StoreId = req.StoreId,  
                 CustomerUserId = null,
                 FreeBarberUserId = freeBarberUserId,
                 ManuelBarberId = null,
@@ -911,7 +912,6 @@ namespace Business.Concrete
                         appt.PendingExpiresAt
                     );
 
-                    // M├╝┼şteri'ye ├Âzel bildirim: FreeBarberRejectedInitial
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.FreeBarberRejectedInitial, actorUserId: freeBarberUserId);
 
                     // Rejected: Actor'ın (freebarber) bildirimlerini otomatik okunmuş yap

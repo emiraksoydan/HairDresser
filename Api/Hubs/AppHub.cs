@@ -1,44 +1,101 @@
 using Core.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace Api.Hubs
 {
     [Authorize]
     public class AppHub : Hub
     {
+        private readonly ILogger<AppHub> _logger;
+
+        public AppHub(ILogger<AppHub> logger)
+        {
+            _logger = logger;
+        }
+
         public override async Task OnConnectedAsync()
         {
-                var userIdStr = Context?.User?.GetUserIdOrThrow();
-
-                if (Guid.TryParse(userIdStr.ToString(), out var userId))
-                await Groups.AddToGroupAsync(Context?.ConnectionId!, $"user:{userId}");
+            try
+            {
+                if (Context?.User != null && !string.IsNullOrEmpty(Context.ConnectionId))
+                {
+                    var userId = Context.User.GetUserIdOrThrow();
+                    await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+                    _logger.LogInformation("[SignalR] User {UserId} connected and added to group user:{UserId} with ConnectionId: {ConnectionId}",
+                        userId, userId, Context.ConnectionId);
+                }
 
                 await base.OnConnectedAsync();
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SignalR] Error in OnConnectedAsync");
+                await base.OnConnectedAsync();
+            }
+        }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-                // Group'tan çıkar - memory leak'i önlemek için
-                var userIdStr = Context?.User?.GetUserIdOrThrow();
-                if (Guid.TryParse(userIdStr?.ToString(), out var userId))
+            try
+            {
+                if (Context?.User != null && !string.IsNullOrEmpty(Context.ConnectionId))
                 {
-                await Groups.RemoveFromGroupAsync(Context?.ConnectionId!, $"user:{userId}");
+                    var userId = Context.User.GetUserIdOrThrow();
+                    await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user:{userId}");
+                    _logger.LogInformation("[SignalR] User {UserId} disconnected and removed from group with ConnectionId: {ConnectionId}",
+                        userId, Context.ConnectionId);
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SignalR] Error in OnDisconnectedAsync");
+            }
+            finally
+            {
                 await base.OnDisconnectedAsync(exception);
             }
+        }
 
-        // Typing indicator için hub metodu (frontend'den çağrılacak)
+        /// <summary>
+        /// Frontend'den bağlantı kurulduktan sonra çağrılır - gruba katılmayı garanti eder
+        /// </summary>
+        public async Task JoinUserGroup()
+        {
+            try
+            {
+                if (Context?.User != null && !string.IsNullOrEmpty(Context.ConnectionId))
+                {
+                    var userId = Context.User.GetUserIdOrThrow();
+                    await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+                    _logger.LogInformation("[SignalR] JoinUserGroup called - User {UserId} added to group with ConnectionId: {ConnectionId}",
+                        userId, Context.ConnectionId);
+
+                    // Başarılı katılımı frontend'e bildir
+                    await Clients.Caller.SendAsync("group.joined", new { userId, success = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SignalR] Error in JoinUserGroup");
+                await Clients.Caller.SendAsync("group.joined", new { success = false, error = ex.Message });
+            }
+        }
+
         public async Task NotifyTyping(string threadId, bool isTyping)
         {
-            var userIdStr = Context?.User?.GetUserIdOrThrow();
-            if (!Guid.TryParse(userIdStr?.ToString(), out var userId) || !Guid.TryParse(threadId, out var threadIdGuid))
-                return;
+            try
+            {
+                if (Context?.User == null || !Guid.TryParse(threadId, out var threadIdGuid))
+                    return;
 
-            // Bu metod için ChatService üzerinden typing event'i göndermek daha mantıklı
-            // Ama hub üzerinden direkt de yapılabilir - frontend'den çağrılacak
-            // Backend'den ChatService.NotifyTypingAsync metodu çağrılacak (API Controller üzerinden)
+                var userId = Context.User.GetUserIdOrThrow();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SignalR] Error in NotifyTyping");
+            }
         }
     }
 }

@@ -19,12 +19,16 @@ namespace Api.BackgroundServices
     public class AppointmentTimeoutWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<BackgroundServicesSettings> backgroundServicesSettings,
+        IOptions<AppointmentSettings> appointmentSettings,
         ILogger<AppointmentTimeoutWorker> logger
     ) : BackgroundService
     {
         private readonly BackgroundServicesSettings _settings = backgroundServicesSettings.Value;
+        private readonly AppointmentSettings _appointmentSettings = appointmentSettings.Value;
         private readonly ILogger<AppointmentTimeoutWorker> _logger = logger;
-        private const int StoreSelectionTotalMinutes = 30;
+
+        // 3'lü sistem (StoreSelection) süreleri - appsettings.json'dan okunuyor
+        private int StoreSelectionTotalMinutes => _appointmentSettings.StoreSelection.TotalMinutes;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -242,6 +246,7 @@ namespace Api.BackgroundServices
                     thread.UpdatedAt = DateTime.UtcNow;
                     await threadDal.Update(thread);
 
+                    // Thread'i kaldır - cevapsız randevularda thread gösterilmemeli
                     foreach (var userId in participantUserIds)
                     {
                         try { await realtime.PushChatThreadRemovedAsync(userId, thread.Id); } catch { /* non-critical */ }
@@ -395,13 +400,9 @@ namespace Api.BackgroundServices
             {
                 await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
 
-                // Unanswered: Thread okundu sayılsın (timeout olduğu için)
-                // MarkThreadReadByAppointmentSystemAsync internally handles badge updates
-                var chatService = scope.ServiceProvider.GetRequiredService<IChatService>();
-
-                if (trackedAppt.CustomerUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.CustomerUserId.Value, trackedAppt.Id);
-                if (trackedAppt.FreeBarberUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.FreeBarberUserId.Value, trackedAppt.Id);
-                if (trackedAppt.BarberStoreUserId.HasValue) await chatService.MarkThreadReadByAppointmentSystemAsync(trackedAppt.BarberStoreUserId.Value, trackedAppt.Id);
+                // NOT: MarkThreadReadByAppointmentSystemAsync çağrısı kaldırıldı
+                // Çünkü thread unread count'ları zaten yukarıda sıfırlanıyor (satır 243-245)
+                // Ve bu fonksiyon bildirimleri okunmuş yapabilir (istenmeyen davranış)
             }
         }
 
@@ -493,7 +494,7 @@ namespace Api.BackgroundServices
                     CreatedAt = notif.CreatedAt,
                     IsRead = notif.IsRead
                 };
-                await realtime.PushNotificationAsync(notif.UserId, updatedDto);
+                await realtime.PushNotificationSilentUpdateAsync(notif.UserId, updatedDto);
             }
             catch (Exception ex)
             {

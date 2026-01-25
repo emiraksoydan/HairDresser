@@ -147,6 +147,29 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<HelpGuide>()
                 .HasIndex(x => new { x.UserType, x.IsActive, x.Order });
 
+            // Complaint indexes
+            modelBuilder.Entity<Complaint>()
+                .HasIndex(x => x.ComplaintFromUserId);
+
+            modelBuilder.Entity<Complaint>()
+                .HasIndex(x => new { x.ComplaintFromUserId, x.ComplaintToUserId, x.AppointmentId })
+                .IsUnique();
+
+            // Request indexes
+            modelBuilder.Entity<Request>()
+                .HasIndex(x => x.RequestFromUserId);
+
+            // Blocked indexes for efficient blocking checks
+            modelBuilder.Entity<Blocked>()
+                .HasIndex(x => x.BlockedFromUserId);
+
+            modelBuilder.Entity<Blocked>()
+                .HasIndex(x => x.BlockedToUserId);
+
+            modelBuilder.Entity<Blocked>()
+                .HasIndex(x => new { x.BlockedFromUserId, x.BlockedToUserId })
+                .IsUnique();
+
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -179,6 +202,11 @@ namespace DataAccess.Concrete
         public DbSet<Setting> Settings { get; set; }
         public DbSet<UserFcmToken> UserFcmTokens { get; set; }
         public DbSet<HelpGuide> HelpGuides { get; set; }
+
+        // Complaint, Request, Blocked
+        public DbSet<Complaint> Complaints { get; set; }
+        public DbSet<Request> Requests { get; set; }
+        public DbSet<Blocked> Blockeds { get; set; }
 
     }
 }

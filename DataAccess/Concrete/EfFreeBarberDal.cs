@@ -420,7 +420,7 @@ namespace DataAccess.Concrete
                     .FirstOrDefaultAsync();
             }
 
-            // 1. Konum filtresi (nearby) - tüm paneller için geçerli (kendi paneli dahil)
+            // 1. Konum filtresi (nearby) - kendi paneli konum filtresinden muaf tutulur
             if (filter.Latitude.HasValue && filter.Longitude.HasValue)
             {
                 var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
@@ -429,9 +429,11 @@ namespace DataAccess.Concrete
                     filter.Longitude.Value, 
                     distance
                 );
+                // Kendi paneli her zaman dahil edilir - konum filtresi sadece başkalarının panellerine uygulanır
                 query = query.Where(fb => 
-                    fb.Latitude >= minLat && fb.Latitude <= maxLat &&
-                    fb.Longitude >= minLon && fb.Longitude <= maxLon
+                    (ownFreeBarberPanelId.HasValue && fb.Id == ownFreeBarberPanelId.Value) || // Kendi paneli her zaman dahil
+                    (fb.Latitude >= minLat && fb.Latitude <= maxLat &&
+                     fb.Longitude >= minLon && fb.Longitude <= maxLon)
                 );
             }
 

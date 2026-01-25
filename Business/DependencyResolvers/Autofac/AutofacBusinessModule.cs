@@ -56,9 +56,18 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<HelpGuideManager>().As<IHelpGuideService>().InstancePerLifetimeScope();
             builder.RegisterType<FirebasePushNotificationService>().As<IPushNotificationService>().InstancePerLifetimeScope();
 
+            // Complaint, Request, Blocked Services
+            builder.RegisterType<ComplaintManager>().As<IComplaintService>().InstancePerLifetimeScope();
+            builder.RegisterType<RequestManager>().As<IRequestService>().InstancePerLifetimeScope();
+            builder.RegisterType<BlockedManager>().As<IBlockedService>().InstancePerLifetimeScope();
+
+            // Content Moderation Service (OpenAI)
+            builder.RegisterType<ContentModerationManager>().As<IContentModerationService>().InstancePerLifetimeScope();
+
             // Helper classes (N+1 query optimization)
             builder.RegisterType<FavoriteHelper>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentBusinessRules>().InstancePerLifetimeScope();
+            builder.RegisterType<BlockedHelper>().InstancePerLifetimeScope();
 
             builder.RegisterType<EfBarberStoreDal>().As<IBarberStoreDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFreeBarberDal>().As<IFreeBarberDal>().InstancePerLifetimeScope();
@@ -86,6 +95,11 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfSettingDal>().As<ISettingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfHelpGuideDal>().As<IHelpGuideDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfUserFcmTokenDal>().As<IUserFcmTokenDal>().InstancePerLifetimeScope();
+
+            // Complaint, Request, Blocked DAL
+            builder.RegisterType<EfComplaintDal>().As<IComplaintDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfRequestDal>().As<IRequestDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfBlockedDal>().As<IBlockedDal>().InstancePerLifetimeScope();
 
             // IHttpContextAccessor CoreModule'de ServiceCollection'a kayıtlı
             // Autofac.Extensions.DependencyInjection ile otomatik olarak Autofac'e aktarılıyor

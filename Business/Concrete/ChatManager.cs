@@ -24,7 +24,9 @@ namespace Business.Concrete
              IImageDal imageDal,
              IFavoriteDal favoriteDal,
              IRealTimePublisher realtime,
-             FavoriteHelper favoriteHelper
+             FavoriteHelper favoriteHelper,
+             BadgeService badgeService,
+             IContentModerationService contentModeration
      ) : IChatService
     {
 
@@ -35,6 +37,11 @@ namespace Business.Concrete
         {
             text = (text ?? "").Trim();
             if (text.Length == 0) return new ErrorDataResult<ChatMessageDto>(Messages.EmptyMessage);
+
+            // İçerik moderasyonu kontrolü
+            var moderationResult = await contentModeration.CheckContentAsync(text);
+            if (!moderationResult.Success)
+                return new ErrorDataResult<ChatMessageDto>(moderationResult.Message);
 
             var appt = await appointmentDal.Get(x => x.Id == appointmentId);
             if (appt is null) return new ErrorDataResult<ChatMessageDto>(Messages.AppointmentNotFound);
@@ -154,14 +161,17 @@ namespace Business.Concrete
             foreach (var u in recipients)
             {
                 await realtime.PushChatMessageAsync(u, dto);
-                // NOT: Badge update burada yapılmıyor - frontend chat.message event'inde
-                // optimistic olarak badge count'u artırıyor
             }
 
             // Thread güncellemesini tüm katılımcılara push et (LastMessagePreview, LastMessageAt, UnreadCount değişti)
             await PushAppointmentThreadUpdatedAsync(appointmentId);
 
-            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
+            // Badge update: sender dışındaki katılımcılar için badge count'u güncelle
+            var recipientsForBadgeUpdate = recipients.Where(u => u != senderUserId).ToList();
+            if (recipientsForBadgeUpdate.Any())
+            {
+                await badgeService.NotifyBadgeChangeBatchAsync(recipientsForBadgeUpdate, BadgeChangeReason.MessageReceived);
+            }
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }
@@ -190,8 +200,11 @@ namespace Business.Concrete
             return await MarkThreadReadByAppointmentInternalAsync(userId, appointmentId);
         }
 
+        /// <summary>
+        /// System/Background worker kullanımı için - TransactionScope olmadan
+        /// Worker kendi transaction'ını yönettiği için nested transaction hatası vermez
+        /// </summary>
         [LogAspect]
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<bool>> MarkThreadReadByAppointmentSystemAsync(Guid userId, Guid appointmentId)
         {
             return await MarkThreadReadByAppointmentInternalAsync(userId, appointmentId);
@@ -788,6 +801,11 @@ namespace Business.Concrete
             text = (text ?? "").Trim();
             if (text.Length == 0) return new ErrorDataResult<ChatMessageDto>(Messages.EmptyMessage);
 
+            // İçerik moderasyonu kontrolü
+            var moderationResult = await contentModeration.CheckContentAsync(text);
+            if (!moderationResult.Success)
+                return new ErrorDataResult<ChatMessageDto>(moderationResult.Message);
+
             var thread = await threadDal.Get(t => t.Id == threadId);
             if (thread is null) return new ErrorDataResult<ChatMessageDto>(Messages.ChatNotFound);
 
@@ -909,7 +927,11 @@ namespace Business.Concrete
             // EnsureFavoriteThreadAsync mantığını kullanarak thread detaylarını oluştur ve push et
             await PushFavoriteThreadUpdatedAsync(fromUserId, toUserId, thread.Id);
 
-            // Transaction commit sonrası badge update'leri TransactionScopeAspect tarafından otomatik çalıştırılıyor
+            // Badge update: sender dışındaki katılımcı için badge count'u güncelle
+            if (otherUserId.HasValue && otherUserId.Value != senderUserId)
+            {
+                await badgeService.NotifyBadgeChangeAsync(otherUserId.Value, BadgeChangeReason.MessageReceived);
+            }
 
             return new SuccessDataResult<ChatMessageDto>(dto);
         }

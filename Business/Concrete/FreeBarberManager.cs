@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
+using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Logging;
@@ -14,7 +15,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class FreeBarberManager(IFreeBarberDal freeBarberDal,IAppointmentService _appointmentService, IServiceOfferingService _serviceOfferingService) : IFreeBarberService
+    public class FreeBarberManager(IFreeBarberDal freeBarberDal, IAppointmentService _appointmentService, IServiceOfferingService _serviceOfferingService, BlockedHelper blockedHelper) : IFreeBarberService
     {
         [SecuredOperation("FreeBarber")]
         [LogAspect]
@@ -93,12 +94,34 @@ namespace Business.Concrete
         public async Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance, Guid? currentUserId = null)
         {
             var getFreeBarberResult = await freeBarberDal.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId);
+
+            // Engellenmiş kullanıcıları filtrele
+            if (currentUserId.HasValue && getFreeBarberResult != null && getFreeBarberResult.Count > 0)
+            {
+                getFreeBarberResult = await blockedHelper.FilterBlockedUsersAsync(
+                    currentUserId,
+                    getFreeBarberResult,
+                    fb => fb.FreeBarberUserId
+                );
+            }
+
             return new SuccessDataResult<List<FreeBarberGetDto>>(getFreeBarberResult);
         }
 
         public async Task<IDataResult<List<FreeBarberGetDto>>> GetFilteredFreeBarbersAsync(FilterRequestDto filter)
         {
             var result = await freeBarberDal.GetFilteredFreeBarbersAsync(filter);
+
+            // Engellenmiş kullanıcıları filtrele
+            if (filter.CurrentUserId.HasValue && result != null && result.Count > 0)
+            {
+                result = await blockedHelper.FilterBlockedUsersAsync(
+                    filter.CurrentUserId,
+                    result,
+                    fb => fb.FreeBarberUserId
+                );
+            }
+
             return new SuccessDataResult<List<FreeBarberGetDto>>(result, Messages.FilteredFreeBarbersRetrieved);
         }
 

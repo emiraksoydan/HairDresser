@@ -103,9 +103,15 @@ namespace Business.Concrete
                 await appointmentDal.Update(appt);
             }
 
-            // DÜZELTME: Randevuyu gönderen kişiyi (actorUserId) recipient listesinden hariç tut
-            // AppointmentUnanswered durumunda TÜM ilgili kişilere bildirim gitmeli (actor dahil)
-            // Diğer durumlarda gönderen kişi (actor) hariç tutulmalı
+            // BİLDİRİM AKIŞI MANTIĞI:
+            // 1. Randevu oluşturulduğunda: Randevu alan kişi (actor) → Karşı tarafa bildirim gönderir
+            //    Örnek: Customer randevu oluşturdu → Store/FreeBarber'a bildirim gider (Customer'a gitmez)
+            // 2. Cevap verildiğinde: Cevap veren kişi (actor) → Randevu alan kişiye geri bildirim gönderir
+            //    Örnek: Store onayladı → Customer'a bildirim gider (Store'a gitmez)
+            //
+            // actorUserId: İşlemi yapan kişi (randevu oluşturan veya cevap veren)
+            // Bu kişi recipient listesinden çıkarılır çünkü kendi yaptığı işlem için bildirim almamalı
+            // ÖNEMLİ: AppointmentUnanswered durumunda TÜM ilgili kişilere bildirim gitmeli (actor dahil)
             // ÖNEMLİ: actorUserId null olabilir (örn: background service'ten gelen AppointmentUnanswered)
             var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
                 .Where(x => x.HasValue)
@@ -118,6 +124,8 @@ namespace Business.Concrete
                 .Distinct()
                 .ToList();
 
+            // Actor'ı recipient listesinden çıkar (kendi yaptığı işlem için bildirim almamalı)
+            // AppointmentUnanswered hariç - bu durumda herkese gitmeli
             if (type != NotificationType.AppointmentUnanswered && actorUserId.HasValue)
             {
                 recipients = recipients
@@ -189,6 +197,13 @@ namespace Business.Concrete
             StoreNotifyDto? storeInfo = null;
             if (store is not null)
             {
+                // Store owner'ın customerNumber'ını userMap'ten al
+                string? storeOwnerNumber = null;
+                if (userMap.TryGetValue(store.BarberStoreOwnerId, out var storeOwner))
+                {
+                    storeOwnerNumber = storeOwner.CustomerNumber;
+                }
+
                 storeInfo = new StoreNotifyDto
                 {
                     StoreId = store.Id,
@@ -196,7 +211,8 @@ namespace Business.Concrete
                     StoreName = store.StoreName,
                     ImageUrl = storeImageUrl,
                     Type = store.Type,
-                    AddressDescription = store.AddressDescription
+                    AddressDescription = store.AddressDescription,
+                    StoreOwnerNumber = storeOwnerNumber
                 };
             }
 

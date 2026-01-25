@@ -596,7 +596,7 @@ namespace DataAccess.Concrete
                     .ToListAsync();
             }
 
-            // 1. Konum filtresi (nearby) - tüm dükkanlar için geçerli (kendi dükkanları dahil)
+            // 1. Konum filtresi (nearby) - kendi dükkanları konum filtresinden muaf tutulur
             if (filter.Latitude.HasValue && filter.Longitude.HasValue)
             {
                 var distance = filter.DistanceKm > 0 ? filter.DistanceKm : 1.0;
@@ -605,9 +605,11 @@ namespace DataAccess.Concrete
                     filter.Longitude.Value, 
                     distance
                 );
+                // Kendi dükkanları her zaman dahil edilir - konum filtresi sadece başkalarının dükkanlarına uygulanır
                 query = query.Where(s => 
-                    s.Latitude >= minLat && s.Latitude <= maxLat &&
-                    s.Longitude >= minLon && s.Longitude <= maxLon
+                    ownStoreIds.Contains(s.Id) || // Kendi dükkanları her zaman dahil
+                    (s.Latitude >= minLat && s.Latitude <= maxLat &&
+                     s.Longitude >= minLon && s.Longitude <= maxLon)
                 );
             }
 

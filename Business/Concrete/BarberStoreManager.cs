@@ -1,6 +1,7 @@
 
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
+using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspect.Autofac.Logging;
@@ -16,7 +17,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IFreeBarberDal freeBarberDal) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IFreeBarberDal freeBarberDal, BlockedHelper blockedHelper) : IBarberStoreService
     {
         [SecuredOperation("BarberStore")]
         [LogAspect]
@@ -91,21 +92,43 @@ namespace Business.Concrete
             {
                 // Kullanıcının free barber paneli var mı kontrol et
                 var freeBarberPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId.Value);
-                
+
                 // Free barber paneli yoksa boş liste döndür
                 if (freeBarberPanel == null)
                 {
                     return new SuccessDataResult<List<BarberStoreGetDto>>(new List<BarberStoreGetDto>(), Messages.NearbyBarbersRetrieved);
                 }
             }
-            
+
             var result = await barberStoreDal.GetNearbyStoresAsync(lat, lon, distance, currentUserId);
+
+            // Engellenmiş kullanıcıları filtrele
+            if (currentUserId.HasValue && result != null && result.Count > 0)
+            {
+                result = await blockedHelper.FilterBlockedStoresAsync(
+                    currentUserId,
+                    result,
+                    s => s.BarberStoreOwnerId ?? Guid.Empty
+                );
+            }
+
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, Messages.NearbyBarbersRetrieved);
         }
 
         public async Task<IDataResult<List<BarberStoreGetDto>>> GetFilteredStoresAsync(FilterRequestDto filter)
         {
             var result = await barberStoreDal.GetFilteredStoresAsync(filter);
+
+            // Engellenmiş kullanıcıları filtrele
+            if (filter.CurrentUserId.HasValue && result != null && result.Count > 0)
+            {
+                result = await blockedHelper.FilterBlockedStoresAsync(
+                    filter.CurrentUserId,
+                    result,
+                    s => s.BarberStoreOwnerId ?? Guid.Empty
+                );
+            }
+
             return new SuccessDataResult<List<BarberStoreGetDto>>(result, Messages.FilteredBarberStoresRetrieved);
         }
 

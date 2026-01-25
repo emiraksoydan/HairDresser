@@ -16,13 +16,13 @@ namespace Entities.Concrete.Enums
         AppointmentUnanswered,
         AppointmentDecisionUpdated,
         
-        // 3'lü sistem için yeni bildirim tipleri
-        FreeBarberRejectedInitial,      // FreeBarber ilk isteği reddetti (Müşteri'ye)
-        StoreRejectedSelection,          // Store seçimi reddetti (FreeBarber+Müşteri'ye)
-        StoreApprovedSelection,          // Store onayladı (FreeBarber+Müşteri'ye)
-        StoreSelectionTimeout,           // Store 5dk cevap vermedi (FreeBarber+Müşteri'ye)
-        CustomerRejectedFinal,           // Müşteri final red verdi (FreeBarber+Store'a)
-        CustomerApprovedFinal,           // Müşteri final onay verdi (FreeBarber+Store'a)
-        CustomerFinalTimeout,            // Müşteri 30dk içinde cevap vermedi (Herkes'e)
+       
+        FreeBarberRejectedInitial,     
+        StoreRejectedSelection,         
+        StoreApprovedSelection,       
+        StoreSelectionTimeout,    
+        CustomerRejectedFinal,           
+        CustomerApprovedFinal,        
+        CustomerFinalTimeout,       
     }
 }

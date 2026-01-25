@@ -42,9 +42,4 @@
     <ProjectReference Include="..\Entities\Entities.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- wwwroot klasörü otomatik olarak Content olarak dahil edilir (Web SDK) -->
-    <!-- Sadece publish için CopyToPublishDirectory ayarı -->
-  </ItemGroup>
-
 </Project>

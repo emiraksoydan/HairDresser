@@ -1,4 +1,4 @@
-﻿using Entities.Abstract;
+using Entities.Abstract;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,9 +10,11 @@ namespace Entities.Concrete.Entities
     public class Blocked : IEntity
     {
         public Guid Id { get; set; }
-        public Guid BlockedToUserId { get; set; }
-        public Guid BlockedFromUserId { get; set; }
+        public Guid BlockedFromUserId { get; set; }  // Engelleyen kullanıcı
+        public Guid BlockedToUserId { get; set; }    // Engellenen kullanıcı
+        public string BlockReason { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public string BlcokReason { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }

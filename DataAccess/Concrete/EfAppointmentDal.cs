@@ -287,6 +287,14 @@ namespace DataAccess.Concrete
             var customerDict = customerList.ToDictionary(u => u.Id, u => u.Name);
             var customerNumberDict = customerList.ToDictionary(u => u.Id, u => u.CustomerNumber);
 
+            // D-2) STORE OWNER & FREE BARBER CustomerNumber'ları
+            var storeOwnerAndFreeBarberUserIds = storeUserIds.Concat(freeBarberUserIds).Distinct().ToList();
+            var storeOwnerAndFreeBarberNumberList = await _context.Users.AsNoTracking()
+                .Where(u => storeOwnerAndFreeBarberUserIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.CustomerNumber })
+                .ToListAsync();
+            var storeOwnerAndFreeBarberNumberDict = storeOwnerAndFreeBarberNumberList.ToDictionary(u => u.Id, u => u.CustomerNumber);
+
             // E) YENİ: CHAIR (Koltuk İsimleri)
             var chairsDict = await _context.BarberChairs.AsNoTracking()
                 .Where(c => chairIds.Contains(c.Id))
@@ -464,6 +472,12 @@ namespace DataAccess.Concrete
                         {
                             dto.StoreAverageRating = avgRating;
                         }
+
+                        // Store owner'ın customerNumber'ı
+                        if (storeOwnerAndFreeBarberNumberDict.TryGetValue(userId, out var storeOwnerNumber))
+                        {
+                            dto.StoreOwnerNumber = storeOwnerNumber;
+                        }
                     }
                 }
 
@@ -494,6 +508,12 @@ namespace DataAccess.Concrete
                         if (averageRatingDict.TryGetValue(fbInfo.FreeBarberUserId, out var avgRating))
                         {
                             dto.FreeBarberAverageRating = avgRating;
+                        }
+
+                        // FreeBarber'ın customerNumber'ı
+                        if (storeOwnerAndFreeBarberNumberDict.TryGetValue(userId, out var freeBarberNumber))
+                        {
+                            dto.FreeBarberNumber = freeBarberNumber;
                         }
                     }
                 }

@@ -42,6 +42,7 @@ namespace Business.Concrete
         /// <summary>
         /// Creates notification for a single user and pushes via SignalR + FCM
         /// </summary>
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [LogAspect]
         public async Task<IDataResult<Guid>> CreateAndPushAsync(
             Guid userId,
@@ -52,7 +53,10 @@ namespace Business.Concrete
             string? body = null)
         {
             // Duplicate check & update logic
-            if (appointmentId.HasValue)
+            // ÖNEMLİ: Sadece AppointmentCreated için duplicate kontrolü yap
+            // Geri dönüş bildirimleri (Approved, Rejected, vb.) için her zaman yeni bildirim oluştur
+            // Çünkü kullanıcılar geri dönüş bildirimlerini görmeli (sound, badge count artmalı)
+            if (appointmentId.HasValue && type == NotificationType.AppointmentCreated)
             {
                 var existingNotif = await GetExistingNotificationAsync(userId, appointmentId.Value, type);
                 if (existingNotif != null)
@@ -81,6 +85,14 @@ namespace Business.Concrete
 
             await notificationDal.Add(notification);
 
+            // CRITICAL FIX: Count badge AFTER notification is added (transaction içinde)
+            // Bu race condition'ı önler - aynı anda birden fazla bildirim geldiğinde doğru count hesaplanır
+            int unreadCount = 0;
+            if (!notification.IsRead)
+            {
+                unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
+            }
+
             var notificationDto = MapToDto(notification);
 
             // Real-time push via SignalR
@@ -89,9 +101,9 @@ namespace Business.Concrete
             // CRITICAL FIX: Send badge.updated event immediately after notification is pushed
             // This updates the badge count on the frontend without requiring an API refetch
             // Frontend expects this event for real-time badge count updates
-            if (!notification.IsRead)
+            // Transaction commit sonrası badge count gönderilecek (TransactionScopeAspect sayesinde)
+            if (!notification.IsRead && unreadCount > 0)
             {
-                var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
                 await realtime.PushBadgeUpdateAsync(userId, notificationUnreadCount: unreadCount);
             }
 
@@ -311,9 +323,8 @@ namespace Business.Concrete
             if (notifications == null || !notifications.Any())
                 return new SuccessDataResult<bool>(true);
 
-            // Skip if status is Rejected (avoid updating old notifications)
-            if (status == AppointmentStatus.Rejected)
-                return new SuccessDataResult<bool>(true);
+            // NOT: Rejected durumunda da payload güncellenmeli ki frontend'de butonlar gizlensin
+            // Eski yorum: "Skip if status is Rejected (avoid updating old notifications)" - Bu yanlıştı
 
             var updatedNotifications = new List<NotificationDto>();
 

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260118095129_mig-1")]
+    [Migration("20260124193510_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -233,6 +233,43 @@ namespace DataAccess.Migrations
                     b.ToTable("BarberStores");
                 });
 
+            modelBuilder.Entity("Entities.Concrete.Entities.Blocked", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlockReason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("BlockedFromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BlockedToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlockedFromUserId");
+
+                    b.HasIndex("BlockedToUserId");
+
+                    b.HasIndex("BlockedFromUserId", "BlockedToUserId")
+                        .IsUnique();
+
+                    b.ToTable("Blockeds");
+                });
+
             modelBuilder.Entity("Entities.Concrete.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -353,6 +390,44 @@ namespace DataAccess.Migrations
                         .HasFilter("\"FavoriteFromUserId\" IS NOT NULL AND \"FavoriteToUserId\" IS NOT NULL");
 
                     b.ToTable("ChatThreads");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.Complaint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComplaintFromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ComplaintReason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ComplaintToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComplaintFromUserId");
+
+                    b.HasIndex("ComplaintFromUserId", "ComplaintToUserId", "AppointmentId")
+                        .IsUnique();
+
+                    b.ToTable("Complaints");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Favorite", b =>
@@ -677,6 +752,42 @@ namespace DataAccess.Migrations
                     b.HasIndex("UserId", "RevokedAt", "ExpiresAt");
 
                     b.ToTable("RefreshTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.Request", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsProcessed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("RequestFromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestMessage")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequestTitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestFromUserId");
+
+                    b.ToTable("Requests");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.ServiceOffering", b =>

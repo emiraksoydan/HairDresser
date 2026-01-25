@@ -150,6 +150,12 @@ builder.Services.AddHttpClient("FCM", client =>
     client.BaseAddress = new Uri("https://fcm.googleapis.com/");
 });
 
+// HttpClient for OpenAI Content Moderation
+builder.Services.AddHttpClient("OpenAI", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 // Register IPushNotificationService (will be resolved by Autofac, but we need to register it in DI container too for optional injection)
 builder.Services.AddScoped<Business.Abstract.IPushNotificationService, Business.Concrete.FirebasePushNotificationService>();
 
