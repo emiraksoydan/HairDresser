@@ -22,7 +22,8 @@ namespace Business.ValidationRules.FluentValidation
                     .NotEmpty().WithMessage("Hizmet adı boş olamaz");
 
                 o.RuleFor(x => x.Price)
-                    .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır");
+                    .NotNull().WithMessage("Hizmet fiyatı girilmelidir")
+                    .GreaterThanOrEqualTo(0).WithMessage("Hizmet fiyatı 0 veya daha büyük olmalıdır");
             });
             RuleFor(x => x.Latitude)
                 .InclusiveBetween(-90, 90).WithMessage("Geçerli bir enlem değeri giriniz (-90..90).");
@@ -30,9 +31,7 @@ namespace Business.ValidationRules.FluentValidation
             RuleFor(x => x.Longitude)
                 .InclusiveBetween(-180, 180).WithMessage("Geçerli bir boylam değeri giriniz (-180..180).");
 
-            RuleFor(x => x.BarberCertificateImageId)
-                .NotNull().WithMessage("Sertifika resmi zorunludur.")
-                .NotEmpty().WithMessage("Sertifika resmi zorunludur.");
+            // BarberCertificateImageId artık opsiyonel (güzellik salonu belgesi için)
 
         }
     }

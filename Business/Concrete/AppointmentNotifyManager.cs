@@ -417,9 +417,6 @@ namespace Business.Concrete
                     IsFreeBarberInFavorites = isFreeBarberFavorite,
                 };
 
-                // DEBUG: Log payload for debugging button visibility
-                Console.WriteLine($"[🔔 Notification] AppointmentId={appt.Id}, Type={type}, Recipient={userId}, Role={role}, StoreDecision={appt.StoreDecision}, FreeBarberDecision={appt.FreeBarberDecision}, CustomerDecision={appt.CustomerDecision}, Status={appt.Status}");
-
                 // role bazlı "kimleri dahil edelim?"
                 // Global exception middleware hataları yakalayacak
                 await notificationSvc.CreateAndPushAsync(

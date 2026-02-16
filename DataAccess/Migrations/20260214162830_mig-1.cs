@@ -17,6 +17,7 @@ namespace DataAccess.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ChairId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ChairName = table.Column<string>(type: "text", nullable: true),
                     StartTime = table.Column<TimeSpan>(type: "interval", nullable: true),
                     EndTime = table.Column<TimeSpan>(type: "interval", nullable: true),
                     AppointmentDate = table.Column<DateOnly>(type: "date", nullable: true),
@@ -213,6 +214,7 @@ namespace DataAccess.Migrations
                     Latitude = table.Column<double>(type: "double precision", nullable: false),
                     Longitude = table.Column<double>(type: "double precision", nullable: false),
                     BarberCertificateImageId = table.Column<Guid>(type: "uuid", nullable: true),
+                    BeautySalonCertificateImageId = table.Column<Guid>(type: "uuid", nullable: true),
                     IsAvailable = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -409,6 +411,8 @@ namespace DataAccess.Migrations
                     ImageId = table.Column<Guid>(type: "uuid", nullable: true),
                     UserType = table.Column<int>(type: "integer", nullable: false),
                     CustomerNumber = table.Column<string>(type: "text", nullable: false),
+                    IsKvkkApproved = table.Column<bool>(type: "boolean", nullable: false),
+                    KvkkApprovedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },

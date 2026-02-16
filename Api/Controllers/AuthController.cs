@@ -30,15 +30,6 @@ namespace Api.Controllers
             return res.Success ? Ok(res) : BadRequest(res.Message);
         }
         [AllowAnonymous]
-        [HttpPost("password")]
-        public async Task<IActionResult> LoginWithPassword([FromBody] UserForVerifyDto req)
-        {
-            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var device = req.Device ?? Request.Headers.UserAgent.ToString();
-            var res = await authService.LoginWithPassword(req, ip, device);
-            return res.Success ? Ok(res) : BadRequest(res);
-        }
-        [AllowAnonymous]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto req)
         {

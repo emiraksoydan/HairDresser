@@ -43,6 +43,9 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("ChairId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ChairName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -468,6 +471,9 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("BarberCertificateImageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("BeautySalonCertificateImageId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -863,6 +869,12 @@ namespace DataAccess.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsKvkkApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("KvkkApprovedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastName")
                         .IsRequired()

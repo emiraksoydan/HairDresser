@@ -11,7 +11,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
-using Core.Abstract;
+
 
 namespace Core.Aspect.Autofac.Transaction
 {

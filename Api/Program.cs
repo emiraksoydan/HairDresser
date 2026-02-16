@@ -15,8 +15,8 @@ using Core.Utilities.Security.PhoneSetting;
 using DataAccess.Concrete;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IO.Compression;
@@ -84,9 +84,9 @@ builder.Services.AddCors(options =>
     else
     {
         // Production: Restrict to specific origins
-        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
             ?? Array.Empty<string>();
-        
+
         options.AddDefaultPolicy(policy =>
         {
             policy.WithOrigins(allowedOrigins)
@@ -141,7 +141,7 @@ builder.Host.ConfigureContainer<ContainerBuilder>(options =>
 {
     options.RegisterModule(new AutofacBusinessModule());
 });
-builder.Services.AddSingleton<IRealTimePublisher,SignalRRealtimePublisher>();
+builder.Services.AddSingleton<IRealTimePublisher, SignalRRealtimePublisher>();
 
 // HttpClient for FCM (v1 API)
 builder.Services.AddHttpClient("FCM", client =>
@@ -185,7 +185,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    app.UseDeveloperExceptionPage();
+    //app.UseDeveloperExceptionPage();
     //app.MapOpenApi();
 }
 app.ConfigureCustomExceptionMiddleware();
@@ -209,3 +209,4 @@ app.MapHub<AppHub>("/hubs/app");
 app.MapControllers();
 
 app.Run();
+

@@ -1,5 +1,5 @@
 using Business.Abstract;
-using Core.Abstract;
+
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Configuration;
 using DataAccess.Concrete;
@@ -195,15 +195,7 @@ namespace Api.BackgroundServices
                 }
             }
 
-            // ✅ DEBUG: Status güncellemesi öncesi log
-            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status BEFORE update: {Status}",
-                trackedAppt.Id, trackedAppt.Status);
-
             UpdateAppointmentStatus(trackedAppt);
-
-            // ✅ DEBUG: Status güncellemesi sonrası log
-            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status AFTER update: {Status}",
-                trackedAppt.Id, trackedAppt.Status);
 
             // Katılımcılar (thread removal + appointment.updated + badge update için)
             var participantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
@@ -224,15 +216,7 @@ namespace Api.BackgroundServices
                 trackedAppt.EndTime = null;
             }
 
-                // ✅ DEBUG: SaveChanges öncesi log
-                _logger.LogInformation("AppointmentTimeoutWorker: Saving changes for appointment {AppointmentId} with Status={Status}",
-                    trackedAppt.Id, trackedAppt.Status);
-
                 await db.SaveChangesAsync(stoppingToken);
-
-                // ✅ DEBUG: SaveChanges sonrası log
-                _logger.LogInformation("AppointmentTimeoutWorker: Changes saved successfully for appointment {AppointmentId}",
-                    trackedAppt.Id);
 
                 await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
 
@@ -273,16 +257,8 @@ namespace Api.BackgroundServices
 
                 await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
-                // ✅ DEBUG: Transaction commit öncesi log
-                _logger.LogInformation("AppointmentTimeoutWorker: Committing transaction for appointment {AppointmentId} with final Status={Status}",
-                    trackedAppt.Id, trackedAppt.Status);
-
                 // Commit transaction - all operations successful
                 await transaction.CommitAsync(stoppingToken);
-
-                // ✅ DEBUG: Transaction commit sonrası log
-                _logger.LogInformation("AppointmentTimeoutWorker: Transaction committed successfully for appointment {AppointmentId}",
-                    trackedAppt.Id);
 
             }
             catch (Exception ex)

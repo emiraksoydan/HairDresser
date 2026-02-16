@@ -2,7 +2,7 @@ using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Abstract;
 using Business.Concrete;
-using Core.Abstract;
+
 using Business.Helpers;
 using Business.Mapping;
 using Castle.DynamicProxy;
@@ -47,7 +47,6 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
             
             // New Helper Services
-            builder.RegisterType<ThreadVisibilityService>().InstancePerLifetimeScope();
             builder.RegisterType<BadgeService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
@@ -88,8 +87,6 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfUserDal>().As<IUserDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatThreadDal>().As<IChatThreadDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatMessageDal>().As<IChatMessageDal>().InstancePerLifetimeScope();
-            builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
-            builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfSettingDal>().As<ISettingDal>().InstancePerLifetimeScope();

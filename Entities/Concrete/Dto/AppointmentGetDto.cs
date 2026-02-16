@@ -26,6 +26,7 @@ namespace Entities.Concrete.Dto
         public double PricingValue { get; set; }
         public AppointmentRequester AppointmentRequester { get; set; }
         public Guid? BarberStoreId { get; set; }
+        public Guid? StoreUserId { get; set; } // Dükkan sahibinin User ID'si (şikayet için)
         public Guid? StoreId { get; set; } // Specific store ID for multi-store owners
         public string? StoreName { get; set; }
         public string? StoreImage { get; set; }
@@ -38,6 +39,7 @@ namespace Entities.Concrete.Dto
         public double? StoreAverageRating { get; set; } // Store'un ortalama rating'i
         public string? StoreOwnerNumber { get; set; } // Dükkan sahibi numarası
         public Guid? FreeBarberId { get; set; }
+        public Guid? FreeBarberUserId { get; set; } // FreeBarber'ın User ID'si (şikayet için)
         public string? FreeBarberName { get; set; }
         public string? FreeBarberImage { get; set; }
         public bool IsFreeBarberFavorite { get; set; }

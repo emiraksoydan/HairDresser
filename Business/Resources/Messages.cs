@@ -86,6 +86,7 @@ namespace Business.Resources
         // User Messages
         public const string UserNotFound = "Kullanıcı bulunamadı.";
         public const string OnlyCustomersCanCreateAppointment = "Sadece müşteriler randevu oluşturabilir.";
+        public const string UserBlockedCannotCreateAppointment = "Engellenen bir kullanıcıdan randevu alamazsınız.";
 
         // Chat Messages
         public const string ChatOnlyForActiveAppointments = "Sohbet sadece Bekleyen/Onaylanmış randevular için aktiftir.";
@@ -206,6 +207,7 @@ namespace Business.Resources
         public const string CategoryDeletedSuccess = "Kategori Silindi";
         public const string MainCategoriesRetrieved = "Ana kategoriler getirildi";
         public const string SubCategoriesRetrieved = "Alt kategoriler getirildi";
+        public const string CategoriesRetrieved = "Kategoriler getirildi";
         
         // Image Messages
         public const string ImageOwnerIdRequired = "Resim sahibi ID'si boş olamaz";

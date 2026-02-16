@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260124193510_mig-1")]
+    [Migration("20260214162830_mig-1")]
     partial class mig1
     {
         /// <inheritdoc />
@@ -45,6 +45,9 @@ namespace DataAccess.Migrations
 
                     b.Property<Guid?>("ChairId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ChairName")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -471,6 +474,9 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("BarberCertificateImageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("BeautySalonCertificateImageId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -866,6 +872,12 @@ namespace DataAccess.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsKvkkApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("KvkkApprovedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastName")
                         .IsRequired()

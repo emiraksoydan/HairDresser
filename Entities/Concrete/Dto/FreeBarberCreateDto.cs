@@ -14,5 +14,6 @@ namespace Entities.Concrete.Dto
         public bool IsAvailable { get; set; }
         public List<ServiceOfferingCreateDto> Offerings { get; set; }
         public Guid? BarberCertificateImageId { get; set; }
+        public Guid? BeautySalonCertificateImageId { get; set; }
     }
 }

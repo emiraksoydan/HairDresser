@@ -10,12 +10,9 @@ namespace Business.Abstract
 {
     public interface IAuthService
     {
-
+        Task<IResult> SendOtpAsync(string phoneNumber, UserType? userType, OtpPurpose otpPurpose);
         Task<IDataResult<Core.Utilities.Security.JWT.AccessToken>> VerifyOtpAsync(UserForVerifyDto userForVerifyDto, string? ip, string? device);
         Task<IDataResult<Core.Utilities.Security.JWT.AccessToken>> RefreshAsync(string refreshToken, string? ip);
-        Task<IResult> SendOtpAsync(string phoneNumber, UserType? userType,OtpPurpose otpPurpose);
         Task<IResult> RevokeAsync(Guid userId, string refreshToken, string? ip);
-
-        Task<IDataResult<Core.Utilities.Security.JWT.AccessToken>> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device);
     }
 }

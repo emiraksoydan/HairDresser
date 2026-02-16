@@ -18,6 +18,7 @@ namespace Entities.Concrete.Dto
         public BarberType Type { get; set; }
         public List<ServiceOfferingUpdateDto> Offerings { get; set; }
         public Guid? BarberCertificateImageId { get; set; }
+        public Guid? BeautySalonCertificateImageId { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }

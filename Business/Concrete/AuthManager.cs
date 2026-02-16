@@ -105,6 +105,8 @@ namespace Business.Concrete
                 PhoneNumber = e164, // E164 formatında telefon numarası
                 CustomerNumber = customerNumber,
                 IsActive = true,
+                IsKvkkApproved = true,
+                KvkkApprovedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -136,6 +138,7 @@ namespace Business.Concrete
             return await CreateAccessAndRefreshAsync(newUser, ip, device, familyId: null);
 
         }
+
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         public async Task<IDataResult<AccessToken>> RefreshAsync(string plainRefresh, string? ip)
         {
@@ -185,119 +188,6 @@ namespace Business.Concrete
             return new SuccessResult("Refresh token iptal edildi.");
         }
 
-        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IDataResult<AccessToken>> LoginWithPassword(UserForVerifyDto userForVerifyDto, string? ip, string? device)
-        {
-            // 1. Telefon numarasını normalize et ve sisteme uygun hale getir
-            var e164 = phoneService.NormalizeToE164(userForVerifyDto.PhoneNumber);
-
-            // 2. İsim bilgilerini hazırla
-            var firstName = userForVerifyDto.FirstName ?? string.Empty;
-            var lastName = userForVerifyDto.LastName ?? string.Empty;
-
-            // 3. Telefon numarasına göre kullanıcıyı ara (Unique check için kritik)
-            var existing = await userService.GetByPhone(e164);
-
-            // Mode kontrolü
-            var isRegister = string.Equals(userForVerifyDto.Mode, "register", StringComparison.OrdinalIgnoreCase);
-
-            User user;
-
-            if (isRegister)
-            {
-                // --- KAYIT MODU ---
-                // Aynı telefon numarası ve userType ile kayıtlı kullanıcı var mı kontrol et
-                if (existing.Data is not null && existing.Data.UserType == userForVerifyDto.UserType)
-                {
-                    // Kullanıcı bu telefonla ve aynı userType ile zaten kayıtlıysa hata dön
-                    return new ErrorDataResult<AccessToken>("Bu telefon numarası ve kullanıcı tipi zaten sisteme kayıtlı. Lütfen giriş yapın.");
-                }
-
-                // Yeni kullanıcı tipi geçerli mi kontrol et
-                if (userForVerifyDto.UserType < UserType.Customer || userForVerifyDto.UserType > UserType.BarberStore)
-                {
-                    return new ErrorDataResult<AccessToken>("Geçersiz kullanıcı tipi.");
-                }
-
-                // Aynı telefon numarasına sahip kullanıcılar var mı kontrol et
-                var usersWithSamePhone = await userService.GetByPhoneAll(e164);
-                string customerNumber = null;
-                
-                if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
-                {
-                    // Aynı telefon numarasına sahip kullanıcı varsa onun müşteri numarasını kullan
-                    customerNumber = usersWithSamePhone.Data.First().CustomerNumber;
-                }
-                else
-                {
-                    // Yeni müşteri numarası oluştur (6 haneli rastgele sayı)
-                    customerNumber = await GenerateUniqueCustomerNumberAsync();
-                }
-
-                // Yeni kullanıcı oluşturma süreci
-                user = new User
-                {
-                    FirstName = firstName,
-                    LastName = lastName,
-                    UserType = userForVerifyDto.UserType,
-                    PhoneNumber = e164, // E164 formatında telefon numarası
-                    CustomerNumber = customerNumber,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                };
-
-                // Kullanıcıyı kaydet
-                var addResult = await userService.Add(user);
-                if (!addResult.Success) return new ErrorDataResult<AccessToken>(addResult.Message);
-                
-                // PhoneNumber'ın doğru kaydedildiğinden emin olmak için tekrar oku
-                var savedUserResult = await userService.GetById(user.Id);
-                if (savedUserResult.Data != null)
-                {
-                    // PhoneNumber boşsa veya farklıysa güncelle
-                    if (string.IsNullOrWhiteSpace(savedUserResult.Data.PhoneNumber) || savedUserResult.Data.PhoneNumber != e164)
-                    {
-                        savedUserResult.Data.PhoneNumber = e164;
-                        await userService.Update(savedUserResult.Data);
-                        user = savedUserResult.Data;
-                    }
-                    else
-                    {
-                        user = savedUserResult.Data;
-                    }
-                }
-
-               
-            }
-            else
-            {
-                // --- GİRİŞ MODU ---
-                if (existing.Data is null)
-                {
-                    // Telefon numarası sistemde yoksa giriş yapılamaz
-                    return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı. Lütfen önce kayıt olun.");
-                }
-
-                // UserType kontrolü - giriş yaparken userType eşleşmeli
-                if (existing.Data.UserType != userForVerifyDto.UserType)
-                {
-                    return new ErrorDataResult<AccessToken>($"Bu telefon numarası için {existing.Data.UserType} kullanıcı tipi ile giriş yapmalısınız.");
-                }
-
-                user = existing.Data;
-
-                // Giriş modunda: Mevcut kullanıcının telefon numarası eksikse veya farklıysa güncelle
-                if (string.IsNullOrWhiteSpace(user.PhoneNumber) || user.PhoneNumber != e164)
-                {
-                    user.PhoneNumber = e164;
-                    await userService.Update(user);
-                }
-            }
-
-            // Access ve Refresh Token üretimi
-            return await CreateAccessAndRefreshAsync(user, ip, device, familyId: null);
-        }
 
 
         private async Task<IDataResult<AccessToken>> CreateAccessAndRefreshAsync(User user, string? ip, string? device, Guid? familyId)

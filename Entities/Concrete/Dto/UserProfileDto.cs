@@ -14,5 +14,6 @@ namespace Entities.Concrete.Dto
         public Guid? ImageId { get; set; }
         public ImageGetDto Image { get; set; }
         public bool IsActive { get; set; }
+        public bool IsKvkkApproved { get; set; }
     }
 }

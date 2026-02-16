@@ -471,7 +471,7 @@ namespace Business.Concrete
                 var freeBarbers = await _context.FreeBarbers
                     .AsNoTracking()
                     .Where(fb => freeBarberIds.Contains(fb.Id))
-                    .Select(fb => new { fb.Id, fb.FirstName, fb.LastName, fb.Type, fb.IsAvailable, fb.Latitude, fb.Longitude, fb.FreeBarberUserId })
+                    .Select(fb => new { fb.Id, fb.FirstName, fb.LastName, fb.Type, fb.IsAvailable, fb.Latitude, fb.Longitude, fb.FreeBarberUserId, fb.BeautySalonCertificateImageId })
                     .ToListAsync();
 
                 var fbIdsList = freeBarbers.Select(fb => fb.Id).ToList();
@@ -536,7 +536,8 @@ namespace Business.Concrete
                         ImageList = images ?? new List<ImageGetDto>(), // Her freeBarber'ın kendi fotoğrafları
                         Latitude = fb.Latitude,
                         Longitude = fb.Longitude,
-                        DistanceKm = 0 // Favoriler için distance hesaplanmıyor
+                        DistanceKm = 0, // Favoriler için distance hesaplanmıyor
+                        BeautySalonCertificateImageId = fb.BeautySalonCertificateImageId
                     };
                 }
             }

@@ -27,8 +27,9 @@ namespace Business.Concrete
         private readonly IConfiguration _configuration;
         private readonly ILogger<FirebasePushNotificationService> _logger;
         private readonly HttpClient _httpClient;
-        private readonly string _projectId;
-        private GoogleCredential _credential;
+        private readonly string? _projectId;
+        private GoogleCredential? _credential;
+        private readonly bool _isFirebaseEnabled;
 
         public FirebasePushNotificationService(
             IUserFcmTokenDal fcmTokenDal,
@@ -41,14 +42,17 @@ namespace Business.Concrete
             _logger = logger;
             _httpClient = httpClientFactory.CreateClient("FCM");
 
-            // Initialize Firebase Admin SDK with service account JSON
+            // Initialize Firebase Admin SDK with service account JSON (opsiyonel)
             try
             {
                 var serviceAccountPath = _configuration["Firebase:ServiceAccountPath"];
-                if (string.IsNullOrEmpty(serviceAccountPath))
+                var firebaseEnabled = _configuration.GetValue<bool>("Firebase:Enabled", true);
+                
+                if (string.IsNullOrEmpty(serviceAccountPath) || !firebaseEnabled)
                 {
-                    _logger.LogError("Firebase:ServiceAccountPath is not configured in appsettings.json");
-                    throw new ArgumentNullException(nameof(serviceAccountPath), "Firebase:ServiceAccountPath must be configured");
+                    _isFirebaseEnabled = false;
+                    _logger.LogWarning("Firebase push notifications are disabled. Firebase:ServiceAccountPath is not configured or Firebase:Enabled is false.");
+                    return;
                 }
 
                 // Resolve path (relative to Api project root or absolute)
@@ -59,8 +63,9 @@ namespace Business.Concrete
 
                 if (!File.Exists(fullPath))
                 {
-                    _logger.LogError($"Firebase service account file not found at: {fullPath}");
-                    throw new FileNotFoundException($"Firebase service account file not found at: {fullPath}");
+                    _isFirebaseEnabled = false;
+                    _logger.LogWarning($"Firebase service account file not found at: {fullPath}. Push notifications will be disabled.");
+                    return;
                 }
 
                 // Load service account credentials and extract project ID
@@ -74,17 +79,25 @@ namespace Business.Concrete
                     _projectId = json.GetProperty("project_id").GetString() ?? throw new InvalidOperationException("project_id not found in service account JSON");
                 }
 
+                _isFirebaseEnabled = true;
                 _logger.LogInformation($"Firebase Admin SDK initialized successfully for project: {_projectId}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Firebase Admin SDK");
-                throw;
+                _isFirebaseEnabled = false;
+                _logger.LogWarning(ex, "Failed to initialize Firebase Admin SDK. Push notifications will be disabled.");
             }
         }
 
         public async Task<bool> SendPushNotificationAsync(Guid userId, NotificationDto notification)
         {
+            // Firebase devre dışıysa sadece log yaz ve false döndür
+            if (!_isFirebaseEnabled || _credential == null || string.IsNullOrEmpty(_projectId))
+            {
+                _logger.LogDebug($"Firebase push notifications are disabled. Skipping notification for user {userId}");
+                return false;
+            }
+
             try
             {
                 // Get all active FCM tokens for the user
@@ -103,7 +116,7 @@ namespace Business.Concrete
                     try
                     {
                         // Get OAuth2 access token
-                        if (_credential.UnderlyingCredential is not ServiceAccountCredential serviceAccountCredential)
+                        if (_credential?.UnderlyingCredential is not ServiceAccountCredential serviceAccountCredential)
                         {
                             throw new InvalidOperationException("Invalid credential type");
                         }

@@ -179,7 +179,8 @@ namespace Business.Concrete
                 CustomerNumber = user.CustomerNumber,
                 ImageId = user.ImageId,
                 Image = imageDto,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                IsKvkkApproved = user.IsKvkkApproved
             };
 
             return new SuccessDataResult<UserProfileDto>(userProfile, "Kullanıcı bilgileri getirildi");

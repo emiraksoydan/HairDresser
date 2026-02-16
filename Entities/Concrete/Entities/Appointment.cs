@@ -7,7 +7,8 @@ namespace Entities.Concrete.Entities
     public class Appointment : IEntity
     {
         public Guid Id { get; set; }
-        public Guid? ChairId { get; set; } 
+        public Guid? ChairId { get; set; }
+        public string? ChairName { get; set; }
         public TimeSpan? StartTime { get; set; } // İsteğime Göre senaryosunda null olabilir
         public TimeSpan? EndTime { get; set; } // İsteğime Göre senaryosunda null olabilir
         public DateOnly? AppointmentDate { get; set; } // İsteğime Göre senaryosunda null olabilir

@@ -1,6 +1,6 @@
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
-using Core.Abstract;
+
 using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
@@ -37,7 +37,8 @@ namespace Business.Concrete
         IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings,
         IUserDal userDal,
-        AppointmentBusinessRules businessRules
+        AppointmentBusinessRules businessRules,
+        Business.Helpers.BlockedHelper blockedHelper
     ) : IAppointmentService
     {
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
@@ -117,6 +118,11 @@ namespace Business.Concrete
             // FreeBarber entity'sini al
             var fbEntity = await freeBarberDal.Get(x => x.FreeBarberUserId == req.FreeBarberUserId.Value);
             if (fbEntity is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
+
+            // Engelleme kontrolü: Customer ve FreeBarber arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(customerUserId, req.FreeBarberUserId.Value);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
 
             // Business Rules kontrol├╝
             // StoreSelection senaryosunda FreeBarber me┼şgul olsa bile d├╝kkana randevu iste─şi g├Ânderebilir
@@ -223,6 +229,11 @@ namespace Business.Concrete
             var chair = await chairDal.Get(c => c.Id == req.ChairId.Value && c.StoreId == req.StoreId);
             if (chair is null) return new ErrorDataResult<Guid>(Messages.ChairNotInStore);
 
+            // Engelleme kontrolü: Customer ve Store Owner arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(customerUserId, store.BarberStoreOwnerId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
+
             // Business Rules kontrol├╝ - Core.Utilities.Business.BusinessRules.RunAsync kullan─▒m─▒
             IResult? result = await BusinessRules.RunAsync(
                 async () => await businessRules.CheckUserIsCustomer(customerUserId),
@@ -243,6 +254,7 @@ namespace Business.Concrete
             {
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId.Value,
+                ChairName = chair.Name,
                 AppointmentDate = appointmentDate,
                 StartTime = start,
                 EndTime = end,
@@ -296,6 +308,11 @@ namespace Business.Concrete
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
             if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
 
+            // Engelleme kontrolü: FreeBarber ve Store Owner arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(freeBarberUserId, store.BarberStoreOwnerId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
+
             // Business Rules kontrol├╝ - Core.Utilities.Business.BusinessRules.RunAsync kullan─▒m─▒
             IResult? result = await BusinessRules.RunAsync(
                 async () => await businessRules.CheckStoreExists(req.StoreId),
@@ -311,7 +328,7 @@ namespace Business.Concrete
             if (result != null)
                 return new ErrorDataResult<Guid>(result.Message);
 
-            // chair se├ğilmi┼şse storeÔÇÖa ait + overlap kontrol
+            // chair seçilmişse store'a ait + overlap kontrol
             if (req.ChairId.HasValue)
             {
                 var chairResult = await BusinessRules.RunAsync(
@@ -328,7 +345,7 @@ namespace Business.Concrete
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId,
                 BarberStoreUserId = store.BarberStoreOwnerId,
-                StoreId = req.StoreId,  
+                StoreId = req.StoreId,
                 CustomerUserId = null,
                 FreeBarberUserId = freeBarberUserId,
                 ManuelBarberId = null,
@@ -376,6 +393,11 @@ namespace Business.Concrete
 
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == req.FreeBarberUserId);
             if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
+
+            // Engelleme kontrolü: Store Owner ve FreeBarber arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(storeOwnerUserId, req.FreeBarberUserId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
 
             var hasActiveAppointment = await appointmentDal.AnyAsync(x =>
                 x.FreeBarberUserId == req.FreeBarberUserId &&
@@ -510,6 +532,7 @@ namespace Business.Concrete
             appt.BarberStoreUserId = store.BarberStoreOwnerId;
             appt.StoreId = storeId;  // Çoklu dükkan desteği
             appt.ChairId = chairId;
+            appt.ChairName = chair.Name;
             // Dükkan için 5 dakikalık onay süresi (ama toplam 30 dakikaya dahil)
             SetStoreSelectionStepExpiry(appt);
             appt.AppointmentDate = appointmentDate;
@@ -1541,38 +1564,8 @@ namespace Business.Concrete
             // ✅ DÜZELTME: Badge count güncelle (bildirim silindi)
             await realtime.PushBadgeUpdateAsync(userId);
 
-            // Eğer tüm kullanıcılar soft delete yaptıysa, appointment'ı hard delete et
-            var allDeleted = true;
-            if (appt.CustomerUserId.HasValue && !appt.IsDeletedByCustomerUserId)
-                allDeleted = false;
-            if (appt.BarberStoreUserId.HasValue && !appt.IsDeletedByBarberStoreUserId)
-                allDeleted = false;
-            if (appt.FreeBarberUserId.HasValue && !appt.IsDeletedByFreeBarberUserId)
-                allDeleted = false;
-
-            if (allDeleted)
-            {
-                // Tüm kullanıcılar soft delete yaptı, appointment'ı hard delete et
-                await appointmentDal.Remove(appt);
-
-                // Thread'i de hard delete et
-                if (thread != null)
-                {
-                    await threadDal.Remove(thread);
-                }
-
-                // İlgili tüm kullanıcılara thread removed push et
-                var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                    .Where(x => x.HasValue)
-                    .Select(x => x!.Value)
-                    .Distinct()
-                    .ToList();
-
-                foreach (var participantUserId in participantUserIds)
-                {
-                    await realtime.PushChatThreadRemovedAsync(participantUserId, thread!.Id);
-                }
-            }
+            // NOT: Hard delete kaldırıldı - Randevular hiçbir zaman veritabanından silinmez
+            // Tüm katılımcılar soft delete yapsa bile veri korunur
 
             // Appointment güncellemesini bildir (kullanıcı için)
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -1654,7 +1647,6 @@ namespace Business.Concrete
             var threads = await threadDal.GetAll(t => appointmentIds.Contains(t.AppointmentId!.Value));
 
             var threadsToUpdate = new List<ChatThread>();
-            var threadsToDelete = new List<ChatThread>();
 
             foreach (var thread in threads)
             {
@@ -1683,20 +1675,6 @@ namespace Business.Concrete
 
                 // Thread removed push et (kullanıcı için)
                 await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
-
-                // Eğer tüm kullanıcılar thread'i soft delete yaptıysa, thread'i hard delete et
-                var allThreadDeleted = true;
-                if (appt.CustomerUserId.HasValue && !thread.IsDeletedByCustomerUserId)
-                    allThreadDeleted = false;
-                if (appt.BarberStoreUserId.HasValue && !thread.IsDeletedByStoreOwnerUserId)
-                    allThreadDeleted = false;
-                if (appt.FreeBarberUserId.HasValue && !thread.IsDeletedByFreeBarberUserId)
-                    allThreadDeleted = false;
-
-                if (allThreadDeleted)
-                {
-                    threadsToDelete.Add(thread);
-                }
             }
 
             // Thread'leri güncelle
@@ -1705,51 +1683,8 @@ namespace Business.Concrete
                 await threadDal.Update(thread);
             }
 
-            // Hard delete edilecek thread'leri sil
-            foreach (var thread in threadsToDelete)
-            {
-                await threadDal.Remove(thread);
-
-                // İlgili tüm kullanıcılara thread removed push et
-                var appt = appointmentsToDelete.FirstOrDefault(a => a.Id == thread.AppointmentId!.Value);
-                if (appt != null)
-                {
-                    var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                        .Where(x => x.HasValue)
-                        .Select(x => x!.Value)
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var participantUserId in participantUserIds)
-                    {
-                        await realtime.PushChatThreadRemovedAsync(participantUserId, thread.Id);
-                    }
-                }
-            }
-
-            // Tüm kullanıcılar soft delete yapan appointment'ları hard delete et
-            var appointmentsToHardDelete = new List<Appointment>();
-            foreach (var appt in appointmentsToDelete)
-            {
-                var allDeleted = true;
-                if (appt.CustomerUserId.HasValue && !appt.IsDeletedByCustomerUserId)
-                    allDeleted = false;
-                if (appt.BarberStoreUserId.HasValue && !appt.IsDeletedByBarberStoreUserId)
-                    allDeleted = false;
-                if (appt.FreeBarberUserId.HasValue && !appt.IsDeletedByFreeBarberUserId)
-                    allDeleted = false;
-
-                if (allDeleted)
-                {
-                    appointmentsToHardDelete.Add(appt);
-                }
-            }
-
-            // Hard delete edilecek appointment'ları sil
-            foreach (var appt in appointmentsToHardDelete)
-            {
-                await appointmentDal.Remove(appt);
-            }
+            // NOT: Hard delete kaldırıldı - Randevular ve thread'ler hiçbir zaman veritabanından silinmez
+            // Tüm katılımcılar soft delete yapsa bile veri korunur
 
             // Appointment güncellemelerini bildir (kullanıcı için)
             foreach (var appt in appointmentsToDelete)

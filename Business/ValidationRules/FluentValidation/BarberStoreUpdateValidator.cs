@@ -41,7 +41,7 @@ namespace Business.ValidationRules.FluentValidation
             {
                 RuleFor(x => x.PricingValue)
                     .NotNull().WithMessage("Fiyat girilmelidir.")
-                    .GreaterThan(0).WithMessage("Fiyat 0'dan büyük olmalıdır.");
+                    .GreaterThanOrEqualTo(0).WithMessage("Fiyat 0'dan büyük veya eşit olmalıdır.");
             });
 
             When(x => x.PricingType == PricingType.Percent, () =>
@@ -95,7 +95,8 @@ namespace Business.ValidationRules.FluentValidation
                  .NotEmpty().WithMessage("Hizmet adı boş olamaz.");
 
                 o.RuleFor(v => v.Price)
-                 .GreaterThan(0).WithMessage("Hizmet fiyatı 0'dan büyük olmalıdır.");
+                 .NotNull().WithMessage("Hizmet fiyatı girilmelidir")
+                 .GreaterThanOrEqualTo(0).WithMessage("Hizmet fiyatı 0 veya daha büyük olmalıdır");
             });
 
             // Hizmet adları benzersiz (case-insensitive)
