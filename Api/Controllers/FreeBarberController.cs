@@ -2,6 +2,7 @@ using Business.Abstract;
 using Core.Extensions;
 using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers
 {
@@ -18,7 +19,8 @@ namespace Api.Controllers
         [HttpPost("create-free-barber")]
         public async Task<IActionResult> Add([FromBody] FreeBarberCreateDto dto)
         {
-            return await HandleCreateOperation(dto, _freeBarberService.Add);
+            var result = await _freeBarberService.Add(dto, CurrentUserId);
+            return HandleDataResult(result);
         }
 
         [HttpPut("update-free-barber")]
@@ -40,7 +42,7 @@ namespace Api.Controllers
         }
 
         [HttpGet("nearby")]
-        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
+        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 10.0)
         {
             var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
             return await HandleDataResultAsync(_freeBarberService.GetNearbyFreeBarberAsync(lat, lon, distance, currentUserId));
@@ -65,6 +67,7 @@ namespace Api.Controllers
             return await HandleDataResultAsync(_freeBarberService.GetFreeBarberForUsers(freeBarberId));
         }
 
+        [EnableRateLimiting("location")]
         [HttpPost("update-location")]
         public async Task<IActionResult> UpdateLocation([FromBody] UpdateLocationDto req)
         {

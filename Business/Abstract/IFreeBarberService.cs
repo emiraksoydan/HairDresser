@@ -8,7 +8,7 @@ namespace Business.Abstract
 {
     public interface IFreeBarberService
     {
-        Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId);
+        Task<IDataResult<Guid>> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId);
         Task<IResult> Update(FreeBarberUpdateDto freeBarberUpdateDto, Guid currentUserId);
         Task<IResult> DeleteAsync(Guid panelId);
         Task<IDataResult<List<FreeBarberGetDto>>> GetNearbyFreeBarberAsync(double lat, double lon, double distance, Guid? currentUserId = null);

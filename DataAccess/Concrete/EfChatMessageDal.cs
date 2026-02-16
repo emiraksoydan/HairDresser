@@ -60,5 +60,60 @@ namespace DataAccess.Concrete
             msgs.Reverse();
             return msgs;
         }
+
+        public async Task<List<ChatMessageItemDto>> GetMessagesByThreadIdWithReadStatusAsync(Guid threadId, DateTime? beforeUtc, List<Guid> allParticipantIds)
+        {
+            var query = Context.ChatMessages.AsNoTracking()
+                .Where(m => m.ThreadId == threadId);
+
+            if (beforeUtc.HasValue)
+                query = query.Where(m => m.CreatedAt < beforeUtc.Value);
+
+            var msgs = await query
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => new ChatMessageItemDto
+                {
+                    MessageId = m.Id,
+                    SenderUserId = m.SenderUserId,
+                    Text = m.Text,
+                    CreatedAt = m.CreatedAt
+                })
+                .ToListAsync();
+
+            if (msgs.Count == 0 || allParticipantIds.Count == 0)
+            {
+                msgs.Reverse();
+                return msgs;
+            }
+
+            var messageIds = msgs.Select(m => m.MessageId).ToList();
+
+            // Read receipt'leri yükle
+            var receipts = await Context.MessageReadReceipts
+                .AsNoTracking()
+                .Where(r => r.ThreadId == threadId && messageIds.Contains(r.MessageId))
+                .Select(r => new { r.MessageId, r.UserId })
+                .ToListAsync();
+
+            var receiptsByMessage = receipts
+                .GroupBy(r => r.MessageId)
+                .ToDictionary(g => g.Key, g => new HashSet<Guid>(g.Select(r => r.UserId)));
+
+            foreach (var msg in msgs)
+            {
+                var requiredReaders = allParticipantIds.Where(id => id != msg.SenderUserId).ToList();
+                if (requiredReaders.Count == 0)
+                {
+                    msg.IsFullyRead = true;
+                    continue;
+                }
+
+                if (receiptsByMessage.TryGetValue(msg.MessageId, out var readers))
+                    msg.IsFullyRead = requiredReaders.All(id => readers.Contains(id));
+            }
+
+            msgs.Reverse();
+            return msgs;
+        }
     }
 }

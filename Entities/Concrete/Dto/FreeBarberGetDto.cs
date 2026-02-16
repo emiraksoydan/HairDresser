@@ -27,6 +27,8 @@ namespace Entities.Concrete.Dto
         public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
         public bool IsOwnPanel { get; set; } // Kullanıcının kendi paneli mi (filtrelerden etkilenmez)
+        /// <summary>Güzellik salonu sertifikası varsa dolu; kartta "Güzellik Uzmanı" chip gösterilir.</summary>
+        public Guid? BeautySalonCertificateImageId { get; set; }
     }
 }
 

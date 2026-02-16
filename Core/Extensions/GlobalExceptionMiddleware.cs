@@ -67,8 +67,12 @@ namespace Core.Extensions
                 // Geçersiz işlem hataları - 400 Bad Request
                 await WriteErrorResponse(context, HttpStatusCode.BadRequest, ex.Message);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine(ex);
+
+                await WriteErrorResponse(context, HttpStatusCode.InternalServerError,ex.Message);
+
                 // Diğer tüm beklenmeyen hatalar - 500 Internal Server Error
                 await WriteErrorResponse(context, HttpStatusCode.InternalServerError, 
                     "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.");

@@ -411,7 +411,7 @@ namespace DataAccess.Concrete
             return result;
         }
 
-        public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 1, Guid? currentUserId = null)
+        public async Task<List<BarberStoreGetDto>> GetNearbyStoresAsync(double lat, double lon, double radiusKm = 10, Guid? currentUserId = null)
         {
             var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(lat, lon, radiusKm);

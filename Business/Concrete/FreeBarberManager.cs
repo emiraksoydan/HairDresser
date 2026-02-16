@@ -21,19 +21,18 @@ namespace Business.Concrete
         [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
         [ValidationAspect(typeof(FreeBarberDtoValidator))]
-        public async Task<IResult> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
+        public async Task<IDataResult<Guid>> Add(FreeBarberCreateDto freeBarberCreateDto, Guid currentUserId)
         {
             // Kullanıcının zaten bir FreeBarber paneli var mı kontrol et
             var existingPanel = await freeBarberDal.Get(x => x.FreeBarberUserId == currentUserId);
             if (existingPanel != null)
-                return new ErrorResult(Messages.FreeBarberPanelAlreadyExists);
-            
+                return new ErrorDataResult<Guid>(Messages.FreeBarberPanelAlreadyExists);
 
             var entity = freeBarberCreateDto.Adapt<FreeBarber>();
             entity.FreeBarberUserId = currentUserId;
             await freeBarberDal.Add(entity);
             await SaveOfferingsAsync(freeBarberCreateDto, entity.Id);
-            return new SuccessResult(Messages.FreeBarberPortalCreatedSuccess);
+            return new SuccessDataResult<Guid>(entity.Id, Messages.FreeBarberPortalCreatedSuccess);
         }
         [SecuredOperation("FreeBarber")]
         [LogAspect]

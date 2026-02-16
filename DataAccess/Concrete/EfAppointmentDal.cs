@@ -212,9 +212,6 @@ namespace DataAccess.Concrete
             // Gerçek ID'ler
             var manuelBarberIds = appointments.Where(x => x.ManuelBarberId.HasValue).Select(x => x.ManuelBarberId.Value).Distinct().ToList();
 
-            // YENİ: Koltuk ID'leri
-            var chairIds = appointments.Where(x => x.ChairId.HasValue).Select(x => x.ChairId.Value).Distinct().ToList();
-
             // ---------------------------------------------------------------------------
             // 3. ADIM: Veri Çekme (Batch Queries)
             // ---------------------------------------------------------------------------
@@ -294,12 +291,6 @@ namespace DataAccess.Concrete
                 .Select(u => new { u.Id, u.CustomerNumber })
                 .ToListAsync();
             var storeOwnerAndFreeBarberNumberDict = storeOwnerAndFreeBarberNumberList.ToDictionary(u => u.Id, u => u.CustomerNumber);
-
-            // E) YENİ: CHAIR (Koltuk İsimleri)
-            var chairsDict = await _context.BarberChairs.AsNoTracking()
-                .Where(c => chairIds.Contains(c.Id))
-                .ToDictionaryAsync(c => c.Id, c => c.Name);
-
 
             // ---------------------------------------------------------------------------
             // 4. ADIM: Yan Veri ID'lerini Hazırla (Resim & Favori)
@@ -436,16 +427,14 @@ namespace DataAccess.Concrete
                     dto.TotalPrice = 0;
                 }
 
-                // YENİ: Koltuk Adı Eşleştirme (Düzeltildi: cName -> chairNameVal)
-                if (appt.ChairId.HasValue && chairsDict.TryGetValue(appt.ChairId.Value, out var chairNameVal))
-                {
-                    dto.ChairName = chairNameVal;
-                }
+                // Koltuk adı: Entity'den snapshot olarak alınıyor (koltuk silinse bile korunur)
+                dto.ChairName = appt.ChairName;
 
                 // --- STORE ---
                 if (appt.BarberStoreUserId.HasValue)
                 {
                     var userId = appt.BarberStoreUserId.Value;
+                    dto.StoreUserId = userId; // Şikayet için Store sahibinin User ID'si
 
                     if (storesDict.TryGetValue(userId, out var sInfo))
                     {
@@ -485,6 +474,7 @@ namespace DataAccess.Concrete
                 if (appt.FreeBarberUserId.HasValue)
                 {
                     var userId = appt.FreeBarberUserId.Value;
+                    dto.FreeBarberUserId = userId; // Şikayet için FreeBarber'ın User ID'si
 
                     if (freeBarberDict.TryGetValue(userId, out var fbInfo))
                     {

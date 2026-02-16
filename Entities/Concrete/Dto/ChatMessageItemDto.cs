@@ -13,5 +13,6 @@ namespace Entities.Concrete.Dto
         public Guid SenderUserId { get; set; }
         public string Text { get; set; } = default!;
         public DateTime CreatedAt { get; set; }
+        public bool IsFullyRead { get; set; }
     }
 }

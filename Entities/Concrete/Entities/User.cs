@@ -20,7 +20,17 @@ namespace Entities.Concrete.Entities
         public UserType UserType { get; set; }
         public string CustomerNumber { get; set; } // Müşteri numarası - aynı telefon numarasına sahip kullanıcılar aynı numarayı paylaşır
         public ICollection<UserOperationClaim> UserOperationClaims { get; set; }
+        public bool IsKvkkApproved { get; set; }
+        public DateTime? KvkkApprovedAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        // Ban
+        public bool IsBanned { get; set; } = false;
+        public string? BanReason { get; set; }
+
+        // Subscription / Trial
+        public DateTime TrialEndDate { get; set; }
+        public DateTime? SubscriptionEndDate { get; set; }
     }
 }

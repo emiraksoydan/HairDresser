@@ -8,8 +8,9 @@ namespace Entities.Concrete.Enums
 {
     public enum OtpPurpose
     {
-        Register = 0, 
-        Login = 1,    
-        Reset = 2    
+        Register = 0,
+        Login = 1,
+        Reset = 2,
+        PhoneChange = 3
     }
 }

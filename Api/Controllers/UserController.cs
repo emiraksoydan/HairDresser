@@ -35,6 +35,25 @@ namespace Api.Controllers
         }
 
         /// <summary>
+        /// Telefon değişikliği için OTP gönder (yeni numaraya)
+        /// </summary>
+        [HttpPost("send-phone-change-otp")]
+        public async Task<IActionResult> SendPhoneChangeOtp([FromBody] SendPhoneChangeOtpDto dto)
+        {
+            var result = await _userService.SendPhoneChangeOtpAsync(CurrentUserId, dto.NewPhone);
+            return HandleResult(result);
+        }
+
+        /// <summary>
+        /// OTP doğrulaması ile telefon numarasını güncelle
+        /// </summary>
+        [HttpPut("update-phone")]
+        public async Task<IActionResult> UpdatePhone([FromBody] UpdatePhoneDto dto)
+        {
+            return await HandleUserDataOperation(userId => _userService.UpdatePhoneAsync(userId, dto.NewPhone, dto.OtpCode));
+        }
+
+        /// <summary>
         /// Register FCM token for push notifications
         /// </summary>
         [HttpPost("register-fcm-token")]
@@ -56,6 +75,9 @@ namespace Api.Controllers
                          : BadRequest(new { success = false, message = "Failed to unregister FCM token" });
         }
     }
+
+    public record SendPhoneChangeOtpDto(string NewPhone);
+    public record UpdatePhoneDto(string NewPhone, string OtpCode);
 
     public class RegisterFcmTokenDto
     {

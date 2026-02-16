@@ -4,6 +4,7 @@ using Entities.Concrete.Dto;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 
 namespace Api.RealTime
 {
@@ -44,6 +45,18 @@ namespace Api.RealTime
             catch (Exception)
             {
                 // Log error but don't throw - message is already in DB
+            }
+        }
+
+        public async Task PushChatMessageRemovedAsync(Guid userId, Guid threadId, Guid messageId)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.messageRemoved", new { threadId, messageId });
+            }
+            catch (Exception)
+            {
+                // Non-critical: client will not see the removal event but message is already deleted from DB
             }
         }
 
@@ -103,6 +116,23 @@ namespace Api.RealTime
             }
         }
 
+        public async Task PushChatMessagesReadAsync(Guid userId, Guid threadId, Guid readerUserId, List<Guid> messageIds)
+        {
+            try
+            {
+                await hub.Clients.Group($"user:{userId}").SendAsync("chat.messagesRead", new
+                {
+                    threadId,
+                    readerUserId,
+                    messageIds
+                });
+            }
+            catch (Exception)
+            {
+                // Non-critical: tick display is cosmetic, read state is already in DB
+            }
+        }
+
         public async Task PushAppointmentUpdatedAsync(Guid userId, Entities.Concrete.Dto.AppointmentGetDto appointment)
         {
             try
@@ -156,6 +186,23 @@ namespace Api.RealTime
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to send image.updated for user {UserId}, image {ImageId}", userId, imageId);
+            }
+        }
+
+        public async Task PushImageRemovedAsync(Guid userId, Guid imageId)
+        {
+            try
+            {
+                await hub.Clients.All.SendAsync("image.removed", new
+                {
+                    userId,
+                    imageId,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send image.removed for user {UserId}, image {ImageId}", userId, imageId);
             }
         }
     }

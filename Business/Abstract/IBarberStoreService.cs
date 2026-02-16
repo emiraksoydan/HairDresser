@@ -9,7 +9,7 @@ namespace Business.Abstract
 {
     public interface IBarberStoreService 
     {
-        Task<IResult> Add(BarberStoreCreateDto barberStoreCreateDto,Guid currentUserId);
+        Task<IDataResult<Guid>> Add(BarberStoreCreateDto barberStoreCreateDto,Guid currentUserId);
         Task<IResult> Update(BarberStoreUpdateDto updateDto,Guid currentUserId);
         Task<IResult> DeleteAsync(Guid storeId, Guid currentUserId);
         Task<IDataResult<BarberStoreDetail>> GetByIdAsync(Guid id);

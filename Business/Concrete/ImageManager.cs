@@ -14,7 +14,7 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService, IUserDal _userDal, DataAccess.Abstract.IBarberStoreDal _barberStoreDal, DataAccess.Abstract.IFreeBarberDal _freeBarberDal, IRealTimePublisher _realTimePublisher) : IImageService
+    public class ImageManager(IImageDal _imageDal, IBlobStorageService _blobStorageService, IUserDal _userDal, DataAccess.Abstract.IBarberStoreDal _barberStoreDal, DataAccess.Abstract.IFreeBarberDal _freeBarberDal, IRealTimePublisher _realTimePublisher, IContentModerationService _contentModerationService) : IImageService
     {
         public async Task<IResult> AddAsync(CreateImageDto createImageDto)
         {
@@ -39,7 +39,7 @@ namespace Business.Concrete
             if (getImage == null)
                 return new ErrorResult("Resim bulunamadı.");
 
-            // Delete from Azure Blob Storage
+            // Delete from file storage
             if (!string.IsNullOrEmpty(getImage.ImageUrl))
             {
                 await _blobStorageService.DeleteAsync(getImage.ImageUrl);
@@ -68,8 +68,8 @@ namespace Business.Concrete
                 return new ErrorResult("Resim bulunamadı.");
 
             // ÖNEMLİ: UpdateImageDto sadece metadata güncellemesi için kullanılır
-            // ImageUrl değişmişse, bu yeni blob'un URL'i değil, mevcut blob'un URL'i korunmalı
-            // Mevcut blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+            // ImageUrl değişmişse, mevcut dosyanın URL'i korunmalı
+            // Dosya güncellemesi için UpdateImageBlobAsync kullanılmalı
             // Burada sadece ImageOwnerId ve OwnerType güncelle (ImageUrl'i koru)
             var oldImageUrl = entity.ImageUrl;
             
@@ -78,14 +78,14 @@ namespace Business.Concrete
             entity.OwnerType = updateImageDto.OwnerType ?? entity.OwnerType;
             entity.UpdatedAt = DateTime.UtcNow;
             
-            // ImageUrl değişmişse uyar (ama değiştirme - mevcut blob korunmalı)
-            if (!string.IsNullOrEmpty(oldImageUrl) && 
-                !string.IsNullOrEmpty(updateImageDto.ImageUrl) && 
+            // ImageUrl değişmişse uyar (ama değiştirme - mevcut dosya korunmalı)
+            if (!string.IsNullOrEmpty(oldImageUrl) &&
+                !string.IsNullOrEmpty(updateImageDto.ImageUrl) &&
                 oldImageUrl != updateImageDto.ImageUrl)
             {
-                // ÖNEMLİ: ImageUrl değişmişse, yeni blob oluşturulmamalı
-                // Mevcut blob korunmalı, blob güncellemesi için UpdateImageBlobAsync kullanılmalı
-                // Burada ImageUrl'i değiştirmiyoruz, mevcut blob'u koruyoruz
+                // ÖNEMLİ: ImageUrl değişmişse, yeni dosya oluşturulmamalı
+                // Mevcut dosya korunmalı, dosya güncellemesi için UpdateImageBlobAsync kullanılmalı
+                // Burada ImageUrl'i değiştirmiyoruz, mevcut dosyayı koruyoruz
             }
 
             await _imageDal.Update(entity);
@@ -115,21 +115,21 @@ namespace Business.Concrete
                 if (!imageDict.TryGetValue(dto.Id, out var entity))
                     continue;
 
-                // ÖNEMLİ: ImageUrl değişmişse, mevcut blob'u koru (yeni blob oluşturulmamalı)
+                // ÖNEMLİ: ImageUrl değişmişse, mevcut dosyayı koru (yeni dosya oluşturulmamalı)
                 // Sadece ImageOwnerId ve OwnerType güncelle
                 entity.ImageOwnerId = dto.ImageOwnerId;
                 entity.OwnerType = dto.OwnerType ?? entity.OwnerType;
                 entity.UpdatedAt = DateTime.UtcNow;
                 
-                // ImageUrl'i koru - mevcut blob güncellemesi için UpdateImageBlobAsync kullanılmalı
+                // ImageUrl'i koru - dosya güncellemesi için UpdateImageBlobAsync kullanılmalı
                 // ImageUrl değişmişse uyar ama değiştirme
-                if (!string.IsNullOrEmpty(entity.ImageUrl) && 
-                    !string.IsNullOrEmpty(dto.ImageUrl) && 
+                if (!string.IsNullOrEmpty(entity.ImageUrl) &&
+                    !string.IsNullOrEmpty(dto.ImageUrl) &&
                     entity.ImageUrl != dto.ImageUrl)
                 {
-                    // ÖNEMLİ: ImageUrl değişmişse, yeni blob oluşturulmamalı
-                    // Mevcut blob korunmalı, blob güncellemesi için UpdateImageBlobAsync kullanılmalı
-                    // Burada ImageUrl'i değiştirmiyoruz, mevcut blob'u koruyoruz
+                    // ÖNEMLİ: ImageUrl değişmişse, yeni dosya oluşturulmamalı
+                    // Mevcut dosya korunmalı, dosya güncellemesi için UpdateImageBlobAsync kullanılmalı
+                    // Burada ImageUrl'i değiştirmiyoruz, mevcut dosyayı koruyoruz
                 }
             }
             if (existingImages.Any())
@@ -162,6 +162,17 @@ namespace Business.Concrete
             // Galeri resimleri (Store/FreeBarber için max 3) UploadImagesAsync ile yüklenir
             // Bu yüzden burada maxImages kontrolü YOK - belgeler ve sertifikalar galeri limitinden bağımsız
 
+            // Moderation için dosya byte'larını şimdi kopyala (request aktifken)
+            // Background task başladıktan sonra IFormFile stream'i dispose olabilir
+            byte[] fileBytes;
+            using (var ms = new System.IO.MemoryStream())
+            {
+                await file.CopyToAsync(ms);
+                fileBytes = ms.ToArray();
+            }
+            var fileContentType = file.ContentType;
+            var fileFileName = file.FileName;
+
             // Get container name based on owner type
             var containerName = ownerType switch
             {
@@ -172,9 +183,9 @@ namespace Business.Concrete
                 _ => throw new ArgumentOutOfRangeException(nameof(ownerType), ownerType, "Geçersiz resim sahibi tipi")
             };
 
-            // Upload to Azure Blob Storage
+            // Upload to file storage (önce yükle, moderation async yapılacak)
             var imageUrl = await _blobStorageService.UploadAsync(file, containerName);
-            
+
             // Cache busting için timestamp ekle
             var urlWithTimestamp = $"{imageUrl}?t={DateTime.UtcNow.Ticks}";
 
@@ -197,12 +208,10 @@ namespace Business.Concrete
                 var user = await _userDal.Get(u => u.Id == ownerId);
                 if (user != null)
                 {
-                    // If user already has a profile image, we keep the old one (don't delete)
-                    // Just update the ImageId to point to the new image
                     user.ImageId = image.Id;
                     await _userDal.Update(user);
                 }
-                
+
                 // SignalR push - tüm kullanıcılara yeni profil fotoğrafı bildir
                 try
                 {
@@ -213,6 +222,16 @@ namespace Business.Concrete
                     // SignalR failure should not break the upload
                 }
             }
+
+            // Fire-and-forget: moderation arka planda yapılır, uygunsuzsa silinir
+            var capturedImageId = image.Id;
+            var capturedOwnerId = ownerId;
+            var capturedOwnerType = ownerType;
+            var capturedUrl = urlWithTimestamp;
+            var capturedIsProfile = updateProfileImage && ownerType == Entities.Concrete.Enums.ImageOwnerType.User;
+            _ = Task.Run(() => ModerateAndRemoveImageIfFlaggedAsync(
+                capturedImageId, capturedOwnerId, capturedOwnerType, capturedUrl,
+                fileBytes, fileContentType, fileFileName, capturedIsProfile));
 
             // Return the Image ID, not the URL
             return new SuccessDataResult<string>(image.Id.ToString(), "Resim başarıyla yüklendi.");
@@ -294,6 +313,15 @@ namespace Business.Concrete
                 }
             }
 
+            // Moderation için tüm dosyaların byte'larını şimdi kopyala (request aktifken)
+            var fileBytesMap = new List<(byte[] bytes, string contentType, string fileName)>();
+            foreach (var f in files)
+            {
+                using var ms = new System.IO.MemoryStream();
+                await f.CopyToAsync(ms);
+                fileBytesMap.Add((ms.ToArray(), f.ContentType, f.FileName));
+            }
+
             // Get container name based on owner type
             var containerName = ownerType switch
             {
@@ -304,7 +332,7 @@ namespace Business.Concrete
                 _ => throw new ArgumentOutOfRangeException(nameof(ownerType), ownerType, "Geçersiz resim sahibi tipi")
             };
 
-            // Upload all files to Azure Blob Storage
+            // Upload all files to file storage
             var imageUrls = await _blobStorageService.UploadMultipleAsync(files, containerName);
 
             // Save all to database
@@ -320,7 +348,58 @@ namespace Business.Concrete
 
             await _imageDal.AddRange(images);
 
+            // Fire-and-forget: her resim için arka planda moderation yap
+            for (int i = 0; i < images.Count; i++)
+            {
+                var capturedImage = images[i];
+                var capturedOwnerId = ownerId;
+                var capturedOwnerType = ownerType;
+                var (capturedBytes, capturedContentType, capturedFileName) = fileBytesMap[i];
+                _ = Task.Run(() => ModerateAndRemoveImageIfFlaggedAsync(
+                    capturedImage.Id, capturedOwnerId, capturedOwnerType, capturedImage.ImageUrl,
+                    capturedBytes, capturedContentType, capturedFileName, false));
+            }
+
             return new SuccessDataResult<List<string>>(imageUrls, $"{files.Count} resim başarıyla yüklendi.");
+        }
+
+        private async Task ModerateAndRemoveImageIfFlaggedAsync(
+            Guid imageId, Guid ownerId, Entities.Concrete.Enums.ImageOwnerType ownerType,
+            string blobUrl, byte[] fileBytes, string contentType, string fileName, bool clearUserProfileIfFlagged)
+        {
+            try
+            {
+                var moderationResult = await _contentModerationService.CheckImageContentAsync(fileBytes, contentType, fileName);
+                if (moderationResult.Success) return;
+
+                // Görsel uygunsuz - dosya ve DB kaydını sil
+                if (!string.IsNullOrEmpty(blobUrl))
+                {
+                    try { await _blobStorageService.DeleteAsync(blobUrl); } catch { }
+                }
+
+                var entity = await _imageDal.Get(i => i.Id == imageId);
+                if (entity != null)
+                    await _imageDal.Remove(entity);
+
+                // Profil görseli ise kullanıcının ImageId'sini temizle
+                if (clearUserProfileIfFlagged)
+                {
+                    var user = await _userDal.Get(u => u.Id == ownerId);
+                    if (user != null && user.ImageId == imageId)
+                    {
+                        user.ImageId = null;
+                        await _userDal.Update(user);
+                    }
+                }
+
+                // Frontend'e bildir
+                await _realTimePublisher.PushImageRemovedAsync(ownerId, imageId);
+            }
+            catch
+            {
+                // Background moderation hatası sessizce atlanır
+            }
         }
 
         public async Task<IDataResult<List<ImageGetDto>>> GetImagesByOwnerAsync(Guid ownerId, Entities.Concrete.Enums.ImageOwnerType ownerType)
@@ -338,8 +417,8 @@ namespace Business.Concrete
         }
 
         /// <summary>
-        /// Updates an existing image blob without creating a new one
-        /// Mevcut blob'un içeriğini günceller, yeni blob oluşturmaz
+        /// Updates an existing image file without creating a new one
+        /// Mevcut dosyanın içeriğini günceller, yeni dosya oluşturmaz
         /// </summary>
         public async Task<IResult> UpdateImageBlobAsync(Guid imageId, Microsoft.AspNetCore.Http.IFormFile file)
         {
@@ -350,7 +429,17 @@ namespace Business.Concrete
             if (string.IsNullOrEmpty(entity.ImageUrl))
                 return new ErrorResult("Resim URL'i bulunamadı.");
 
-            // Mevcut blob'u güncelle (yeni blob oluşturma)
+            // Moderation için dosya byte'larını şimdi kopyala (request aktifken)
+            byte[] fileBytes;
+            using (var ms = new System.IO.MemoryStream())
+            {
+                await file.CopyToAsync(ms);
+                fileBytes = ms.ToArray();
+            }
+            var fileContentType = file.ContentType;
+            var fileFileName = file.FileName;
+
+            // Mevcut dosyayı güncelle (önce yükle, moderation async yapılacak)
             var updatedUrl = await _blobStorageService.UpdateAsync(file, entity.ImageUrl);
             
             // ImageUrl'e cache busting için timestamp ekle
@@ -373,6 +462,15 @@ namespace Business.Concrete
                     // SignalR failure should not break the update
                 }
             }
+
+            // Fire-and-forget: moderation arka planda yapılır, uygunsuzsa dosya+entity silinir
+            var capturedImageId = imageId;
+            var capturedOwnerId = entity.ImageOwnerId;
+            var capturedOwnerType = entity.OwnerType;
+            var capturedIsProfile = entity.OwnerType == Entities.Concrete.Enums.ImageOwnerType.User;
+            _ = Task.Run(() => ModerateAndRemoveImageIfFlaggedAsync(
+                capturedImageId, capturedOwnerId, capturedOwnerType, urlWithTimestamp,
+                fileBytes, fileContentType, fileFileName, capturedIsProfile));
 
             return new SuccessResult("Resim başarıyla güncellendi.");
         }

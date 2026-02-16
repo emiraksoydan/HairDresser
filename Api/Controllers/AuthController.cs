@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Api.Controllers
@@ -14,6 +15,7 @@ namespace Api.Controllers
     public class AuthController(IAuthService authService) : ControllerBase
     {
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         [HttpPost("send-otp")]
         public async Task<IActionResult> SendOtp([FromBody] UserForSendOtpDto req)
         {
@@ -21,6 +23,7 @@ namespace Api.Controllers
             return r.Success ? Ok(r) : BadRequest(r);
         }
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         [HttpPost("verify-otp")]
         public async Task<IActionResult> VerifyOtp([FromBody] UserForVerifyDto req)
         {
@@ -30,15 +33,7 @@ namespace Api.Controllers
             return res.Success ? Ok(res) : BadRequest(res.Message);
         }
         [AllowAnonymous]
-        [HttpPost("password")]
-        public async Task<IActionResult> LoginWithPassword([FromBody] UserForVerifyDto req)
-        {
-            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var device = req.Device ?? Request.Headers.UserAgent.ToString();
-            var res = await authService.LoginWithPassword(req, ip, device);
-            return res.Success ? Ok(res) : BadRequest(res);
-        }
-        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto req)
         {

@@ -11,6 +11,7 @@ using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using DataAccess.Concrete;
+using Entities.Concrete.Dto;
 using Entities.Concrete.Entities;
 using MapsterMapper;
 
@@ -51,6 +52,30 @@ namespace Business.Concrete
         {
             var categories = await categoriesDal.GetAll(x => x.ParentId == parentId);
             return new SuccessDataResult<List<Category>>(categories, Messages.SubCategoriesRetrieved);
+        }
+
+        public async Task<IDataResult<List<CategoryHierarchyDto>>> GetCategoryHierarchyAsync()
+        {
+            var allCategories = await categoriesDal.GetAll();
+            var hierarchy = BuildHierarchy(allCategories);
+            return new SuccessDataResult<List<CategoryHierarchyDto>>(hierarchy, Messages.CategoriesRetrieved);
+        }
+
+        private List<CategoryHierarchyDto> BuildHierarchy(List<Category> categories)
+        {
+            var lookup = categories.ToLookup(c => c.ParentId);
+
+            List<CategoryHierarchyDto> BuildLevel(Guid? parentId)
+            {
+                return lookup[parentId].Select(c => new CategoryHierarchyDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Children = BuildLevel(c.Id)
+                }).ToList();
+            }
+
+            return BuildLevel(null);
         }
     }
 }

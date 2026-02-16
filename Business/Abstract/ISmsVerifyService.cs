@@ -1,10 +1,9 @@
-﻿using Core.Utilities.Results;
-using System;
+using Core.Utilities.Results;
 using System.Threading.Tasks;
 
 namespace Business.Abstract
 {
-    public interface ITwilioVerifyService
+    public interface ISmsVerifyService
     {
         Task<IResult> SendAsync(string e164);
         Task<IResult> CheckAsync(string e164, string code);

@@ -2,7 +2,7 @@ using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Abstract;
 using Business.Concrete;
-using Core.Abstract;
+
 using Business.Helpers;
 using Business.Mapping;
 using Castle.DynamicProxy;
@@ -47,7 +47,6 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<AppointmentNotifyManager>().As<IAppointmentNotifyService>().InstancePerLifetimeScope();
             
             // New Helper Services
-            builder.RegisterType<ThreadVisibilityService>().InstancePerLifetimeScope();
             builder.RegisterType<BadgeService>().InstancePerLifetimeScope();
             builder.RegisterType<UserSummaryManager>().As<IUserSummaryService>().InstancePerLifetimeScope();
             builder.RegisterType<RatingManager>().As<IRatingService>().InstancePerLifetimeScope();
@@ -64,6 +63,9 @@ namespace Business.DependencyResolvers.Autofac
             // Content Moderation Service (OpenAI)
             builder.RegisterType<ContentModerationManager>().As<IContentModerationService>().InstancePerLifetimeScope();
 
+            // Message Encryption Service (AES-256)
+            builder.RegisterType<MessageEncryptionService>().As<IMessageEncryptionService>().SingleInstance();
+
             // Helper classes (N+1 query optimization)
             builder.RegisterType<FavoriteHelper>().InstancePerLifetimeScope();
             builder.RegisterType<AppointmentBusinessRules>().InstancePerLifetimeScope();
@@ -79,7 +81,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfAppointmentDal>().As<IAppointmentDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfNotificationDal>().As<INotificationDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfAppointmentServiceOfferingDal>().As<IAppointmentServiceOffering>().InstancePerLifetimeScope();
-            builder.RegisterType<TwilioVerifyManager>().As<ITwilioVerifyService>().InstancePerLifetimeScope();
+            builder.RegisterType<NetGsmSmsManager>().As<ISmsVerifyService>().InstancePerLifetimeScope();
             builder.RegisterType<RefreshTokenService>().As<IRefreshTokenService>().InstancePerLifetimeScope();
             builder.RegisterType<EfRefreshTokenDal>().As<IRefreshTokenDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfImageDal>().As<IImageDal>().InstancePerLifetimeScope();
@@ -88,8 +90,7 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<EfUserDal>().As<IUserDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatThreadDal>().As<IChatThreadDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfChatMessageDal>().As<IChatMessageDal>().InstancePerLifetimeScope();
-            builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
-            builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
+            builder.RegisterType<EfMessageReadReceiptDal>().As<IMessageReadReceiptDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfRatingDal>().As<IRatingDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfFavoriteDal>().As<IFavoriteDal>().InstancePerLifetimeScope();
             builder.RegisterType<EfSettingDal>().As<ISettingDal>().InstancePerLifetimeScope();
@@ -105,8 +106,8 @@ namespace Business.DependencyResolvers.Autofac
             // Autofac.Extensions.DependencyInjection ile otomatik olarak Autofac'e aktarılıyor
             // Burada tekrar kaydetmeye gerek yok
 
-            // Register Azure Blob Storage Service
-            builder.RegisterType<BlobStorageService>().As<IBlobStorageService>().SingleInstance();
+            // Yerel disk dosya depolama
+            builder.RegisterType<LocalFileStorageService>().As<IBlobStorageService>().SingleInstance();
 
             TypeAdapterConfig.GlobalSettings.Scan(typeof(GeneralMapping).Assembly);
 

@@ -83,19 +83,5 @@ namespace Api.Hubs
             }
         }
 
-        public async Task NotifyTyping(string threadId, bool isTyping)
-        {
-            try
-            {
-                if (Context?.User == null || !Guid.TryParse(threadId, out var threadIdGuid))
-                    return;
-
-                var userId = Context.User.GetUserIdOrThrow();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[SignalR] Error in NotifyTyping");
-            }
-        }
     }
 }

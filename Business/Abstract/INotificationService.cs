@@ -1,9 +1,7 @@
 using Core.Utilities.Results;
 using Entities.Concrete.Dto;
 using Entities.Concrete.Enums;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+
 
 namespace Business.Abstract
 {

@@ -43,5 +43,11 @@ namespace Api.Controllers
         {
             return await HandleDataResultAsync(_categoryService.GetChildCategories(parentId));
         }
+
+        [HttpGet("hierarchy")]
+        public async Task<IActionResult> GetCategoryHierarchy()
+        {
+            return await HandleDataResultAsync(_categoryService.GetCategoryHierarchyAsync());
+        }
     }
 }

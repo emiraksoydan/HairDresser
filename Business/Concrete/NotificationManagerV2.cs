@@ -1,5 +1,5 @@
 using Business.Abstract;
-using Core.Abstract;
+
 using Core.Aspect.Autofac.Logging;
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Results;
@@ -157,9 +157,7 @@ namespace Business.Concrete
             notification.ReadAt = DateTime.UtcNow;
             await notificationDal.Update(notification);
 
-            // Badge count changed - notify frontend with count
-            var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
-            await realtime.PushBadgeUpdateAsync(userId, unreadCount);
+            await PushBadgeCountAsync(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -184,9 +182,7 @@ namespace Business.Concrete
 
             await notificationDal.UpdateRange(notifications);
 
-            // Badge count changed - notify frontend with count
-            var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
-            await realtime.PushBadgeUpdateAsync(userId, unreadCount);
+            await PushBadgeCountAsync(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -221,9 +217,7 @@ namespace Business.Concrete
             // Delete notification
             await notificationDal.Remove(notification);
 
-            // Badge count changed - notify frontend with count
-            var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
-            await realtime.PushBadgeUpdateAsync(userId, unreadCount);
+            await PushBadgeCountAsync(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -293,9 +287,7 @@ namespace Business.Concrete
                 await notificationDal.Remove(n);
             }
 
-            // Badge count changed - notify frontend with count
-            var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
-            await realtime.PushBadgeUpdateAsync(userId, unreadCount);
+            await PushBadgeCountAsync(userId);
 
             return new SuccessDataResult<bool>(true);
         }
@@ -341,7 +333,7 @@ namespace Business.Concrete
 
                 try
                 {
-                    var updated = await UpdatePayloadFieldsAsync(
+                    var updated = UpdatePayloadFieldsAsync(
                         notification,
                         status,
                         storeDecision,
@@ -403,6 +395,12 @@ namespace Business.Concrete
 
         #region Private Helper Methods
 
+        private async Task PushBadgeCountAsync(Guid userId)
+        {
+            var unreadCount = await notificationDal.CountAsync(x => x.UserId == userId && !x.IsRead);
+            await realtime.PushBadgeUpdateAsync(userId, unreadCount);
+        }
+
         private async Task<Notification?> GetExistingNotificationAsync(Guid userId, Guid appointmentId, NotificationType type)
         {
             // Special handling for AppointmentUnanswered - check any type
@@ -435,7 +433,7 @@ namespace Business.Concrete
             await notificationDal.Update(notification);
         }
 
-        private async Task<bool> UpdatePayloadFieldsAsync(
+        private bool UpdatePayloadFieldsAsync(
             Notification notification,
             AppointmentStatus status,
             DecisionStatus? storeDecision,

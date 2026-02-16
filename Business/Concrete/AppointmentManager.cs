@@ -1,6 +1,6 @@
 using Business.Abstract;
 using Business.BusinessAspect.Autofac;
-using Core.Abstract;
+
 using Business.Helpers;
 using Business.Resources;
 using Business.ValidationRules.FluentValidation;
@@ -37,7 +37,8 @@ namespace Business.Concrete
         IChatService chatService,
         IOptions<AppointmentSettings> appointmentSettings,
         IUserDal userDal,
-        AppointmentBusinessRules businessRules
+        AppointmentBusinessRules businessRules,
+        Business.Helpers.BlockedHelper blockedHelper
     ) : IAppointmentService
     {
         private static readonly AppointmentStatus[] Active = [AppointmentStatus.Pending, AppointmentStatus.Approved];
@@ -118,6 +119,11 @@ namespace Business.Concrete
             var fbEntity = await freeBarberDal.Get(x => x.FreeBarberUserId == req.FreeBarberUserId.Value);
             if (fbEntity is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
 
+            // Engelleme kontrolü: Customer ve FreeBarber arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(customerUserId, req.FreeBarberUserId.Value);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
+
             // Business Rules kontrol├╝
             // StoreSelection senaryosunda FreeBarber me┼şgul olsa bile d├╝kkana randevu iste─şi g├Ânderebilir
             var businessRulesList = new List<Func<Task<IResult>>>
@@ -193,8 +199,18 @@ namespace Business.Concrete
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
-            var lockRes = await SetFreeBarberAvailabilityAsync(fbEntity, false);
-            if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
+            if (req.StoreSelectionType.Value == StoreSelectionType.CustomRequest)
+            {
+                // CustomRequest: atomic lock - check+set in one DB operation, prevents race condition
+                var acquired = await freeBarberDal.TryLockAsync(req.FreeBarberUserId.Value);
+                if (!acquired) return new ErrorDataResult<Guid>(Messages.FreeBarberNotAvailable);
+            }
+            else
+            {
+                // StoreSelection: force-set IsAvailable=false regardless of current state
+                var lockRes = await SetFreeBarberAvailabilityAsync(fbEntity, false);
+                if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
+            }
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, customerUserId);
 
@@ -223,6 +239,11 @@ namespace Business.Concrete
             var chair = await chairDal.Get(c => c.Id == req.ChairId.Value && c.StoreId == req.StoreId);
             if (chair is null) return new ErrorDataResult<Guid>(Messages.ChairNotInStore);
 
+            // Engelleme kontrolü: Customer ve Store Owner arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(customerUserId, store.BarberStoreOwnerId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
+
             // Business Rules kontrol├╝ - Core.Utilities.Business.BusinessRules.RunAsync kullan─▒m─▒
             IResult? result = await BusinessRules.RunAsync(
                 async () => await businessRules.CheckUserIsCustomer(customerUserId),
@@ -243,6 +264,7 @@ namespace Business.Concrete
             {
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId.Value,
+                ChairName = chair.Name,
                 AppointmentDate = appointmentDate,
                 StartTime = start,
                 EndTime = end,
@@ -293,8 +315,25 @@ namespace Business.Concrete
             var store = await barberStoreDal.Get(x => x.Id == req.StoreId);
             if (store is null) return new ErrorDataResult<Guid>(Messages.StoreNotFound);
 
+            // Servis validasyonu: Percent (yüzdelik) sisteminde en az 1 hizmet zorunlu
+            // Rent (saatlik kiralama) sisteminde hizmet seçimi zorunlu değil
+            if (store.PricingType == PricingType.Percent)
+            {
+                if (req.ServiceOfferingIds == null || req.ServiceOfferingIds.Count == 0)
+                    return new ErrorDataResult<Guid>(Messages.ServiceOfferingRequired);
+
+                var offeringRes = await EnsureServiceOfferingsBelongToOwnerAsync(req.ServiceOfferingIds, store.Id);
+                if (!offeringRes.Success)
+                    return new ErrorDataResult<Guid>(offeringRes.Message);
+            }
+
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
             if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
+
+            // Engelleme kontrolü: FreeBarber ve Store Owner arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(freeBarberUserId, store.BarberStoreOwnerId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
 
             // Business Rules kontrol├╝ - Core.Utilities.Business.BusinessRules.RunAsync kullan─▒m─▒
             IResult? result = await BusinessRules.RunAsync(
@@ -311,7 +350,7 @@ namespace Business.Concrete
             if (result != null)
                 return new ErrorDataResult<Guid>(result.Message);
 
-            // chair se├ğilmi┼şse storeÔÇÖa ait + overlap kontrol
+            // chair seçilmişse store'a ait + overlap kontrol
             if (req.ChairId.HasValue)
             {
                 var chairResult = await BusinessRules.RunAsync(
@@ -328,7 +367,7 @@ namespace Business.Concrete
                 Id = Guid.NewGuid(),
                 ChairId = req.ChairId,
                 BarberStoreUserId = store.BarberStoreOwnerId,
-                StoreId = req.StoreId,  
+                StoreId = req.StoreId,
                 CustomerUserId = null,
                 FreeBarberUserId = freeBarberUserId,
                 ManuelBarberId = null,
@@ -354,8 +393,9 @@ namespace Business.Concrete
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
-            var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
-            if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
+            // Atomic lock: prevents race condition where two stores try to call the same free barber simultaneously
+            var acquired = await freeBarberDal.TryLockAsync(freeBarberUserId);
+            if (!acquired) return new ErrorDataResult<Guid>(Messages.FreeBarberNotAvailable);
 
             await FinalizeAppointmentCreationAsync(appt, req.ServiceOfferingIds, freeBarberUserId);
 
@@ -376,6 +416,11 @@ namespace Business.Concrete
 
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == req.FreeBarberUserId);
             if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
+
+            // Engelleme kontrolü: Store Owner ve FreeBarber arasında engelleme var mı? (çift yönlü)
+            var hasBlock = await blockedHelper.HasBlockBetweenAsync(storeOwnerUserId, req.FreeBarberUserId);
+            if (hasBlock)
+                return new ErrorDataResult<Guid>(Messages.UserBlockedCannotCreateAppointment);
 
             var hasActiveAppointment = await appointmentDal.AnyAsync(x =>
                 x.FreeBarberUserId == req.FreeBarberUserId &&
@@ -434,8 +479,13 @@ namespace Business.Concrete
                 return new ErrorDataResult<Guid>(Messages.AppointmentSlotTaken);
             }
 
-            var lockRes = await SetFreeBarberAvailabilityAsync(fb, false);
-            if (!lockRes.Success) return new ErrorDataResult<Guid>(lockRes.Message);
+            if (!hasActiveAppointment)
+            {
+                // Atomic lock: prevents race condition where two stores call the same free barber simultaneously
+                var acquired = await freeBarberDal.TryLockAsync(req.FreeBarberUserId);
+                if (!acquired) return new ErrorDataResult<Guid>(Messages.FreeBarberNotAvailable);
+            }
+            // else: IsAvailable was already synced to false at the desync-fix block above, or was already false
 
             await FinalizeAppointmentCreationAsync(appt, serviceOfferingIds: null, storeOwnerUserId);
 
@@ -510,6 +560,7 @@ namespace Business.Concrete
             appt.BarberStoreUserId = store.BarberStoreOwnerId;
             appt.StoreId = storeId;  // Çoklu dükkan desteği
             appt.ChairId = chairId;
+            appt.ChairName = chair.Name;
             // Dükkan için 5 dakikalık onay süresi (ama toplam 30 dakikaya dahil)
             SetStoreSelectionStepExpiry(appt);
             appt.AppointmentDate = appointmentDate;
@@ -542,15 +593,7 @@ namespace Business.Concrete
                     actorUserId: freeBarberUserId);
             }
 
-            // Mevcut bildirimlerin payload'ını güncelle (senkronizasyon için)
-            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                appt.Id,
-                appt.Status,
-                appt.StoreDecision,
-                appt.FreeBarberDecision,
-                appt.CustomerDecision,
-                appt.PendingExpiresAt
-            );
+            await SyncNotificationPayloadAsync(appt);
 
             // İlgili kullanıcılara appointment güncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -614,26 +657,10 @@ namespace Business.Concrete
                 await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
                 // 1) Önce store karar adımına ait eski PendingExpiresAt ile (store'un kendi action notification'ı güncellensin)
                 if (previousPendingExpiresAt.HasValue)
-                {
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id,
-                        appt.Status,
-                        appt.StoreDecision,
-                        appt.FreeBarberDecision,
-                        appt.CustomerDecision,
-                        previousPendingExpiresAt
-                    );
-                }
+                    await SyncNotificationPayloadAsync(appt, previousPendingExpiresAt);
 
                 // 2) Sonra mevcut PendingExpiresAt ile (varsa diğer notification'lar da senkronize olsun)
-                await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                    appt.Id,
-                    appt.Status,
-                    appt.StoreDecision,
-                    appt.FreeBarberDecision,
-                    appt.CustomerDecision,
-                    appt.PendingExpiresAt
-                );
+                await SyncNotificationPayloadAsync(appt);
 
                 if (!approve)
                 {
@@ -724,17 +751,7 @@ namespace Business.Concrete
 
             await appointmentDal.Update(appt);
 
-            // Decision verildikten sonra notification payload'lar─▒n─▒ g├╝ncelle (status, decisions)
-            // Bu sayede frontend'de butonlar do─şru ┼şekilde gizlenir
-            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                appt.Id,
-                appt.Status,
-                appt.StoreDecision,
-                appt.FreeBarberDecision,
-                appt.CustomerDecision,
-                appt.PendingExpiresAt
-            );
-
+            await SyncNotificationPayloadAsync(appt);
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
@@ -902,15 +919,7 @@ namespace Business.Concrete
                     // Thread'i pasif yap
                     await UpdateThreadOnAppointmentStatusChangeAsync(appt);
 
-                    // Notification payload g├╝ncelle
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id,
-                        appt.Status,
-                        appt.StoreDecision,
-                        appt.FreeBarberDecision,
-                        appt.CustomerDecision,
-                        appt.PendingExpiresAt
-                    );
+                    await SyncNotificationPayloadAsync(appt);
 
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.FreeBarberRejectedInitial, actorUserId: freeBarberUserId);
 
@@ -950,15 +959,7 @@ namespace Business.Concrete
                     await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                     await UpdateThreadOnAppointmentStatusChangeAsync(appt);
 
-                    // Notification payload g├╝ncelle
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id,
-                        appt.Status,
-                        appt.StoreDecision,
-                        appt.FreeBarberDecision,
-                        appt.CustomerDecision,
-                        appt.PendingExpiresAt
-                    );
+                    await SyncNotificationPayloadAsync(appt);
 
                     // M├╝┼şteri ve Store'a bildir
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.FreeBarberRejectedInitial, actorUserId: freeBarberUserId);
@@ -1016,18 +1017,7 @@ namespace Business.Concrete
 
             await appointmentDal.Update(appt);
 
-            // Decision verildikten sonra notification payload'lar─▒n─▒ g├╝ncelle (status, decisions)
-            // Bu sayede frontend'de butonlar do─şru ┼şekilde gizlenir
-            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                appt.Id,
-                appt.Status,
-                appt.StoreDecision,
-                appt.FreeBarberDecision,
-                appt.CustomerDecision,
-                appt.PendingExpiresAt
-            );
-
-
+            await SyncNotificationPayloadAsync(appt);
 
             if (appt.Status == AppointmentStatus.Rejected)
             {
@@ -1131,7 +1121,7 @@ namespace Business.Concrete
                     await ReleaseFreeBarberIfNeededAsync(appt.FreeBarberUserId);
                     await UpdateThreadOnAppointmentStatusChangeAsync(appt);
 
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(appt.Id, appt.Status, appt.StoreDecision, appt.FreeBarberDecision, appt.CustomerDecision, appt.PendingExpiresAt);
+                    await SyncNotificationPayloadAsync(appt);
 
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentRejected, actorUserId: customerUserId);
 
@@ -1160,9 +1150,7 @@ namespace Business.Concrete
 
                     await appointmentDal.Update(appt);
 
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id, appt.Status, appt.StoreDecision, appt.FreeBarberDecision,
-                        appt.CustomerDecision, appt.PendingExpiresAt);
+                    await SyncNotificationPayloadAsync(appt);
 
                     await notifySvc.NotifyAsync(appt.Id, NotificationType.AppointmentApproved, actorUserId: customerUserId);
 
@@ -1236,29 +1224,10 @@ namespace Business.Concrete
                 await UpdateThreadStoreOwnerAsync(appt.Id, null);
                 await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
             }
-            // Notification payload update
-            // Reject senaryosunda PendingExpiresAt overall 30dk'ya döner; bu durumda StoreApprovedSelection notification'ı
-            // eski customer step PendingExpiresAt ile kayıtlı olduğu için önce onu güncelle.
             if (!approve && previousPendingExpiresAt.HasValue)
-            {
-                await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                    appt.Id,
-                    appt.Status,
-                    appt.StoreDecision,
-                    appt.FreeBarberDecision,
-                    appt.CustomerDecision,
-                    previousPendingExpiresAt
-                );
-            }
+                await SyncNotificationPayloadAsync(appt, previousPendingExpiresAt);
 
-            await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                appt.Id,
-                appt.Status,
-                appt.StoreDecision,
-                appt.FreeBarberDecision,
-                appt.CustomerDecision,
-                appt.PendingExpiresAt
-            );
+            await SyncNotificationPayloadAsync(appt);
 
             // ─░lgili kullan─▒c─▒lara appointment g├╝ncellemesini bildir
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -1323,19 +1292,8 @@ namespace Business.Concrete
                 await appointmentDal.Update(appt);
             }
 
-            // 3'lü sistem (StoreSelection) durumunda FreeBarber'ın AppointmentCreated notification'ındaki reddet butonu kalkmalı
-            // 2'li sistem (CustomRequest) durumunda bu kontrol gerekmiyor
             if (appt.StoreSelectionType == StoreSelectionType.StoreSelection)
-            {
-                await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                    appt.Id,
-                    appt.Status,
-                    appt.StoreDecision,
-                    appt.FreeBarberDecision,
-                    appt.CustomerDecision,
-                    appt.PendingExpiresAt
-                );
-            }
+                await SyncNotificationPayloadAsync(appt);
 
             //await notificationService.MarkReadByAppointmentIdAsync(userId, appt.Id);
 
@@ -1433,21 +1391,8 @@ namespace Business.Concrete
                 await appointmentDal.Update(appt);
             }
 
-            // 3'lü sistem (StoreSelection) durumunda FreeBarber'ın AppointmentCreated notification'ındaki reddet butonu kalkmalı
-            // 2'li sistem (CustomRequest) durumunda bu kontrol gerekmiyor
             if (appt.StoreSelectionType == StoreSelectionType.StoreSelection)
-            {
-                await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                    appt.Id,
-                    appt.Status,
-                    appt.StoreDecision,
-                    appt.FreeBarberDecision,
-                    appt.CustomerDecision,
-                    appt.PendingExpiresAt
-                );
-            }
-
-
+                await SyncNotificationPayloadAsync(appt);
 
             // Thread g├╝ncellemesi (thread kald─▒r─▒lacak)
             await UpdateThreadOnAppointmentStatusChangeAsync(appt);
@@ -1541,38 +1486,8 @@ namespace Business.Concrete
             // ✅ DÜZELTME: Badge count güncelle (bildirim silindi)
             await realtime.PushBadgeUpdateAsync(userId);
 
-            // Eğer tüm kullanıcılar soft delete yaptıysa, appointment'ı hard delete et
-            var allDeleted = true;
-            if (appt.CustomerUserId.HasValue && !appt.IsDeletedByCustomerUserId)
-                allDeleted = false;
-            if (appt.BarberStoreUserId.HasValue && !appt.IsDeletedByBarberStoreUserId)
-                allDeleted = false;
-            if (appt.FreeBarberUserId.HasValue && !appt.IsDeletedByFreeBarberUserId)
-                allDeleted = false;
-
-            if (allDeleted)
-            {
-                // Tüm kullanıcılar soft delete yaptı, appointment'ı hard delete et
-                await appointmentDal.Remove(appt);
-
-                // Thread'i de hard delete et
-                if (thread != null)
-                {
-                    await threadDal.Remove(thread);
-                }
-
-                // İlgili tüm kullanıcılara thread removed push et
-                var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                    .Where(x => x.HasValue)
-                    .Select(x => x!.Value)
-                    .Distinct()
-                    .ToList();
-
-                foreach (var participantUserId in participantUserIds)
-                {
-                    await realtime.PushChatThreadRemovedAsync(participantUserId, thread!.Id);
-                }
-            }
+            // NOT: Hard delete kaldırıldı - Randevular hiçbir zaman veritabanından silinmez
+            // Tüm katılımcılar soft delete yapsa bile veri korunur
 
             // Appointment güncellemesini bildir (kullanıcı için)
             await NotifyAppointmentUpdateToParticipantsAsync(appt);
@@ -1654,7 +1569,6 @@ namespace Business.Concrete
             var threads = await threadDal.GetAll(t => appointmentIds.Contains(t.AppointmentId!.Value));
 
             var threadsToUpdate = new List<ChatThread>();
-            var threadsToDelete = new List<ChatThread>();
 
             foreach (var thread in threads)
             {
@@ -1683,20 +1597,6 @@ namespace Business.Concrete
 
                 // Thread removed push et (kullanıcı için)
                 await realtime.PushChatThreadRemovedAsync(userId, thread.Id);
-
-                // Eğer tüm kullanıcılar thread'i soft delete yaptıysa, thread'i hard delete et
-                var allThreadDeleted = true;
-                if (appt.CustomerUserId.HasValue && !thread.IsDeletedByCustomerUserId)
-                    allThreadDeleted = false;
-                if (appt.BarberStoreUserId.HasValue && !thread.IsDeletedByStoreOwnerUserId)
-                    allThreadDeleted = false;
-                if (appt.FreeBarberUserId.HasValue && !thread.IsDeletedByFreeBarberUserId)
-                    allThreadDeleted = false;
-
-                if (allThreadDeleted)
-                {
-                    threadsToDelete.Add(thread);
-                }
             }
 
             // Thread'leri güncelle
@@ -1705,51 +1605,8 @@ namespace Business.Concrete
                 await threadDal.Update(thread);
             }
 
-            // Hard delete edilecek thread'leri sil
-            foreach (var thread in threadsToDelete)
-            {
-                await threadDal.Remove(thread);
-
-                // İlgili tüm kullanıcılara thread removed push et
-                var appt = appointmentsToDelete.FirstOrDefault(a => a.Id == thread.AppointmentId!.Value);
-                if (appt != null)
-                {
-                    var participantUserIds = new[] { appt.CustomerUserId, appt.BarberStoreUserId, appt.FreeBarberUserId }
-                        .Where(x => x.HasValue)
-                        .Select(x => x!.Value)
-                        .Distinct()
-                        .ToList();
-
-                    foreach (var participantUserId in participantUserIds)
-                    {
-                        await realtime.PushChatThreadRemovedAsync(participantUserId, thread.Id);
-                    }
-                }
-            }
-
-            // Tüm kullanıcılar soft delete yapan appointment'ları hard delete et
-            var appointmentsToHardDelete = new List<Appointment>();
-            foreach (var appt in appointmentsToDelete)
-            {
-                var allDeleted = true;
-                if (appt.CustomerUserId.HasValue && !appt.IsDeletedByCustomerUserId)
-                    allDeleted = false;
-                if (appt.BarberStoreUserId.HasValue && !appt.IsDeletedByBarberStoreUserId)
-                    allDeleted = false;
-                if (appt.FreeBarberUserId.HasValue && !appt.IsDeletedByFreeBarberUserId)
-                    allDeleted = false;
-
-                if (allDeleted)
-                {
-                    appointmentsToHardDelete.Add(appt);
-                }
-            }
-
-            // Hard delete edilecek appointment'ları sil
-            foreach (var appt in appointmentsToHardDelete)
-            {
-                await appointmentDal.Remove(appt);
-            }
+            // NOT: Hard delete kaldırıldı - Randevular ve thread'ler hiçbir zaman veritabanından silinmez
+            // Tüm katılımcılar soft delete yapsa bile veri korunur
 
             // Appointment güncellemelerini bildir (kullanıcı için)
             foreach (var appt in appointmentsToDelete)
@@ -2069,12 +1926,7 @@ namespace Business.Concrete
                     appt.PendingExpiresAt = null;
                     appt.UpdatedAt = DateTime.UtcNow;
 
-                    if (appt.StoreDecision == DecisionStatus.Pending)
-                        appt.StoreDecision = DecisionStatus.NoAnswer;
-                    if (appt.FreeBarberDecision == DecisionStatus.Pending)
-                        appt.FreeBarberDecision = DecisionStatus.NoAnswer;
-                    if (appt.CustomerDecision == DecisionStatus.Pending)
-                        appt.CustomerDecision = DecisionStatus.NoAnswer;
+                    MarkPendingDecisionsAsNoAnswer(appt);
 
                     await appointmentDal.Update(appt);
 
@@ -2110,14 +1962,7 @@ namespace Business.Concrete
                     await appointmentDal.Update(appt);
                     await UpdateThreadStoreOwnerAsync(appt.Id, null);
                     await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id,
-                        appt.Status,
-                        appt.StoreDecision,
-                        appt.FreeBarberDecision,
-                        appt.CustomerDecision,
-                        appt.PendingExpiresAt
-                    );
+                    await SyncNotificationPayloadAsync(appt);
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
@@ -2155,14 +2000,7 @@ namespace Business.Concrete
                     await appointmentDal.Update(appt);
                     await UpdateThreadStoreOwnerAsync(appt.Id, null);
                     await chatService.PushAppointmentThreadUpdatedAsync(appt.Id);
-                    await notificationService.UpdateNotificationPayloadByAppointmentAsync(
-                        appt.Id,
-                        appt.Status,
-                        appt.StoreDecision,
-                        appt.FreeBarberDecision,
-                        appt.CustomerDecision,
-                        appt.PendingExpiresAt
-                    );
+                    await SyncNotificationPayloadAsync(appt);
 
                     await NotifyAppointmentUpdateToParticipantsAsync(appt);
 
@@ -2176,13 +2014,7 @@ namespace Business.Concrete
             appt.PendingExpiresAt = null;
             appt.UpdatedAt = DateTime.UtcNow;
 
-            // Pending kararları NoAnswer'a çek (aksiyon engelleme + payload tutarlılığı)
-            if (appt.StoreDecision == DecisionStatus.Pending)
-                appt.StoreDecision = DecisionStatus.NoAnswer;
-            if (appt.FreeBarberDecision == DecisionStatus.Pending)
-                appt.FreeBarberDecision = DecisionStatus.NoAnswer;
-            if (appt.CustomerDecision == DecisionStatus.Pending)
-                appt.CustomerDecision = DecisionStatus.NoAnswer;
+            MarkPendingDecisionsAsNoAnswer(appt);
 
             // Önce status'u kaydet (bildirim payload'ı dolu gelsin)
             await appointmentDal.Update(appt);
@@ -2264,6 +2096,32 @@ namespace Business.Concrete
                 // Thread yoksa hen├╝z olu┼şturulmam─▒┼ş demektir (mesaj g├Ânderilmemi┼ş)
                 // Thread olu┼şturuldu─şunda (ilk mesaj g├Ânderildi─şinde) zaten do─şru durumda olacak
             }
+        }
+
+        /// <summary>
+        /// Shorthand for the 6-parameter UpdateNotificationPayloadByAppointmentAsync call.
+        /// Pass expiresAtOverride to target a specific step's PendingExpiresAt (e.g. previousPendingExpiresAt).
+        /// </summary>
+        private Task SyncNotificationPayloadAsync(Appointment appt, DateTime? expiresAtOverride = null)
+            => notificationService.UpdateNotificationPayloadByAppointmentAsync(
+                appt.Id,
+                appt.Status,
+                appt.StoreDecision,
+                appt.FreeBarberDecision,
+                appt.CustomerDecision,
+                expiresAtOverride ?? appt.PendingExpiresAt);
+
+        /// <summary>
+        /// Sets every Pending decision to NoAnswer (used when appointment times out).
+        /// </summary>
+        private static void MarkPendingDecisionsAsNoAnswer(Appointment appt)
+        {
+            if (appt.StoreDecision == DecisionStatus.Pending)
+                appt.StoreDecision = DecisionStatus.NoAnswer;
+            if (appt.FreeBarberDecision == DecisionStatus.Pending)
+                appt.FreeBarberDecision = DecisionStatus.NoAnswer;
+            if (appt.CustomerDecision == DecisionStatus.Pending)
+                appt.CustomerDecision = DecisionStatus.NoAnswer;
         }
 
         private async Task NotifyAppointmentUpdateToParticipantsAsync(Appointment appt)

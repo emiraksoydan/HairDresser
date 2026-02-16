@@ -100,6 +100,165 @@ namespace Business.Concrete
             return new SuccessResult();
         }
 
+        public async Task<IResult> CheckImageContentAsync(Microsoft.AspNetCore.Http.IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return new SuccessResult();
+
+            var apiKey = _configuration["OpenAI:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                _logger.LogWarning("OpenAI API key is not configured. Skipping image moderation.");
+                return new SuccessResult();
+            }
+
+            try
+            {
+                // Convert file to base64
+                using var memoryStream = new System.IO.MemoryStream();
+                await file.CopyToAsync(memoryStream);
+                var base64Image = Convert.ToBase64String(memoryStream.ToArray());
+
+                var mediaType = file.ContentType ?? "image/jpeg";
+
+                var request = new HttpRequestMessage(HttpMethod.Post, MODERATION_ENDPOINT);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+                // omni-moderation-latest model supports image input
+                var payload = new
+                {
+                    model = "omni-moderation-latest",
+                    input = new object[]
+                    {
+                        new
+                        {
+                            type = "image_url",
+                            image_url = new
+                            {
+                                url = $"data:{mediaType};base64,{base64Image}"
+                            }
+                        }
+                    }
+                };
+
+                request.Content = new StringContent(
+                    JsonSerializer.Serialize(payload),
+                    Encoding.UTF8,
+                    "application/json"
+                );
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("OpenAI Image Moderation API error: {StatusCode} - {Content}",
+                        response.StatusCode, responseContent);
+                    return new SuccessResult(); // Fail-open: API hatası durumunda yüklemeye izin ver
+                }
+
+                var moderationResponse = JsonSerializer.Deserialize<ModerationResponse>(responseContent,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (moderationResponse?.Results != null && moderationResponse.Results.Length > 0)
+                {
+                    var result = moderationResponse.Results[0];
+                    if (result.Flagged)
+                    {
+                        var flaggedCategories = GetFlaggedCategories(result.Categories);
+                        _logger.LogWarning(
+                            "Image flagged by OpenAI Moderation. Categories: {Categories}, FileName: {FileName}",
+                            string.Join(", ", flaggedCategories), file.FileName);
+
+                        return new ErrorResult(
+                            "Yüklediğiniz görsel uygunsuz içerik barındırmaktadır. Lütfen uygun bir görsel yükleyiniz.");
+                    }
+                }
+
+                return new SuccessResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during image content moderation check for file: {FileName}", file.FileName);
+                return new SuccessResult(); // Fail-open: hata durumunda yüklemeye izin ver
+            }
+        }
+
+        public async Task<IResult> CheckImageContentAsync(byte[] imageBytes, string contentType, string fileName = "image")
+        {
+            if (imageBytes == null || imageBytes.Length == 0)
+                return new SuccessResult();
+
+            var apiKey = _configuration["OpenAI:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                _logger.LogWarning("OpenAI API key is not configured. Skipping image moderation.");
+                return new SuccessResult();
+            }
+
+            try
+            {
+                var base64Image = Convert.ToBase64String(imageBytes);
+                var mediaType = contentType ?? "image/jpeg";
+
+                var request = new HttpRequestMessage(HttpMethod.Post, MODERATION_ENDPOINT);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+                var payload = new
+                {
+                    model = "omni-moderation-latest",
+                    input = new object[]
+                    {
+                        new
+                        {
+                            type = "image_url",
+                            image_url = new { url = $"data:{mediaType};base64,{base64Image}" }
+                        }
+                    }
+                };
+
+                request.Content = new StringContent(
+                    JsonSerializer.Serialize(payload),
+                    Encoding.UTF8,
+                    "application/json"
+                );
+
+                var response = await _httpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("OpenAI Image Moderation API error: {StatusCode} - {Content}", response.StatusCode, responseContent);
+                    return new SuccessResult();
+                }
+
+                var moderationResponse = JsonSerializer.Deserialize<ModerationResponse>(responseContent,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (moderationResponse?.Results != null && moderationResponse.Results.Length > 0)
+                {
+                    var result = moderationResponse.Results[0];
+                    if (result.Flagged)
+                    {
+                        var flaggedCategories = GetFlaggedCategories(result.Categories);
+                        _logger.LogWarning(
+                            "Image flagged by OpenAI Moderation. Categories: {Categories}, FileName: {FileName}",
+                            string.Join(", ", flaggedCategories), fileName);
+
+                        return new ErrorResult(
+                            "Yüklediğiniz görsel uygunsuz içerik barındırmaktadır. Lütfen uygun bir görsel yükleyiniz.");
+                    }
+                }
+
+                return new SuccessResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during image content moderation check for file: {FileName}", fileName);
+                return new SuccessResult();
+            }
+        }
+
         private string[] GetFlaggedCategories(ModerationCategories categories)
         {
             var flagged = new System.Collections.Generic.List<string>();

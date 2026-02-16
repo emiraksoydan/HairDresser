@@ -1,5 +1,5 @@
 using Business.Abstract;
-using Core.Abstract;
+
 using Core.Aspect.Autofac.Transaction;
 using Core.Utilities.Configuration;
 using DataAccess.Concrete;
@@ -37,6 +37,11 @@ namespace Api.BackgroundServices
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
 
+                // Per-cycle timeout: yavaş DB sorgusu bir sonraki cycle'ı bloklamasın
+                using var cycleCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                cycleCts.CancelAfter(TimeSpan.FromMinutes(2));
+                var cycleToken = cycleCts.Token;
+
                 var now = DateTime.UtcNow;
                 const int batchSize = 50; // Her seferde 50 appointment işle
 
@@ -44,7 +49,7 @@ namespace Api.BackgroundServices
                 var totalExpiredCount = await db.Appointments
                     .CountAsync(a => a.Status == AppointmentStatus.Pending
                                   && a.PendingExpiresAt != null
-                                  && a.PendingExpiresAt <= now, stoppingToken);
+                                  && a.PendingExpiresAt <= now, cycleToken);
 
 
                 // Batch'ler halinde işle
@@ -58,7 +63,7 @@ namespace Api.BackgroundServices
                                  && a.PendingExpiresAt <= now)
                         .OrderBy(a => a.PendingExpiresAt) // En eski olanları önce işle
                         .Take(batchSize)
-                        .ToListAsync(stoppingToken);
+                        .ToListAsync(cycleToken);
 
                     if (!expiredBatch.Any())
                         break; // Daha fazla expired appointment yok
@@ -67,14 +72,23 @@ namespace Api.BackgroundServices
                     {
                         try
                         {
-                            await ProcessExpiredAppointmentAsync(appt, scope, stoppingToken);
+                            await ProcessExpiredAppointmentAsync(appt, scope, cycleToken);
                             processedCount++;
+                        }
+                        catch (OperationCanceledException) when (cycleCts.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+                        {
+                            _logger.LogWarning("Appointment timeout cycle exceeded 2 minute limit. Skipping remaining batch.");
+                            break;
                         }
                         catch (Exception ex)
                         {
                             processedCount++; // Sayacı artır ki sonsuz döngüye girmesin
                         }
                     }
+
+                    // Cycle timeout kontrolü
+                    if (cycleToken.IsCancellationRequested)
+                        break;
 
                     // Batch işlendikten sonra kısa bir bekleme (database'e fazla yük bindirmemek için)
                     if (processedCount < totalExpiredCount)
@@ -195,15 +209,7 @@ namespace Api.BackgroundServices
                 }
             }
 
-            // ✅ DEBUG: Status güncellemesi öncesi log
-            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status BEFORE update: {Status}",
-                trackedAppt.Id, trackedAppt.Status);
-
             UpdateAppointmentStatus(trackedAppt);
-
-            // ✅ DEBUG: Status güncellemesi sonrası log
-            _logger.LogInformation("AppointmentTimeoutWorker: Appointment {AppointmentId} - Status AFTER update: {Status}",
-                trackedAppt.Id, trackedAppt.Status);
 
             // Katılımcılar (thread removal + appointment.updated + badge update için)
             var participantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
@@ -224,15 +230,7 @@ namespace Api.BackgroundServices
                 trackedAppt.EndTime = null;
             }
 
-                // ✅ DEBUG: SaveChanges öncesi log
-                _logger.LogInformation("AppointmentTimeoutWorker: Saving changes for appointment {AppointmentId} with Status={Status}",
-                    trackedAppt.Id, trackedAppt.Status);
-
                 await db.SaveChangesAsync(stoppingToken);
-
-                // ✅ DEBUG: SaveChanges sonrası log
-                _logger.LogInformation("AppointmentTimeoutWorker: Changes saved successfully for appointment {AppointmentId}",
-                    trackedAppt.Id);
 
                 await ReleaseFreeBarberAsync(trackedAppt, freeBarberDal, stoppingToken);
 
@@ -273,16 +271,8 @@ namespace Api.BackgroundServices
 
                 await UpdateAndSendNotificationsAsync(trackedAppt, db, notifySvc, realtime, scope, stoppingToken);
 
-                // ✅ DEBUG: Transaction commit öncesi log
-                _logger.LogInformation("AppointmentTimeoutWorker: Committing transaction for appointment {AppointmentId} with final Status={Status}",
-                    trackedAppt.Id, trackedAppt.Status);
-
                 // Commit transaction - all operations successful
                 await transaction.CommitAsync(stoppingToken);
-
-                // ✅ DEBUG: Transaction commit sonrası log
-                _logger.LogInformation("AppointmentTimeoutWorker: Transaction committed successfully for appointment {AppointmentId}",
-                    trackedAppt.Id);
 
             }
             catch (Exception ex)
@@ -396,7 +386,7 @@ namespace Api.BackgroundServices
                 .Where(userId => !usersWithExistingNotifications.Contains(userId))
                 .ToList();
 
-            if (usersWithoutNotifications.Any())
+            if (usersWithoutNotifications.Any() && trackedAppt.Status == AppointmentStatus.Unanswered)
             {
                 await SendNewUnansweredNotificationsAsync(trackedAppt, notifySvc, usersWithoutNotifications, stoppingToken);
 
@@ -524,10 +514,12 @@ namespace Api.BackgroundServices
                 _logger.LogInformation("AppointmentTimeoutWorker: Sending new AppointmentUnanswered notifications to {Count} users without existing notifications for appointment {AppointmentId}",
                     usersWithoutNotifications.Count, trackedAppt.Id);
 
-                // DÜZELTME: NotifyToRecipientsAsync kullan - sadece belirtilen kullanıcılara gönder
-                // NotifyAsync tüm participants'a gönderir (istenmeyen davranış)
-                await notifySvc.NotifyToRecipientsAsync(
-                    trackedAppt.Id,
+                // DÜZELTME: NotifyWithAppointmentToRecipientsAsync kullan - appointment entity'sini direkt al
+                // NotifyToRecipientsAsync DB'den appointment'ı tekrar okur; açık transaction içinde
+                // uncommitted Unanswered status yeni bağlantıda görünmeyebilir (READ COMMITTED isolation).
+                // Entity direkt geçilerek hem doğru status hem de gereksiz DB okuma önlenir.
+                await notifySvc.NotifyWithAppointmentToRecipientsAsync(
+                    trackedAppt,
                     NotificationType.AppointmentUnanswered,
                     usersWithoutNotifications,
                     actorUserId: null);

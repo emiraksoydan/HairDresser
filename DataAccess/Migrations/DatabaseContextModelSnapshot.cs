@@ -43,6 +43,9 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("ChairId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ChairName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -468,6 +471,9 @@ namespace DataAccess.Migrations
                     b.Property<Guid?>("BarberCertificateImageId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("BeautySalonCertificateImageId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -596,6 +602,34 @@ namespace DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ManuelBarbers");
+                });
+
+            modelBuilder.Entity("Entities.Concrete.Entities.MessageReadReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ThreadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("ThreadId", "UserId");
+
+                    b.ToTable("MessageReadReceipts");
                 });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Notification", b =>
@@ -847,6 +881,9 @@ namespace DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BanReason")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -864,6 +901,15 @@ namespace DataAccess.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsBanned")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsKvkkApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("KvkkApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -872,6 +918,12 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SubscriptionEndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("TrialEndDate")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

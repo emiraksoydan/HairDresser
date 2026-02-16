@@ -86,6 +86,7 @@ namespace Business.Resources
         // User Messages
         public const string UserNotFound = "Kullanıcı bulunamadı.";
         public const string OnlyCustomersCanCreateAppointment = "Sadece müşteriler randevu oluşturabilir.";
+        public const string UserBlockedCannotCreateAppointment = "Engellenen bir kullanıcıdan randevu alamazsınız.";
 
         // Chat Messages
         public const string ChatOnlyForActiveAppointments = "Sohbet sadece Bekleyen/Onaylanmış randevular için aktiftir.";
@@ -206,6 +207,7 @@ namespace Business.Resources
         public const string CategoryDeletedSuccess = "Kategori Silindi";
         public const string MainCategoriesRetrieved = "Ana kategoriler getirildi";
         public const string SubCategoriesRetrieved = "Alt kategoriler getirildi";
+        public const string CategoriesRetrieved = "Kategoriler getirildi";
         
         // Image Messages
         public const string ImageOwnerIdRequired = "Resim sahibi ID'si boş olamaz";
@@ -221,6 +223,17 @@ namespace Business.Resources
         
         // Additional Appointment Messages
         public const string CannotRejectAfterCustomerApproval = "Müşteri onay verdiği için bu randevu artık reddedilemez.";
+
+        // Ban Messages
+        public const string UserBanned = "Hesabınız yönetici tarafından askıya alınmıştır.";
+        public const string UserBannedWithReason = "Hesabınız askıya alınmıştır. Sebep: {0}";
+        public const string UserBannedSuccess = "Kullanıcı başarıyla engellendi.";
+        public const string UserUnbannedSuccess = "Kullanıcı engeli başarıyla kaldırıldı.";
+
+        // Subscription / Trial Messages
+        public const string TrialExpired = "Deneme süreniz sona ermiştir. Devam etmek için lütfen abone olunuz.";
+        public const string TrialPanelLimitReached = "Deneme süresinde yalnızca 1 panel ekleyebilirsiniz. Birden fazla panel için lütfen abone olunuz.";
+        public const string BarberStorePanelAlreadyExists = "Zaten bir berber dükkanı paneliniz bulunmaktadır.";
     }
 }
 

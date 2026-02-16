@@ -18,7 +18,8 @@ namespace Api.Controllers
         [HttpPost("create-store")]
         public async Task<IActionResult> Add([FromBody] BarberStoreCreateDto dto)
         {
-            return await HandleCreateOperation(dto, _storeService.Add);
+            var result = await _storeService.Add(dto, CurrentUserId);
+            return HandleDataResult(result);
         }
 
         [HttpPut("update-store")]
@@ -40,7 +41,7 @@ namespace Api.Controllers
         }
 
         [HttpGet("nearby")]
-        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 1.0)
+        public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lon, [FromQuery] double distance = 10.0)
         {
             var currentUserId = User.GetUserIdOrNull(); // Optional: giriş yapmamış kullanıcılar da görebilmeli
             return await HandleDataResultAsync(_storeService.GetNearbyStoresAsync(lat, lon, distance, currentUserId));

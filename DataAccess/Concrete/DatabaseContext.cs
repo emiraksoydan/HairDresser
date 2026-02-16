@@ -78,6 +78,13 @@ namespace DataAccess.Concrete
             modelBuilder.Entity<ChatMessage>()
                 .HasIndex(x => new { x.ThreadId, x.CreatedAt });
 
+            modelBuilder.Entity<MessageReadReceipt>()
+                .HasIndex(x => new { x.MessageId, x.UserId })
+                .IsUnique();
+
+            modelBuilder.Entity<MessageReadReceipt>()
+                .HasIndex(x => new { x.ThreadId, x.UserId });
+
             modelBuilder.Entity<Notification>()
                 .HasIndex(x => new { x.UserId, x.IsRead, x.CreatedAt });
 
@@ -199,6 +206,7 @@ namespace DataAccess.Concrete
 
         public DbSet<ChatThread> ChatThreads { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<MessageReadReceipt> MessageReadReceipts { get; set; }
         public DbSet<Setting> Settings { get; set; }
         public DbSet<UserFcmToken> UserFcmTokens { get; set; }
         public DbSet<HelpGuide> HelpGuides { get; set; }

@@ -1,5 +1,6 @@
 using Business.Abstract;
 using Business.Resources;
+using Entities.Concrete.Dto;
 using Entities.Concrete.Enums;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,42 +17,53 @@ namespace Api.Controllers
         }
 
         /// <summary>
-        /// Upload single image to Azure Blob Storage
+        /// Upload single image to file storage
         /// </summary>
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadImage([FromForm] IFormFile file, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId, [FromQuery] bool isProfileImage = true)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage([FromForm] ImageUploadRequest request, [FromQuery] bool? isProfileImage = null)
         {
-            // Validate ownerId is not empty
-            if (ownerId == Guid.Empty)
-            {
-                return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
-            }
+            if (request.OwnerId == Guid.Empty)
+                return BadRequest(Messages.ImageOwnerIdRequired);
 
-            return await HandleDataResultAsync(_imageService.UploadImageAsync(file, ownerType, ownerId, isProfileImage));
+            // Query string'den gelen değer öncelikli, yoksa form'dan gelen değer kullanılır
+            var updateProfileImage = isProfileImage ?? request.IsProfileImage;
+
+            return await HandleDataResultAsync(
+                _imageService.UploadImageAsync(
+                    request.File,
+                    request.OwnerType,
+                    request.OwnerId,
+                    updateProfileImage));
         }
 
         /// <summary>
-        /// Upload multiple images to Azure Blob Storage
+        /// Upload multiple images to file storage
         /// </summary>
         [HttpPost("upload-multiple")]
-        public async Task<IActionResult> UploadImages([FromForm] List<IFormFile> files, [FromForm] ImageOwnerType ownerType, [FromForm] Guid ownerId)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImages([FromForm] ImageMultiUploadRequestDto request)
         {
-            // Validate ownerId is not empty
-            if (ownerId == Guid.Empty)
-            {
-                return BadRequest(new { success = false, message = Messages.ImageOwnerIdRequired });
-            }
+            if (request.OwnerId == Guid.Empty)
+                return BadRequest(Messages.ImageOwnerIdRequired);
 
-            return await HandleDataResultAsync(_imageService.UploadImagesAsync(files, ownerType, ownerId));
+            return await HandleDataResultAsync(
+                _imageService.UploadImagesAsync(
+                    request.Files,
+                    request.OwnerType,
+                    request.OwnerId));
         }
 
         /// <summary>
         /// Get all images by owner
         /// </summary>
         [HttpGet("owner/{ownerId}")]
-        public async Task<IActionResult> GetImagesByOwner(Guid ownerId, [FromQuery] ImageOwnerType ownerType)
+        public async Task<IActionResult> GetImagesByOwner(
+            Guid ownerId,
+            [FromQuery] ImageOwnerType ownerType)
         {
-            return await HandleDataResultAsync(_imageService.GetImagesByOwnerAsync(ownerId, ownerType));
+            return await HandleDataResultAsync(
+                _imageService.GetImagesByOwnerAsync(ownerId, ownerType));
         }
 
         /// <summary>
@@ -75,15 +87,19 @@ namespace Api.Controllers
         /// <summary>
         /// Update existing image blob without creating a new one
         /// </summary>
-        [HttpPut("update-blob/{imageId}")]
-        public async Task<IActionResult> UpdateImageBlob(Guid imageId, [FromForm] IFormFile file)
+        [HttpPut("update-blob")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdateImageBlob(
+            [FromForm] UpdateImageBlobRequestDto request)
         {
-            if (imageId == Guid.Empty)
-            {
-                return BadRequest(new { success = false, message = Messages.ImageIdRequired });
-            }
+            if (request.ImageId == Guid.Empty)
+                return BadRequest(Messages.ImageIdRequired);
 
-            return await HandleResultAsync(_imageService.UpdateImageBlobAsync(imageId, file));
+            return await HandleResultAsync(
+                _imageService.UpdateImageBlobAsync(
+                    request.ImageId,
+                    request.File));
         }
+
     }
 }

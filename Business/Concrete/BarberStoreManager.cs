@@ -17,23 +17,35 @@ using Mapster;
 
 namespace Business.Concrete
 {
-    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IFreeBarberDal freeBarberDal, BlockedHelper blockedHelper) : IBarberStoreService
+    public class BarberStoreManager(IBarberStoreDal barberStoreDal, IWorkingHourService workingHourService, IManuelBarberService _manuelBarberService, IBarberStoreChairService _barberStoreChairService, IServiceOfferingService _serviceOfferingService, IAppointmentService appointmentService, IFreeBarberDal freeBarberDal, BlockedHelper blockedHelper, IUserDal userDal) : IBarberStoreService
     {
         [SecuredOperation("BarberStore")]
         [LogAspect]
         [ValidationAspect(typeof(BarberStoreCreateDtoValidator))]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
-        public async Task<IResult> Add(BarberStoreCreateDto dto, Guid currentUserId)
+        public async Task<IDataResult<Guid>> Add(BarberStoreCreateDto dto, Guid currentUserId)
         {
             IResult result = BusinessRules.Run(BarberAttemptCore(dto.Chairs,c=>c.BarberId));
             if (result != null)
-                return result;
+                return new ErrorDataResult<Guid>(result.Message);
+
+            // Deneme süresindeyse maksimum 1 dükkan limiti
+            var user = await userDal.Get(u => u.Id == currentUserId);
+            bool isInTrial = user?.TrialEndDate > DateTime.UtcNow;
+            bool hasSubscription = user?.SubscriptionEndDate.HasValue == true && user.SubscriptionEndDate.Value > DateTime.UtcNow;
+            if (isInTrial && !hasSubscription)
+            {
+                var existingStore = await barberStoreDal.Get(x => x.BarberStoreOwnerId == currentUserId);
+                if (existingStore != null)
+                    return new ErrorDataResult<Guid>(Messages.TrialPanelLimitReached);
+            }
+
             var store = await CreateStoreAsync(dto, currentUserId);
             await SaveManuelBarbersAsync(dto, store.Id);
             await SaveChairsAsync(dto, store.Id);
             await SaveOfferingsAsync(dto, store.Id);
             await SaveWorkingHoursAsync(dto, store.Id);
-            return new SuccessResult(Messages.StoreCreatedSuccess);
+            return new SuccessDataResult<Guid>(store.Id, Messages.StoreCreatedSuccess);
         }
 
         [SecuredOperation("BarberStore")]

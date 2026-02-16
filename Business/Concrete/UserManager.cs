@@ -16,15 +16,16 @@ using Core.Aspect.Autofac.Transaction;
 namespace Business.Concrete
 {
     public class UserManager(
-        IUserDal userDal, 
-        IPhoneService phoneService, 
-        ITokenHelper tokenHelper, 
-        IImageService imageService, 
-        IRefreshTokenService refreshTokenService, 
-        IRefreshTokenDal refreshTokenDal, 
+        IUserDal userDal,
+        IPhoneService phoneService,
+        ITokenHelper tokenHelper,
+        IImageService imageService,
+        IRefreshTokenService refreshTokenService,
+        IRefreshTokenDal refreshTokenDal,
         IConfiguration configuration,
         IOperationClaimDal operationClaimDal,
-        IUserOperationClaimService userOperationClaimService) : IUserService
+        IUserOperationClaimService userOperationClaimService,
+        ISmsVerifyService smsVerifyService) : IUserService
     {
         [LogAspect]
         [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
@@ -179,7 +180,8 @@ namespace Business.Concrete
                 CustomerNumber = user.CustomerNumber,
                 ImageId = user.ImageId,
                 Image = imageDto,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                IsKvkkApproved = user.IsKvkkApproved
             };
 
             return new SuccessDataResult<UserProfileDto>(userProfile, "Kullanıcı bilgileri getirildi");
@@ -199,73 +201,7 @@ namespace Business.Concrete
 
             var currentUser = currentUserResult.Data;
 
-            // Normalize phone number
-            var e164 = phoneService.NormalizeToE164(dto.PhoneNumber);
-
-            // Mevcut kullanıcının telefon numarası değişiyor mu kontrol et
-            string currentPhone = currentUser.PhoneNumber ?? string.Empty; // PhoneNumber required olduğu için genelde null olmaz ama güvenlik için
-            var isPhoneChanging = currentPhone != e164;
-
-            if (isPhoneChanging)
-            {
-                // Aynı telefon numarasına sahip tüm kullanıcıları kontrol et
-                var usersWithSamePhone = await GetByPhoneAll(e164);
-                
-                if (usersWithSamePhone.Data != null && usersWithSamePhone.Data.Any())
-                {
-                    // Aynı telefon numarasına sahip başka kullanıcı var mı kontrol et (kendisi hariç)
-                    var otherUser = usersWithSamePhone.Data.FirstOrDefault(u => u.Id != currentUserId);
-                    
-                    if (otherUser != null)
-                    {
-                        // Eğer müşteri numaraları aynıysa ve userType farklıysa, telefon numarasını güncelle (hata verme)
-                        if (otherUser.CustomerNumber == currentUser.CustomerNumber && otherUser.UserType != currentUser.UserType)
-                        {
-                            // Aynı müşteri numarasına sahip farklı tür kullanıcı - telefon numarasını güncelle
-                            currentUser.PhoneNumber = e164;
-                        }
-                        else if (otherUser.CustomerNumber != currentUser.CustomerNumber)
-                        {
-                            // Farklı müşteri numarasına sahip kullanıcı - bu numara başka bir kullanıcıya ait
-                            return new ErrorDataResult<AccessToken>("Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor");
-                        }
-                        else if (otherUser.UserType == currentUser.UserType)
-                        {
-                            // Aynı userType - bu numara zaten bu kullanıcıya ait olmalı
-                            return new ErrorDataResult<AccessToken>("Bu telefon numarası zaten sizin tarafınızdan kullanılıyor");
-                        }
-                    }
-                    else
-                    {
-                        // Aynı telefon numarasına sahip başka kullanıcı yok - telefon numarasını güncelle
-                        currentUser.PhoneNumber = e164;
-                    }
-                }
-                else
-                {
-                    // Bu telefon numarası hiç kullanılmamış - telefon numarasını güncelle
-                    currentUser.PhoneNumber = e164;
-                }
-
-                // Aynı müşteri numarasına sahip tüm kullanıcıların telefon numaralarını güncelle
-                if (!string.IsNullOrEmpty(currentUser.CustomerNumber))
-                {
-                    var usersWithSameCustomerNumber = await GetByCustomerNumberAll(currentUser.CustomerNumber);
-                    if (usersWithSameCustomerNumber.Data != null && usersWithSameCustomerNumber.Data.Any())
-                    {
-                        foreach (var user in usersWithSameCustomerNumber.Data)
-                        {
-                            if (user.Id != currentUserId && user.PhoneNumber != e164)
-                            {
-                                user.PhoneNumber = e164;
-                                user.UpdatedAt = DateTime.UtcNow;
-                                await userDal.Update(user);
-                            }
-                        }
-                    }
-                }
-            }
-
+            // Telefon alanı bu endpoint'ten güncellenmez — OTP doğrulamalı UpdatePhoneAsync kullanılmalı
             // Update user fields
             currentUser.FirstName = dto.FirstName;
             currentUser.LastName = dto.LastName;
@@ -318,6 +254,100 @@ namespace Business.Concrete
                 RefreshToken = rt.Plain,
                 RefreshTokenExpires = rt.Expires
             }, "Profil başarıyla güncellendi");
+        }
+
+        [LogAspect(logParameters: false)]
+        public async Task<IResult> SendPhoneChangeOtpAsync(Guid currentUserId, string newPhone)
+        {
+            var e164 = phoneService.NormalizeToE164(newPhone);
+            if (string.IsNullOrWhiteSpace(e164))
+                return new ErrorResult("Geçersiz telefon numarası.");
+
+            var currentUserResult = await GetById(currentUserId);
+            if (currentUserResult.Data == null)
+                return new ErrorResult("Kullanıcı bulunamadı.");
+
+            if (currentUserResult.Data.PhoneNumber == e164)
+                return new ErrorResult("Girilen numara mevcut numaranızla aynı.");
+
+            // Yeni numara başka kullanıcıya ait mi?
+            var existing = await GetByPhone(e164);
+            if (existing.Data != null && existing.Data.Id != currentUserId)
+                return new ErrorResult("Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor.");
+
+            return await smsVerifyService.SendAsync(e164);
+        }
+
+        [LogAspect(logParameters: false)]
+        [TransactionScopeAspect(IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted)]
+        public async Task<IDataResult<AccessToken>> UpdatePhoneAsync(Guid currentUserId, string newPhone, string otpCode)
+        {
+            var e164 = phoneService.NormalizeToE164(newPhone);
+
+            // OTP doğrula
+            var verifyResult = await smsVerifyService.CheckAsync(e164, otpCode);
+            if (!verifyResult.Success)
+                return new ErrorDataResult<AccessToken>(verifyResult.Message);
+
+            var currentUserResult = await GetById(currentUserId);
+            if (currentUserResult.Data == null)
+                return new ErrorDataResult<AccessToken>("Kullanıcı bulunamadı.");
+
+            var currentUser = currentUserResult.Data;
+
+            // Aynı müşteri numarasına sahip tüm kullanıcıların telefonunu güncelle
+            if (!string.IsNullOrEmpty(currentUser.CustomerNumber))
+            {
+                var siblings = await GetByCustomerNumberAll(currentUser.CustomerNumber);
+                if (siblings.Data != null)
+                {
+                    foreach (var sibling in siblings.Data)
+                    {
+                        sibling.PhoneNumber = e164;
+                        sibling.UpdatedAt = DateTime.UtcNow;
+                        await userDal.Update(sibling);
+                    }
+                }
+            }
+            else
+            {
+                currentUser.PhoneNumber = e164;
+                currentUser.UpdatedAt = DateTime.UtcNow;
+                await userDal.Update(currentUser);
+            }
+
+            // Güvenlik: mevcut refresh token'ları iptal et
+            var activeTokens = await refreshTokenDal.GetActiveByUser(currentUserId);
+            foreach (var token in activeTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+                await refreshTokenDal.Update(token);
+            }
+
+            // Yeni token üret
+            var claims = await GetClaims(currentUser);
+            var newAccessToken = tokenHelper.CreateToken(currentUser, claims.Data);
+            var refreshDays = configuration.GetSection("TokenOptions:RefreshTokenExpirationDays").Get<int?>() ?? 30;
+            var rt = refreshTokenService.CreateNew(refreshDays);
+            await refreshTokenDal.Add(new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUser.Id,
+                TokenHash = rt.Hash,
+                TokenSalt = rt.Salt,
+                Fingerprint = rt.Fingerprint,
+                FamilyId = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = rt.Expires
+            });
+
+            return new SuccessDataResult<AccessToken>(new AccessToken
+            {
+                Token = newAccessToken.Token,
+                Expiration = newAccessToken.Expiration,
+                RefreshToken = rt.Plain,
+                RefreshTokenExpires = rt.Expires
+            }, "Telefon numarası başarıyla güncellendi.");
         }
     }
 }

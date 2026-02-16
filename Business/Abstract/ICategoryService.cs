@@ -12,6 +12,7 @@ namespace Business.Abstract
         Task<IDataResult<List<Category>>> GetAllCategories();
         Task<IDataResult<List<Category>>> GetParentCategories();
         Task<IDataResult<List<Category>>> GetChildCategories(Guid parentId);
+        Task<IDataResult<List<CategoryHierarchyDto>>> GetCategoryHierarchyAsync();
         Task<IResult> AddCategory(Category category);
         Task<IResult> DeleteCategory(Guid id);
     }

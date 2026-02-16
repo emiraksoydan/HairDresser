@@ -23,6 +23,7 @@ namespace Entities.Concrete.Dto
         public double Longitude { get; set; }
         public List<ImageGetDto> ImageList { get; set; }
         public List<ServiceOfferingGetDto> Offerings { get; set; }
+        public Guid? BeautySalonCertificateImageId { get; set; }
     }
 }
 

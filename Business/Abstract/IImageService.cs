@@ -17,12 +17,12 @@ namespace Business.Abstract
         Task<IDataResult<ImageGetDto>> GetImage(Guid id);
 
         /// <summary>
-        /// Upload single image to Azure Blob Storage
+        /// Upload single image to file storage
         /// </summary>
         Task<IDataResult<string>> UploadImageAsync(IFormFile file, ImageOwnerType ownerType, Guid ownerId, bool updateProfileImage = true);
 
         /// <summary>
-        /// Upload multiple images to Azure Blob Storage
+        /// Upload multiple images to file storage
         /// </summary>
         Task<IDataResult<List<string>>> UploadImagesAsync(List<IFormFile> files, ImageOwnerType ownerType, Guid ownerId);
 

@@ -32,6 +32,7 @@ namespace DataAccess.Concrete
                   s.FirstName,
                   s.LastName,
                   s.BarberCertificateImageId,
+                  s.BeautySalonCertificateImageId,
                   s.IsAvailable,
               })
               .FirstOrDefaultAsync();
@@ -58,7 +59,7 @@ namespace DataAccess.Concrete
 
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId && i.Id != freeBarber.BeautySalonCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -89,6 +90,7 @@ namespace DataAccess.Concrete
                 FavoriteCount = favoriteCount,
                 Rating = avgRating,
                 ReviewCount = reviewCount,
+                BeautySalonCertificateImageId = freeBarber.BeautySalonCertificateImageId,
             };
         }
 
@@ -107,6 +109,7 @@ namespace DataAccess.Concrete
                    s.FirstName,
                    s.LastName,
                    s.BarberCertificateImageId,
+                   s.BeautySalonCertificateImageId,
                    s.IsAvailable,
 
 
@@ -133,10 +136,10 @@ namespace DataAccess.Concrete
                 .AsNoTracking()
                 .CountAsync(f => f.FavoritedToId == freeBarber.FreeBarberUserId && f.IsActive);
 
-  
+
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId && i.Id != freeBarber.BeautySalonCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -169,10 +172,11 @@ namespace DataAccess.Concrete
                 ReviewCount = reviewCount,
                 Latitude = freeBarber.Latitude,
                 Longitude = freeBarber.Longitude,
+                BeautySalonCertificateImageId = freeBarber.BeautySalonCertificateImageId,
             };
         }
 
-        public async Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 1, Guid? currentUserId = null)
+        public async Task<List<FreeBarberGetDto>> GetNearbyFreeBarberAsync(double lat, double lon, double radiusKm = 10, Guid? currentUserId = null)
         {
             var nowLocal = TimeZoneHelper.ToTurkeyTime(DateTime.UtcNow);
             var (minLat, maxLat, minLon, maxLon) = GeoBounds.BoxKm(lat, lon, radiusKm);
@@ -190,7 +194,8 @@ namespace DataAccess.Concrete
                     s.LastName,
                     s.FreeBarberUserId,
                     s.IsAvailable,
-                    s.BarberCertificateImageId
+                    s.BarberCertificateImageId,
+                    s.BeautySalonCertificateImageId
 
                 })
                 .ToListAsync();
@@ -302,7 +307,7 @@ namespace DataAccess.Concrete
                         Id = s.Id,
                         FreeBarberUserId = s.FreeBarberUserId,
                         IsAvailable = s.IsAvailable,
-                        ImageList = images?.Where(img => img.Id != s.BarberCertificateImageId).ToList() ?? new List<ImageGetDto>(),
+                        ImageList = images?.Where(img => img.Id != s.BarberCertificateImageId && img.Id != s.BeautySalonCertificateImageId).ToList() ?? new List<ImageGetDto>(),
                         Type = s.Type,
                         Latitude = s.Latitude,
                         Longitude = s.Longitude,
@@ -312,7 +317,8 @@ namespace DataAccess.Concrete
                         Rating = Math.Round(avgRating, 2),
                         Offerings = offerings ?? new List<ServiceOfferingGetDto>(),
                         DistanceKm = Math.Round(distance, 3),
-                        IsFavorited = isFavorited
+                        IsFavorited = isFavorited,
+                        BeautySalonCertificateImageId = s.BeautySalonCertificateImageId
                     };
                 })
                 .Where(dto => dto != null)
@@ -336,6 +342,7 @@ namespace DataAccess.Concrete
                    s.FirstName,
                    s.LastName,
                    s.BarberCertificateImageId,
+                   s.BeautySalonCertificateImageId,
                    s.IsAvailable,
                    s.Latitude,
                    s.Longitude,
@@ -348,7 +355,7 @@ namespace DataAccess.Concrete
 
             var images = await _context.Images
                 .AsNoTracking()
-                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId)
+                .Where(i => i.ImageOwnerId == freeBarber.Id && i.OwnerType == ImageOwnerType.FreeBarber && i.Id != freeBarber.BarberCertificateImageId && i.Id != freeBarber.BeautySalonCertificateImageId)
                 .Select(i => new ImageGetDto
                 {
                     Id = i.Id,
@@ -367,7 +374,7 @@ namespace DataAccess.Concrete
                 })
                 .ToListAsync();
 
-            // Fetch certificate image if exists
+            // Fetch barber certificate image if exists
             ImageGetDto certificateImageDto = null;
             if (freeBarber.BarberCertificateImageId.HasValue)
             {
@@ -385,6 +392,24 @@ namespace DataAccess.Concrete
                 }
             }
 
+            // Fetch beauty salon certificate image if exists
+            ImageGetDto beautySalonCertificateImageDto = null;
+            if (freeBarber.BeautySalonCertificateImageId.HasValue)
+            {
+                var beautyCertImage = await _context.Images
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(i => i.Id == freeBarber.BeautySalonCertificateImageId.Value);
+
+                if (beautyCertImage != null)
+                {
+                    beautySalonCertificateImageDto = new ImageGetDto
+                    {
+                        Id = beautyCertImage.Id,
+                        ImageUrl = beautyCertImage.ImageUrl,
+                    };
+                }
+            }
+
             return new FreeBarberMinePanelDetailDto
             {
                 Id = freeBarber.Id,
@@ -395,11 +420,23 @@ namespace DataAccess.Concrete
                 IsAvailable = freeBarber.IsAvailable,
                 BarberCertificateImageId = freeBarber.BarberCertificateImageId,
                 BarberCertificateImage = certificateImageDto,
+                BeautySalonCertificateImageId = freeBarber.BeautySalonCertificateImageId,
+                BeautySalonCertificateImage = beautySalonCertificateImageDto,
                 ImageList = images,
                 Offerings = offerings,
                 Latitude = freeBarber.Latitude,
                 Longitude = freeBarber.Longitude,
             };
+        }
+
+        public async Task<bool> TryLockAsync(Guid freeBarberUserId)
+        {
+            var rows = await _context.FreeBarbers
+                .Where(x => x.FreeBarberUserId == freeBarberUserId && x.IsAvailable)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.IsAvailable, false)
+                    .SetProperty(x => x.UpdatedAt, DateTime.UtcNow));
+            return rows > 0;
         }
 
         public async Task<List<FreeBarberGetDto>> GetFilteredFreeBarbersAsync(FilterRequestDto filter)
@@ -471,6 +508,7 @@ namespace DataAccess.Concrete
                     fb.Type,
                     fb.IsAvailable,
                     fb.BarberCertificateImageId,
+                    fb.BeautySalonCertificateImageId,
                     IsOwnPanel = ownFreeBarberPanelId.HasValue && fb.Id == ownFreeBarberPanelId.Value
                 })
                 .ToListAsync();
@@ -655,8 +693,9 @@ namespace DataAccess.Concrete
                     FavoriteCount = favoriteDict.GetValueOrDefault(fb.FreeBarberUserId, 0),
                     IsFavorited = isFavoritedDict.GetValueOrDefault(fb.FreeBarberUserId, false),
                     Offerings = fbOfferings,
-                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>()).Where(img => img.Id != fb.BarberCertificateImageId).ToList(),
-                    IsOwnPanel = fb.IsOwnPanel // Kendi paneli mi bilgisi (frontend'de kullanılabilir)
+                    ImageList = imagesDict.GetValueOrDefault(fb.Id, new List<ImageGetDto>()).Where(img => img.Id != fb.BarberCertificateImageId && img.Id != fb.BeautySalonCertificateImageId).ToList(),
+                    IsOwnPanel = fb.IsOwnPanel, // Kendi paneli mi bilgisi (frontend'de kullanılabilir)
+                    BeautySalonCertificateImageId = fb.BeautySalonCertificateImageId
                 };
             }).ToList();
 

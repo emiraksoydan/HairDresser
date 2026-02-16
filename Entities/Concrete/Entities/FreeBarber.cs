@@ -18,6 +18,7 @@ namespace Entities.Concrete.Entities
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public Guid? BarberCertificateImageId { get; set; }
+        public Guid? BeautySalonCertificateImageId { get; set; }
         public bool IsAvailable { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
