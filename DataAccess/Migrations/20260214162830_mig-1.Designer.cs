@@ -12,11 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-<<<<<<<< HEAD:DataAccess/Migrations/20260320125801_mig-1.Designer.cs
-    [Migration("20260320125801_mig-1")]
-========
     [Migration("20260214162830_mig-1")]
->>>>>>>> 9620a0736f822f91967378e987281bc5e94acec8:DataAccess/Migrations/20260214162830_mig-1.Designer.cs
     partial class mig1
     {
         /// <inheritdoc />
@@ -30,1080 +26,1077 @@ namespace DataAccess.Migrations
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Entities.Concrete.Entities.Appointment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateOnly?>("AppointmentDate")
-                        .HasColumnType("date");
+                b.Property<DateOnly?>("AppointmentDate")
+                    .HasColumnType("date");
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("ApprovedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("BarberStoreUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("BarberStoreUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CancelledByUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("CancelledByUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ChairId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("ChairId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("ChairName")
-                        .HasColumnType("text");
+                b.Property<string>("ChairName")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("CompletedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<int?>("CustomerDecision")
-                        .HasColumnType("integer");
+                b.Property<int?>("CustomerDecision")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid?>("CustomerUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("CustomerUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<TimeSpan?>("EndTime")
-                        .HasColumnType("interval");
+                b.Property<TimeSpan?>("EndTime")
+                    .HasColumnType("interval");
 
-                    b.Property<int?>("FreeBarberDecision")
-                        .HasColumnType("integer");
+                b.Property<int?>("FreeBarberDecision")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid?>("FreeBarberUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("FreeBarberUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<bool>("IsDeletedByBarberStoreUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByBarberStoreUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<bool>("IsDeletedByCustomerUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByCustomerUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<bool>("IsDeletedByFreeBarberUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByFreeBarberUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<Guid?>("ManuelBarberId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("ManuelBarberId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
+                b.Property<string>("Note")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime?>("PendingExpiresAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("PendingExpiresAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("RequestedBy")
-                        .HasColumnType("integer");
+                b.Property<int>("RequestedBy")
+                    .HasColumnType("integer");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bytea");
+                b.Property<byte[]>("RowVersion")
+                    .IsConcurrencyToken()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("bytea");
 
-                    b.Property<TimeSpan?>("StartTime")
-                        .HasColumnType("interval");
+                b.Property<TimeSpan?>("StartTime")
+                    .HasColumnType("interval");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                b.Property<int>("Status")
+                    .HasColumnType("integer");
 
-                    b.Property<int?>("StoreDecision")
-                        .HasColumnType("integer");
+                b.Property<int?>("StoreDecision")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid?>("StoreId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("StoreId")
+                    .HasColumnType("uuid");
 
-                    b.Property<int?>("StoreSelectionType")
-                        .HasColumnType("integer");
+                b.Property<int?>("StoreSelectionType")
+                    .HasColumnType("integer");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("BarberStoreUserId", "Status")
-                        .HasFilter("\"Status\" IN (0, 1)");
+                b.HasIndex("BarberStoreUserId", "Status")
+                    .HasFilter("\"Status\" IN (0, 1)");
 
-                    b.HasIndex("CustomerUserId", "Status")
-                        .HasFilter("\"Status\" IN (0, 1)");
+                b.HasIndex("CustomerUserId", "Status")
+                    .HasFilter("\"Status\" IN (0, 1)");
 
-                    b.HasIndex("FreeBarberUserId", "Status")
-                        .HasFilter("\"Status\" IN (0, 1)");
+                b.HasIndex("FreeBarberUserId", "Status")
+                    .HasFilter("\"Status\" IN (0, 1)");
 
-                    b.HasIndex("Status", "PendingExpiresAt");
+                b.HasIndex("Status", "PendingExpiresAt");
 
-                    b.HasIndex("ChairId", "AppointmentDate", "StartTime", "EndTime")
-                        .IsUnique()
-                        .HasFilter("\"Status\" IN (0, 1)");
+                b.HasIndex("ChairId", "AppointmentDate", "StartTime", "EndTime")
+                    .IsUnique()
+                    .HasFilter("\"Status\" IN (0, 1)");
 
-                    b.ToTable("Appointments");
-                });
+                b.ToTable("Appointments");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.AppointmentServiceOffering", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                b.Property<decimal>("Price")
+                    .HasPrecision(18, 2)
+                    .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("ServiceName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("ServiceOfferingId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("ServiceOfferingId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("AppointmentId");
+                b.HasIndex("AppointmentId");
 
-                    b.ToTable("AppointmentServiceOfferings");
-                });
+                b.ToTable("AppointmentServiceOfferings");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.BarberChair", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsAvailable")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsAvailable")
+                    .HasColumnType("boolean");
 
-                    b.Property<Guid?>("ManuelBarberId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("ManuelBarberId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Name")
-                        .HasColumnType("text");
+                b.Property<string>("Name")
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("StoreId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("StoreId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("BarberChairs");
-                });
+                b.ToTable("BarberChairs");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.BarberStore", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("AddressDescription")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("AddressDescription")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("BarberStoreOwnerId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("BarberStoreOwnerId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision");
+                b.Property<double>("Latitude")
+                    .HasColumnType("double precision");
 
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision");
+                b.Property<double>("Longitude")
+                    .HasColumnType("double precision");
 
-                    b.Property<int>("PricingType")
-                        .HasColumnType("integer");
+                b.Property<int>("PricingType")
+                    .HasColumnType("integer");
 
-                    b.Property<double>("PricingValue")
-                        .HasColumnType("double precision");
+                b.Property<double>("PricingValue")
+                    .HasColumnType("double precision");
 
-                    b.Property<string>("StoreName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("StoreName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid?>("TaxDocumentImageId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("TaxDocumentImageId")
+                    .HasColumnType("uuid");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                b.Property<int>("Type")
+                    .HasColumnType("integer");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("BarberStores");
-                });
+                b.ToTable("BarberStores");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Blocked", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("BlockReason")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("BlockReason")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("BlockedFromUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("BlockedFromUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("BlockedToUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("BlockedToUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("DeletedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("boolean");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("BlockedFromUserId");
+                b.HasIndex("BlockedFromUserId");
 
-                    b.HasIndex("BlockedToUserId");
+                b.HasIndex("BlockedToUserId");
 
-                    b.HasIndex("BlockedFromUserId", "BlockedToUserId")
-                        .IsUnique();
+                b.HasIndex("BlockedFromUserId", "BlockedToUserId")
+                    .IsUnique();
 
-                    b.ToTable("Blockeds");
-                });
+                b.ToTable("Blockeds");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Category", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("ParentId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("ParentId");
+                b.HasIndex("ParentId");
 
-                    b.ToTable("Categories");
-                });
+                b.ToTable("Categories");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.ChatMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsSystem")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsSystem")
+                    .HasColumnType("boolean");
 
-                    b.Property<Guid>("SenderUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("SenderUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Text")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("ThreadId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("ThreadId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("ThreadId", "CreatedAt");
+                b.HasIndex("ThreadId", "CreatedAt");
 
-                    b.ToTable("ChatMessages");
-                });
+                b.ToTable("ChatMessages");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.ChatThread", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("CustomerUnreadCount")
-                        .HasColumnType("integer");
+                b.Property<int>("CustomerUnreadCount")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid?>("CustomerUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("CustomerUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("FavoriteFromUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("FavoriteFromUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("FavoriteToUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("FavoriteToUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<int>("FreeBarberUnreadCount")
-                        .HasColumnType("integer");
+                b.Property<int>("FreeBarberUnreadCount")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid?>("FreeBarberUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("FreeBarberUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<bool>("IsDeletedByCustomerUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByCustomerUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<bool>("IsDeletedByFreeBarberUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByFreeBarberUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<bool>("IsDeletedByStoreOwnerUserId")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeletedByStoreOwnerUserId")
+                    .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("LastMessageAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("LastMessageAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("LastMessagePreview")
-                        .HasColumnType("text");
+                b.Property<string>("LastMessagePreview")
+                    .HasColumnType("text");
 
-                    b.Property<Guid?>("StoreId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("StoreId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("StoreOwnerUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("StoreOwnerUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<int>("StoreUnreadCount")
-                        .HasColumnType("integer");
+                b.Property<int>("StoreUnreadCount")
+                    .HasColumnType("integer");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("AppointmentId")
-                        .IsUnique()
-                        .HasFilter("\"AppointmentId\" IS NOT NULL");
+                b.HasIndex("AppointmentId")
+                    .IsUnique()
+                    .HasFilter("\"AppointmentId\" IS NOT NULL");
 
-                    b.HasIndex("FavoriteFromUserId", "FavoriteToUserId", "StoreId")
-                        .IsUnique()
-                        .HasFilter("\"FavoriteFromUserId\" IS NOT NULL AND \"FavoriteToUserId\" IS NOT NULL");
+                b.HasIndex("FavoriteFromUserId", "FavoriteToUserId", "StoreId")
+                    .IsUnique()
+                    .HasFilter("\"FavoriteFromUserId\" IS NOT NULL AND \"FavoriteToUserId\" IS NOT NULL");
 
-                    b.ToTable("ChatThreads");
-                });
+                b.ToTable("ChatThreads");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Complaint", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("ComplaintFromUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("ComplaintFromUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("ComplaintReason")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("ComplaintReason")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("ComplaintToUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("ComplaintToUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("DeletedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("boolean");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("ComplaintFromUserId");
+                b.HasIndex("ComplaintFromUserId");
 
-                    b.HasIndex("ComplaintFromUserId", "ComplaintToUserId", "AppointmentId")
-                        .IsUnique();
+                b.HasIndex("ComplaintFromUserId", "ComplaintToUserId", "AppointmentId")
+                    .IsUnique();
 
-                    b.ToTable("Complaints");
-                });
+                b.ToTable("Complaints");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Favorite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("FavoritedFromId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("FavoritedFromId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("FavoritedToId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("FavoritedToId")
+                    .HasColumnType("uuid");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsActive")
+                    .HasColumnType("boolean");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("FavoritedToId", "IsActive");
+                b.HasIndex("FavoritedToId", "IsActive");
 
-                    b.HasIndex("FavoritedFromId", "FavoritedToId", "IsActive");
+                b.HasIndex("FavoritedFromId", "FavoritedToId", "IsActive");
 
-                    b.HasIndex("FavoritedToId", "FavoritedFromId", "IsActive");
+                b.HasIndex("FavoritedToId", "FavoritedFromId", "IsActive");
 
-                    b.ToTable("Favorites");
-                });
+                b.ToTable("Favorites");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.FreeBarber", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("BarberCertificateImageId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("BarberCertificateImageId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("BeautySalonCertificateImageId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("BeautySalonCertificateImageId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("FirstName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("FreeBarberUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("FreeBarberUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<bool>("IsAvailable")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsAvailable")
+                    .HasColumnType("boolean");
 
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("LastName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision");
+                b.Property<double>("Latitude")
+                    .HasColumnType("double precision");
 
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision");
+                b.Property<double>("Longitude")
+                    .HasColumnType("double precision");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                b.Property<int>("Type")
+                    .HasColumnType("integer");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("FreeBarberUserId")
-                        .IsUnique();
+                b.HasIndex("FreeBarberUserId")
+                    .IsUnique();
 
-                    b.HasIndex("IsAvailable", "Latitude", "Longitude");
+                b.HasIndex("IsAvailable", "Latitude", "Longitude");
 
-                    b.ToTable("FreeBarbers");
-                });
+                b.ToTable("FreeBarbers");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.HelpGuide", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsActive")
+                    .HasColumnType("boolean");
 
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
+                b.Property<int>("Order")
+                    .HasColumnType("integer");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("UserType")
-                        .HasColumnType("integer");
+                b.Property<int>("UserType")
+                    .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("UserType", "IsActive", "Order");
+                b.HasIndex("UserType", "IsActive", "Order");
 
-                    b.ToTable("HelpGuides");
-                });
+                b.ToTable("HelpGuides");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Image", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("ImageOwnerId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("ImageOwnerId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("ImageUrl")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<int>("OwnerType")
-                        .HasColumnType("integer");
+                b.Property<int>("OwnerType")
+                    .HasColumnType("integer");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("ImageOwnerId");
+                b.HasIndex("ImageOwnerId");
 
-                    b.HasIndex("OwnerType", "ImageOwnerId");
+                b.HasIndex("OwnerType", "ImageOwnerId");
 
-                    b.ToTable("Images");
-                });
+                b.ToTable("Images");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.ManuelBarber", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("FullName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid>("StoreId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("StoreId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("ManuelBarbers");
-                });
+                b.ToTable("ManuelBarbers");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Notification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Body")
-                        .HasColumnType("text");
+                b.Property<string>("Body")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsRead")
+                    .HasColumnType("boolean");
 
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("PayloadJson")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("ReadAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                b.Property<int>("Type")
+                    .HasColumnType("integer");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+                b.HasIndex("UserId", "IsRead", "CreatedAt");
 
-                    b.ToTable("Notifications");
-                });
+                b.ToTable("Notifications");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.OperationClaim", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("OperationClaims");
-                });
+                b.ToTable("OperationClaims");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Rating", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("AppointmentId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("AppointmentId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Comment")
-                        .HasColumnType("text");
+                b.Property<string>("Comment")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("RatedFromId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("RatedFromId")
+                    .HasColumnType("uuid");
 
-                    b.Property<double>("Score")
-                        .HasColumnType("double precision");
+                b.Property<double>("Score")
+                    .HasColumnType("double precision");
 
-                    b.Property<Guid>("TargetId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("TargetId")
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("RatedFromId");
+                b.HasIndex("RatedFromId");
 
-                    b.HasIndex("TargetId", "Score");
+                b.HasIndex("TargetId", "Score");
 
-                    b.ToTable("Ratings");
-                });
+                b.ToTable("Ratings");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.RefreshToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CreatedByIp")
-                        .HasColumnType("text");
+                b.Property<string>("CreatedByIp")
+                    .HasColumnType("text");
 
-                    b.Property<string>("Device")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                b.Property<string>("Device")
+                    .HasMaxLength(128)
+                    .HasColumnType("character varying(128)");
 
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("ExpiresAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("FamilyId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("FamilyId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                b.Property<string>("Fingerprint")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)");
 
-                    b.Property<string>("ReplacedByFingerprint")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                b.Property<string>("ReplacedByFingerprint")
+                    .HasMaxLength(64)
+                    .HasColumnType("character varying(64)");
 
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("RevokedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("RevokedByIp")
-                        .HasColumnType("text");
+                b.Property<string>("RevokedByIp")
+                    .HasColumnType("text");
 
-                    b.Property<byte[]>("TokenHash")
-                        .IsRequired()
-                        .HasColumnType("bytea");
+                b.Property<byte[]>("TokenHash")
+                    .IsRequired()
+                    .HasColumnType("bytea");
 
-                    b.Property<byte[]>("TokenSalt")
-                        .IsRequired()
-                        .HasColumnType("bytea");
+                b.Property<byte[]>("TokenSalt")
+                    .IsRequired()
+                    .HasColumnType("bytea");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("FamilyId");
+                b.HasIndex("FamilyId");
 
-                    b.HasIndex("Fingerprint")
-                        .IsUnique();
+                b.HasIndex("Fingerprint")
+                    .IsUnique();
 
-                    b.HasIndex("UserId", "RevokedAt", "ExpiresAt");
+                b.HasIndex("UserId", "RevokedAt", "ExpiresAt");
 
-                    b.ToTable("RefreshTokens", (string)null);
-                });
+                b.ToTable("RefreshTokens", (string)null);
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Request", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("DeletedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("boolean");
 
-                    b.Property<bool>("IsProcessed")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsProcessed")
+                    .HasColumnType("boolean");
 
-                    b.Property<Guid>("RequestFromUserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("RequestFromUserId")
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("RequestMessage")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("RequestMessage")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<string>("RequestTitle")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("RequestTitle")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("RequestFromUserId");
+                b.HasIndex("RequestFromUserId");
 
-                    b.ToTable("Requests");
-                });
+                b.ToTable("Requests");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.ServiceOffering", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("OwnerId")
+                    .HasColumnType("uuid");
 
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                b.Property<decimal>("Price")
+                    .HasPrecision(18, 2)
+                    .HasColumnType("numeric(18,2)");
 
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("ServiceName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("ServiceOfferings");
-                });
+                b.ToTable("ServiceOfferings");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Setting", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("ShowImageAnimation")
-                        .HasColumnType("boolean");
+                b.Property<bool>("ShowImageAnimation")
+                    .HasColumnType("boolean");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("UserId")
-                        .IsUnique();
+                b.HasIndex("UserId")
+                    .IsUnique();
 
-                    b.ToTable("Settings");
-                });
+                b.ToTable("Settings");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.User", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<string>("BanReason")
-                        .HasColumnType("text");
+                b.Property<string>("BanReason")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CustomerNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("CustomerNumber")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("FirstName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<Guid?>("ImageId")
-                        .HasColumnType("uuid");
+                b.Property<Guid?>("ImageId")
+                    .HasColumnType("uuid");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsActive")
+                    .HasColumnType("boolean");
 
-<<<<<<<< HEAD:DataAccess/Migrations/20260320125801_mig-1.Designer.cs
-                    b.Property<bool>("IsBanned")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsBanned")
+                    .HasColumnType("boolean");
 
-========
->>>>>>>> 9620a0736f822f91967378e987281bc5e94acec8:DataAccess/Migrations/20260214162830_mig-1.Designer.cs
-                    b.Property<bool>("IsKvkkApproved")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsKvkkApproved")
+                    .HasColumnType("boolean");
 
-                    b.Property<DateTime?>("KvkkApprovedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("KvkkApprovedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("LastName")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                b.Property<string>("PhoneNumber")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("character varying(20)");
 
-                    b.Property<DateTime?>("SubscriptionEndDate")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime?>("SubscriptionEndDate")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("TrialEndDate")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("TrialEndDate")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("UserType")
-                        .HasColumnType("integer");
+                b.Property<int>("UserType")
+                    .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("ImageId");
+                b.HasIndex("ImageId");
 
-                    b.HasIndex("PhoneNumber")
-                        .HasDatabaseName("IX_User_PhoneNumber");
+                b.HasIndex("PhoneNumber")
+                    .HasDatabaseName("IX_User_PhoneNumber");
 
-                    b.ToTable("Users");
-                });
+                b.ToTable("Users");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.UserFcmToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DeviceId")
-                        .HasColumnType("text");
+                b.Property<string>("DeviceId")
+                    .HasColumnType("text");
 
-                    b.Property<string>("FcmToken")
-                        .IsRequired()
-                        .HasColumnType("text");
+                b.Property<string>("FcmToken")
+                    .IsRequired()
+                    .HasColumnType("text");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsActive")
+                    .HasColumnType("boolean");
 
-                    b.Property<string>("Platform")
-                        .HasColumnType("text");
+                b.Property<string>("Platform")
+                    .HasColumnType("text");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("FcmToken")
-                        .IsUnique();
+                b.HasIndex("FcmToken")
+                    .IsUnique();
 
-                    b.HasIndex("UserId", "IsActive");
+                b.HasIndex("UserId", "IsActive");
 
-                    b.ToTable("UserFcmTokens");
-                });
+                b.ToTable("UserFcmTokens");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.UserOperationClaim", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("OperationClaimId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("OperationClaimId")
+                    .HasColumnType("uuid");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uuid");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.HasIndex("OperationClaimId");
+                b.HasIndex("OperationClaimId");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("UserOperationClaims");
-                });
+                b.ToTable("UserOperationClaims");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.WorkingHour", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uuid");
 
-                    b.Property<int>("DayOfWeek")
-                        .HasColumnType("integer");
+                b.Property<int>("DayOfWeek")
+                    .HasColumnType("integer");
 
-                    b.Property<TimeSpan>("EndTime")
-                        .HasColumnType("interval");
+                b.Property<TimeSpan>("EndTime")
+                    .HasColumnType("interval");
 
-                    b.Property<bool>("IsClosed")
-                        .HasColumnType("boolean");
+                b.Property<bool>("IsClosed")
+                    .HasColumnType("boolean");
 
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid");
+                b.Property<Guid>("OwnerId")
+                    .HasColumnType("uuid");
 
-                    b.Property<TimeSpan>("StartTime")
-                        .HasColumnType("interval");
+                b.Property<TimeSpan>("StartTime")
+                    .HasColumnType("interval");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("WorkingHours");
-                });
+                b.ToTable("WorkingHours");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.AppointmentServiceOffering", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.Appointment", "Appointment")
-                        .WithMany("ServiceOfferings")
-                        .HasForeignKey("AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("Entities.Concrete.Entities.Appointment", "Appointment")
+                    .WithMany("ServiceOfferings")
+                    .HasForeignKey("AppointmentId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("Appointment");
-                });
+                b.Navigation("Appointment");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Category", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.Category", "Parent")
-                        .WithMany()
-                        .HasForeignKey("ParentId");
+            {
+                b.HasOne("Entities.Concrete.Entities.Category", "Parent")
+                    .WithMany()
+                    .HasForeignKey("ParentId");
 
-                    b.Navigation("Parent");
-                });
+                b.Navigation("Parent");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Rating", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.User", "RatedFrom")
-                        .WithMany()
-                        .HasForeignKey("RatedFromId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("Entities.Concrete.Entities.User", "RatedFrom")
+                    .WithMany()
+                    .HasForeignKey("RatedFromId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("RatedFrom");
-                });
+                b.Navigation("RatedFrom");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Setting", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("Entities.Concrete.Entities.User", "User")
+                    .WithMany()
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.User", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.Image", "Image")
-                        .WithMany()
-                        .HasForeignKey("ImageId")
-                        .OnDelete(DeleteBehavior.SetNull);
+            {
+                b.HasOne("Entities.Concrete.Entities.Image", "Image")
+                    .WithMany()
+                    .HasForeignKey("ImageId")
+                    .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Image");
-                });
+                b.Navigation("Image");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.UserFcmToken", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("Entities.Concrete.Entities.User", "User")
+                    .WithMany()
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.UserOperationClaim", b =>
-                {
-                    b.HasOne("Entities.Concrete.Entities.OperationClaim", "OperationClaim")
-                        .WithMany("UserOperationClaims")
-                        .HasForeignKey("OperationClaimId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("Entities.Concrete.Entities.OperationClaim", "OperationClaim")
+                    .WithMany("UserOperationClaims")
+                    .HasForeignKey("OperationClaimId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.HasOne("Entities.Concrete.Entities.User", "User")
-                        .WithMany("UserOperationClaims")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                b.HasOne("Entities.Concrete.Entities.User", "User")
+                    .WithMany("UserOperationClaims")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("OperationClaim");
+                b.Navigation("OperationClaim");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.Appointment", b =>
-                {
-                    b.Navigation("ServiceOfferings");
-                });
+            {
+                b.Navigation("ServiceOfferings");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.OperationClaim", b =>
-                {
-                    b.Navigation("UserOperationClaims");
-                });
+            {
+                b.Navigation("UserOperationClaims");
+            });
 
             modelBuilder.Entity("Entities.Concrete.Entities.User", b =>
-                {
-                    b.Navigation("UserOperationClaims");
-                });
+            {
+                b.Navigation("UserOperationClaims");
+            });
 #pragma warning restore 612, 618
         }
     }
