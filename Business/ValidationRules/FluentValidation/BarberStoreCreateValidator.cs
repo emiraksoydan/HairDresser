@@ -10,7 +10,9 @@ public class BarberStoreCreateDtoValidator : AbstractValidator<BarberStoreCreate
     {
         // Temel alanlar
         RuleFor(x => x.StoreName)
-            .NotEmpty().WithMessage("İşletme adı zorunludur.");
+            .NotEmpty().WithMessage("İşletme adı zorunludur.")
+            .MinimumLength(2).WithMessage("İşletme adı en az 2 karakter olmalıdır.")
+            .MaximumLength(100).WithMessage("İşletme adı en fazla 100 karakter olabilir.");
 
         RuleFor(x => x.Type)
             .IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir.");

@@ -12,8 +12,14 @@ namespace Business.ValidationRules.FluentValidation
     {
         public FreeBarberDtoValidator()
         {
-            RuleFor(x => x.FirstName).NotEmpty().WithMessage(" Ad zorunludur");
-            RuleFor(x => x.LastName).NotEmpty().WithMessage(" Soyad zorunludur");
+            RuleFor(x => x.FirstName)
+                .NotEmpty().WithMessage("Ad zorunludur")
+                .MinimumLength(2).WithMessage("Ad en az 2 karakter olmalıdır")
+                .MaximumLength(50).WithMessage("Ad en fazla 50 karakter olabilir");
+            RuleFor(x => x.LastName)
+                .NotEmpty().WithMessage("Soyad zorunludur")
+                .MinimumLength(2).WithMessage("Soyad en az 2 karakter olmalıdır")
+                .MaximumLength(50).WithMessage("Soyad en fazla 50 karakter olabilir");
             RuleFor(x => x.Type).NotNull().WithMessage("İşletme türü zorunludur").IsInEnum().WithMessage("Geçerli bir işletme türü seçilmelidir");
             RuleFor(x => x.Offerings).NotNull().WithMessage("Hizmet listesi zorunludur").Must(x => x.Count > 0).WithMessage("En az bir hizmet girilmelidir");
             RuleForEach(x => x.Offerings).ChildRules(o =>

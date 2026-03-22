@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260321174642_AddMessageReadReceipts")]
-    partial class AddMessageReadReceipts
+    [Migration("20260322152736_mig-1")]
+    partial class mig1
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -219,6 +219,10 @@ namespace DataAccess.Migrations
                         .HasColumnType("double precision");
 
                     b.Property<string>("StoreName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StoreNo")
                         .IsRequired()
                         .HasColumnType("text");
 

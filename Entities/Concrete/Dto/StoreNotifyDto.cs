@@ -17,6 +17,7 @@ namespace Entities.Concrete.Dto
         public BarberType? Type { get; set; }
         public bool? IsInFavorites { get; set; } // Bu dükkan favorilerde mi?
         public string? AddressDescription { get; set; } // Dükkan adres açıklaması
-        public string? StoreOwnerNumber { get; set; } // Dükkan sahibi numarası
+        public string? StoreOwnerNumber { get; set; } // Dükkan sahibi numarası (kullanıcı no)
+        public string? StoreNo { get; set; } // Dükkan özelinde benzersiz numara
     }
 }

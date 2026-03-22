@@ -219,6 +219,10 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("StoreNo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("TaxDocumentImageId")
                         .HasColumnType("uuid");
 

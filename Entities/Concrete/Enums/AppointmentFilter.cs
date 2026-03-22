@@ -11,5 +11,6 @@ namespace Entities.Concrete.Enums
         Active = 1,
         Completed = 2,
         Cancelled = 3,
+        Pending = 4,
     }
 }

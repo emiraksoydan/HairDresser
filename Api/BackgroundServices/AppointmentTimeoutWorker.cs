@@ -375,15 +375,24 @@ namespace Api.BackgroundServices
                 await UpdateNotificationPayloadAsync(notif, trackedAppt, db, realtime, stoppingToken);
             }
 
-            // ÖNEMLİ: Mevcut notification'ı olmayan kullanıcılara yeni AppointmentUnanswered notification gönder
             var allParticipantUserIds = new[] { trackedAppt.CustomerUserId, trackedAppt.BarberStoreUserId, trackedAppt.FreeBarberUserId }
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
                 .Distinct()
                 .ToList();
 
+            // FIX: AppointmentUnanswered bildirimi zaten olan kullanıcıları bul (duplicate önleme)
+            // Eski davranış: mevcut notification'ı olmayan kullanıcılara gönder
+            // Yeni davranış: AppointmentUnanswered tipinde bildirimi olmayan TÜM katılımcılara gönder
+            // Böylece müşteri AppointmentCreated bildirimi olsa bile yeni bir Unanswered bildirimi alır
+            var usersWithUnansweredNotification = await db.Notifications
+                .Where(n => n.AppointmentId == trackedAppt.Id && n.Type == NotificationType.AppointmentUnanswered)
+                .Select(n => n.UserId)
+                .Distinct()
+                .ToListAsync(stoppingToken);
+
             var usersWithoutNotifications = allParticipantUserIds
-                .Where(userId => !usersWithExistingNotifications.Contains(userId))
+                .Where(userId => !usersWithUnansweredNotification.Contains(userId))
                 .ToList();
 
             if (usersWithoutNotifications.Any() && trackedAppt.Status == AppointmentStatus.Unanswered)

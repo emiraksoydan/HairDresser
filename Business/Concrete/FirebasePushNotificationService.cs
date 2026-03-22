@@ -147,8 +147,10 @@ namespace Business.Concrete
                                     priority = "high",
                                     notification = new
                                     {
-                                        sound = "default",
-                                        channelId = "default"
+                                        sound = "default"
+                                        // channelId belirtilmez → FCM otomatik olarak
+                                        // fcm_fallback_notification_channel kullanır
+                                        // (Firebase SDK tarafından her cihazda otomatik oluşturulur)
                                     }
                                 },
                                 apns = new

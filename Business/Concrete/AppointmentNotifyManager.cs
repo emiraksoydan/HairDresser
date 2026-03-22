@@ -212,7 +212,8 @@ namespace Business.Concrete
                     ImageUrl = storeImageUrl,
                     Type = store.Type,
                     AddressDescription = store.AddressDescription,
-                    StoreOwnerNumber = storeOwnerNumber
+                    StoreOwnerNumber = storeOwnerNumber,
+                    StoreNo = store.StoreNo
                 };
             }
 

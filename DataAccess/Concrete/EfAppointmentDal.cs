@@ -193,6 +193,9 @@ namespace DataAccess.Concrete
                 case AppointmentFilter.Cancelled:
                     query = query.Where(x => x.Status == AppointmentStatus.Cancelled || x.Status == AppointmentStatus.Rejected || x.Status == AppointmentStatus.Unanswered);
                     break;
+                case AppointmentFilter.Pending:
+                    query = query.Where(x => x.Status == AppointmentStatus.Pending);
+                    break;
             }
 
             var appointments = await query.ToListAsync();

@@ -58,6 +58,7 @@ namespace Business.Resources
         public const string FreeBarberNotAllowedForStoreAppointment = "Dükkan randevusunda serbest berber seçilemez.";
         public const string FreeBarberUpdateUnauthorized = "Bu serbest berberi güncelleme yetkiniz yok";
         public const string FreeBarberPanelAlreadyExists = "Zaten bir serbest berber paneliniz bulunmaktadır. Her kullanıcının sadece bir paneli olabilir.";
+        public const string FreeBarberPanelRequired = "Randevu oluşturmak için önce serbest berber panelinizi oluşturmanız gerekmektedir.";
 
         // Customer Messages
         public const string CustomerHasActiveAppointment = "Müşterinin aktif (Bekleyen/Onaylanmış) randevusu var.";

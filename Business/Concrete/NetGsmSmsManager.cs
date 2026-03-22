@@ -20,7 +20,7 @@ namespace Business.Concrete
     public class NetGsmSmsManager : ISmsVerifyService
     {
         private const string OTP_ENDPOINT = "https://api.netgsm.com.tr/sms/rest/v2/otp";
-        private const int OTP_EXPIRY_MINUTES = 5;
+        private const int OTP_EXPIRY_MINUTES = 2;
         private const string CACHE_PREFIX = "otp_";
         private const string ATTEMPTS_PREFIX = "otp_attempts_";
         private const string DEV_OTP_CODE = "123456";

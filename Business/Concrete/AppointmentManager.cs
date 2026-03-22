@@ -328,7 +328,7 @@ namespace Business.Concrete
             }
 
             var fb = await freeBarberDal.Get(x => x.FreeBarberUserId == freeBarberUserId);
-            if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberNotFound);
+            if (fb is null) return new ErrorDataResult<Guid>(Messages.FreeBarberPanelRequired);
 
             // Engelleme kontrolü: FreeBarber ve Store Owner arasında engelleme var mı? (çift yönlü)
             var hasBlock = await blockedHelper.HasBlockBetweenAsync(freeBarberUserId, store.BarberStoreOwnerId);

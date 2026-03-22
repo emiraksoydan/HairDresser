@@ -15,6 +15,7 @@ namespace Entities.Concrete.Entities
         public Guid Id { get; set; }
         public Guid BarberStoreOwnerId { get; set; }
         public string StoreName { get; set; }
+        public string StoreNo { get; set; } // Dükkan numarası - 6 haneli benzersiz numara
         public string AddressDescription { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }

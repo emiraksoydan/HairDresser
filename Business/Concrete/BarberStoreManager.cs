@@ -185,8 +185,23 @@ namespace Business.Concrete
         {
             BarberStore store = dto.Adapt<BarberStore>();
             store.BarberStoreOwnerId = currentUserId;
+            store.StoreNo = await GenerateUniqueStoreNoAsync();
             await barberStoreDal.Add(store);
             return store;
+        }
+
+        private async Task<string> GenerateUniqueStoreNoAsync()
+        {
+            var random = new Random();
+            string storeNo;
+            do
+            {
+                // 6 haneli rastgele sayı (100000-999999)
+                storeNo = random.Next(100000, 999999).ToString();
+                var existing = await barberStoreDal.Get(s => s.StoreNo == storeNo);
+                if (existing == null) break;
+            } while (true);
+            return storeNo;
         }
 
         private async Task SaveManuelBarbersAsync(BarberStoreCreateDto dto, Guid storeId)
